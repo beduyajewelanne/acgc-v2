@@ -1,29 +1,44 @@
-const express = require("express");
-const cors = require("cors");
-const { MongoClient } = require("mongodb");
+// server/index.js
+
 require("dotenv").config();
-const uri = process.env.ATLAS_URI;
-const client = new MongoClient(uri);
 
+const express    = require("express");
+const cors       = require("cors");
+const { closeDB } = require("./helper/db");
 
-const app = express();
-app.use(cors());
+const authRoutes = require("./server/authRoutes");
+
+const app  = express();
+const PORT = process.env.PORT || 5000;
+
+// ── Middleware ────────────────────────────────────────────────────────────────
+
+app.use(cors({
+  origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
+  credentials: true,
+}));
+
 app.use(express.json());
 
-// let db;
+// ── Routes ────────────────────────────────────────────────────────────────────
 
-// async function connectDB() {
-//   await client.connect();
-//   db = client.db("mern_demo");
-//   console.log("✅ Connected to MongoDB");
-// }
-// connectDB();
+app.use("/api/auth", authRoutes);
 
-app.get("/api/test", async (req, res) => {
-  const collection = db.collection("items");
-  const items = await collection.find({}).toArray();
-  res.json(items);
-}); 
+// Health check
+app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
+// ── Start ─────────────────────────────────────────────────────────────────────
 
-app.listen(process.env.PORT, () => console.log(`🚀 Server running on port ${process.env.PORT}`));
+const server = app.listen(PORT, () => {
+  console.log(`[server] Running on http://localhost:${PORT}`);
+});
+
+// Graceful shutdown
+async function shutdown() {
+  server.close(async () => {
+    await closeDB();
+    process.exit(0);
+  });
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT",  shutdown);

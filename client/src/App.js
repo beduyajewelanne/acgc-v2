@@ -42,6 +42,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './views/pages/Login'; // verify this matches your structure
 import SignUpForm from './views/pages/SignUpForm'; 
+import ForgotPassword from './views/pages/ForgotPassword';
+
 
 function App() {
   return (
@@ -49,6 +51,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUpForm />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         {/* Fallback route */}
         <Route path="*" element={<Login />} />
       </Routes>

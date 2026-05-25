@@ -19,7 +19,10 @@ authRoutes.post("/api/login", async (req, res) => {
         const userQuery = [
             {
                 $match: {
-                    email: decrypted_payload.email,
+                    $or: [
+                        { email: { $regex: `^${decrypted_payload.email}$`, $options: "i" } },
+                        { username: { $regex: `^${decrypted_payload.email}$`, $options: "i" } }
+                    ]
                 }
             }
         ];

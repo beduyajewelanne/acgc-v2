@@ -1,11 +1,18 @@
-import React from 'react';
+import React, { useContext, useEffect} from 'react';
 import './CustomerDashboard.css'; 
 import { useNavigate } from 'react-router-dom';
 import FeatureCard from '../../../components/FeatureCard'; 
 import ProductCard from '../../../components/ProductCard';
+import { UserContext } from 'App';
+import { isEmpty } from 'services/data.services';
 const CustomerDashboard = ({ isLoggedIn }) => {
   const navigate = useNavigate(); //
-  
+  const { user } = useContext(UserContext);
+  useEffect(() => {
+    if (user && !isEmpty(user.token)) {
+      console.log("User is logged in:", user);
+    }
+  }, [user])
     return (
     <div className="homepage-container">
       <section className="hero-banner">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './SignUpForm.css';
+import { CRUD } from 'services/data.services';
 
 const PH_GEOGRAPHY_REGISTRY = {
   "Abra": ["Bangued", "Boliney", "Bucay", "Bucloc", "Daguioman", "Danglas", "Dolores", "La Paz", "Lacub", "Lagangilang", "Lagayan", "Langiden", "Licuan-Baay", "Luba", "Malibcong", "Manabo", "Peñarrubia", "Pidigan", "Pilar", "Sallapadan", "San Isidro", "San Juan", "San Quintin", "Tayum", "Tineg", "Tubo", "Villaviciosa"],
@@ -161,7 +162,34 @@ const SignUpForm = () => {
       setFeedback(errors);
     } else {
       setFeedback([]);
-      alert("Registration Successful!");
+      const url = window.base_api + "register";
+      const requestOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData })
+      };
+      CRUD(url, requestOptions, (res) => {
+        if (res.remarks == "success") {
+          alert("Registration Successful!");
+          setFormData({
+            firstName: '',
+            lastName: '',
+            email: '',
+            username: '',
+            phone: '',
+            address: '',
+            province: '',
+            city: '',
+            barangay: '',
+            zipCode: '',            
+            password: '',
+            confirmPassword: '',
+            termsAccepted: false
+          });
+        } else {
+          alert("Registration Failed: " + res.message);
+        }
+      });
       console.log("Form Output Payload: ", formData);
     }
   };

@@ -1,45 +1,40 @@
-// server/helper/db.js
-// Native MongoDB connection — no Mongoose
-
 const { MongoClient } = require("mongodb");
+const Db = process.env.ATLAS_URI;
+const app_env = process.env.REACT_APP_ENV;
+if (!Db) {
+  console.error("❌ Error: ATLAS_URI is not defined in your environment variables.");
+}
 
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017";
-const DB_NAME   = process.env.DB_NAME   || "acgc";
+const client = new MongoClient(Db);
+let _db;
 
-let client = null;
-let db     = null;
-
-/**
- * Returns a connected MongoClient instance (singleton).
- */
-async function getClient() {
-  if (!client) {
-    client = new MongoClient(MONGO_URI);
+async function connectToServer(callback) {
+  try {
     await client.connect();
-  }
-  return client;
-}
+    if (app_env === "development") {
+      _db = client.db("acgc-development");
+      console.log("Development Server");
+      console.log("Successfully connected to MongoDB.");
+    } else if (app_env === "production") {
+      _db = client.db("acgc-production");
+      console.log("Production Server");
+      console.log("Successfully connected to MongoDB.");
+    } else {
+      console.log("Application environment (REACT_APP_ENV) not recognized. Not connected to a specific server instance.");
+    }
 
-/**
- * Returns the default database handle.
- */
-async function getDB() {
-  if (!db) {
-    const c = await getClient();
-    db = c.db(DB_NAME);
-  }
-  return db;
-}
-
-/**
- * Gracefully close the connection (call on process exit).
- */
-async function closeDB() {
-  if (client) {
-    await client.close();
-    client = null;
-    db     = null;
+    if (typeof callback === "function") callback(null);
+  } catch (err) {
+    console.error("Failed to connect to MongoDB:", err.message);
+    if (typeof callback === "function") callback(err);
   }
 }
 
-module.exports = { getDB, closeDB };
+function getDb() {
+  return _db;
+}
+
+module.exports = {
+  connectToServer,
+  getDb
+};

@@ -1,6 +1,8 @@
-const bcrypt = require("bcrypt");
+import bcrypt from "bcrypt";
 const saltRounds = 10;
-const { MongoClient, ObjectId } = require("mongodb");
+// const { MongoClient, ObjectId } = require("mongodb");
+import { ObjectId, MongoClient } from "mongodb";
+import {getDb, connectToServer} from "./db.js";
 /**
  * 
  * @param {any} data 
@@ -14,6 +16,25 @@ export function isEmpty(data) {
   return false;
 }
 
+export function decrypt(data) {
+  try {
+    const decoded = atob(data);
+    return JSON.parse(decoded);
+  } catch (err) {
+    console.error("Decryption error:", err.message);
+    return null;
+  }
+}
+
+export function encrypt(data) {
+  try {
+    const stringData = typeof data === "object" ? JSON.stringify(data) : data;
+    return btoa(stringData);
+  } catch (err) {
+    console.error("Encryption error:", err.message);
+    return null;
+  }
+}
 /**
  * Hash a raw password
  * @param {string} rawPassword
@@ -46,7 +67,7 @@ export async function validateHash(inputPassword, passwordHashed) {
  * @returns {Promise<object>} Result object
  */
 export async function insert_one_helper(target_collection, data) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     const inserted_result = await db_connect
@@ -78,7 +99,7 @@ export async function insert_one_helper(target_collection, data) {
  * @returns {Promise<object>} Result object
  */
 export async function update_one_helper(target_collection, target_query, set_data) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     const result = await db_connect
@@ -117,7 +138,7 @@ export async function update_one_helper(target_collection, target_query, set_dat
  * @returns {Promise<object>} Result object
  */
 export async function delete_or_archive_helper(target_collection, target_query, archive = false) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     let result;
@@ -166,7 +187,7 @@ export async function delete_or_archive_helper(target_collection, target_query, 
  * @returns {Promise<object>} Result object
  */
 export async function delete_or_archive_many_helper(target_collection, target_query, archive = false) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     let result;
@@ -217,7 +238,7 @@ export async function delete_or_archive_many_helper(target_collection, target_qu
  * @returns {Promise<object>} Result object
  */
 export async function get_data_helper(target_collection, target_query = {}) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     let result;
@@ -256,7 +277,7 @@ export async function get_data_helper(target_collection, target_query = {}) {
  * @returns {Promise<object>} Result object
  */
 export async function check_record_exists(target_collection, query = {}) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     let result;
@@ -298,11 +319,7 @@ export async function check_record_exists(target_collection, query = {}) {
  */
 async function restore_data(target_collection, _id, db) {
   try {
-    let db_connect = dbo.getDb();
-
-    if (db && typeof db !== "undefined") {
-      db_connect = await dbo.getotherDB(db);
-    }
+    let db_connect = getDb();
 
     const myquery = { _id: new ObjectId(_id) };
     const newvalues = { $set: { archive: 0 } };

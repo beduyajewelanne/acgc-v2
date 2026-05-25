@@ -15,16 +15,31 @@ export async function CRUD(url, requestOptions, callback){
  * 
  * @param {string} data 
  */
-export async function encrypt(data){
-  return btoa(data);
+export function encrypt(data) {
+  try {
+    // Convert object to a JSON string first
+    const stringData = typeof data === "object" ? JSON.stringify(data) : data;
+    return btoa(stringData);
+  } catch (err) {
+    console.error("Encryption error:", err.message);
+    return null;
+  }
 }
 
 /**
  * 
  * @param {string} data 
  */
-export async function decrypt(data){
-  return atob(data);
+export function decrypt(data) {
+  try {
+    // Decode the base64 string
+    const decoded = atob(data);
+    // Parse it back into a JavaScript object
+    return JSON.parse(decoded);
+  } catch (err) {
+    console.error("Decryption error:", err.message);
+    return null;
+  }
 }
 
 /**

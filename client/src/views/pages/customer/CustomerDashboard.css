@@ -1,0 +1,53 @@
+/* CustomerDashboard.css */
+:root {
+  --primary-red: #8b1e22; /* A deep, professional maroon-red */
+  --light-red: #f4e8e8;   /* Soft background for sections */
+  --white: #ffffff;
+  --text-dark: #333333;
+}
+
+.homepage-container {
+  background-color: var(--white);
+  color: var(--text-dark);
+}
+
+.dashboard-container {
+    padding: 2rem;
+    background-color: var(--bg-color);
+    min-height: 100vh;
+}
+
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 20px;
+    padding: 20px;
+}
+
+.product-card {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    transition: transform 0.3s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+}
+
+.order-btn {
+    background-color: var(--primary-red);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 15px;
+    font-weight: 600;
+}
+
+.order-btn:hover {
+    background-color: #6D1111;
+}

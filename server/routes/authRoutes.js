@@ -3,7 +3,8 @@ const authRoutes = express.Router();
 const port = process.env.PORT || 5000;
 const dbo = require("../helper/db");
 const nodemailer = require("nodemailer");
-const { get_data_helper, check_record_exists, decrypt, insert_one_helper, validateHash, hashPass } = require("../helper/Helper");
+const crypto = require("crypto");
+const { get_data_helper, check_record_exists, decrypt, insert_one_helper, validateHash, hashPass, update_one_helper } = require("../helper/Helper");
 
 authRoutes.post("/api/login", async (req, res) => {
     try {
@@ -35,12 +36,15 @@ authRoutes.post("/api/login", async (req, res) => {
             const isPasswordValid = await validateHash(decrypted_payload.password, user.password);
 
             if (isPasswordValid) {
+                const token = crypto.randomBytes(32).toString("hex");
+                await update_one_helper("users", { _id: user._id }, { $set: { token, lastLogin: new Date() } });
+
                 delete user.password;
 
                 return res.json({
                     remarks: "success",
                     message: "Login successful",
-                    payload: user,
+                    payload: {...user, token},
                 });
             }
         }
@@ -62,18 +66,18 @@ authRoutes.post("/api/register", async (req, res) => {
             firstName,
             lastName,
             email,
-            phoneNumber,
-            streetAddress,
+            phone,
+            address,
             province,
-            cityMunicipality,
+            city,
             barangay,
             zipCode,
             username,
             password
         } = req.body;
 
-        if (!firstName || !lastName || !email || !phoneNumber || !streetAddress || 
-            !province || !cityMunicipality || !barangay || !zipCode || !username || !password) {
+        if (!firstName || !lastName || !email || !phone || !address || 
+            !province || !city || !barangay || !zipCode || !username || !password) {
             return res.status(400).json({ 
                 remarks: "failed", 
                 message: "All fields are required" 
@@ -119,17 +123,15 @@ authRoutes.post("/api/register", async (req, res) => {
             firstName,
             lastName,
             email,
-            phoneNumber,
-            address: {
-                streetAddress,
-                province,
-                cityMunicipality,
-                barangay,
-                zipCode
-            },
+            phone,
+            address,
+            province,
+            city,
+            barangay,
+            zipCode,
             username,
             password: hashedPassword,
-            userType: "client",
+            role: "client",
             createdAt: new Date()
         };
 

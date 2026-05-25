@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { Link } from 'react-router-dom';
-
+import React, { useState, useEffect, useContext } from "react";
+import { Link, useNavigate } from 'react-router-dom';
+import { CRUD, encrypt } from "services/data.services";
+import { UserContext } from "App";
 export default function Login() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ emailOrUsername: "", password: "", remember: false });
   const [message, setMessage] = useState(null); // { type: "error"|"warning"|"success", text }
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { user, setUser } = useContext(UserContext);
 
   // Admin modal state
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -70,41 +73,41 @@ export default function Login() {
     setMessage(null);
     setLoading(true);
 
-    const payload = {
-      emailOrUsername: encodeField(form.emailOrUsername),
-      password: encodeField(form.password),
+    const payload = encrypt({
+      email: form.emailOrUsername,
+      password: form.password
+    });
+
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payload: payload })
     };
 
     try {
-      const res = await fetch(window.base_api + "auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      CRUD(window.base_api + "login", requestOptions, async (res) => {
+        if(res.remarks === "success") {
+          const data = res.payload;
+          localStorage.setItem("userData", JSON.stringify(data));
+          if (form.remember) {
+            setCookie("saved_email", form.emailOrUsername, 30);
+          } else {
+            setCookie("saved_email", "", -1);
+          }
+          setMessage({ type: "success", text: "Login successful." });
+          const { role } = data;
+          await setUser(data);
+          if (role === "admin") {
+            navigate("/admin/dashboard");
+          } else if (role === "skilled_worker") {
+            navigate("/worker/dashboard");
+          } else {
+            navigate("/]");
+          }
+        }  else {
+          setMessage({ type: "error", text: res.message || "Invalid email or password." });
+        }
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMessage({ type: "error", text: data.message || "Login failed." });
-        return;
-      }
-
-      localStorage.setItem("token", data.token);
-
-      if (form.remember) {
-        setCookie("saved_email", form.emailOrUsername, 30);
-      } else {
-        setCookie("saved_email", "", -1);
-      }
-
-      const { role } = data.user;
-      if (role === "admin") {
-        window.location.href = "/admin/dashboard";
-      } else if (role === "skilled_worker") {
-        window.location.href = "/worker/dashboard";
-      } else {
-        window.location.href = "/dashboard";
-      }
     } catch {
       setMessage({ type: "error", text: "Network error. Please try again." });
     } finally {

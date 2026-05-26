@@ -17,6 +17,7 @@ import CustomerRoutes from './views/pages/customer/CustomerRoutes';
 import BrowseProducts from './views/pages/customer/BrowseProducts';
 import CustomerDashboard from './views/pages/customer/CustomerDashboard';
 import TrackProducts from './views/pages/customer/TrackProduct';
+import { CartProvider } from './context/CartContext';
 
 export const UserContext = createContext();
 
@@ -40,7 +41,6 @@ export function useStateCallback(initialState) {
   return [state, setStateCallback];
 }
 
-// Sub-component para makuha ang location context (dapat nasa loob ng Router)
 const AppContent = ({ isLoggedIn }) => {
   const location = useLocation();
   const hideFooterRoutes = ['/login', '/signup', '/forgot-password'];
@@ -57,10 +57,10 @@ const AppContent = ({ isLoggedIn }) => {
         <Route path="/*" element={
           <DashboardLayout isLoggedIn={isLoggedIn}>
             <Routes>
-              <Route path="/" element={<CustomerDashboard isLoggedIn={isLoggedIn} />} />
-              <Route path="/customer/products" element={<BrowseProducts />} />
-              <Route path="/track" element={<TrackProducts />} />
-              <Route path="/about" element={<AboutUs />} />
+             ]<Route index element={<CustomerDashboard isLoggedIn={isLoggedIn} />} />
+              <Route path="customer/products" element={<BrowseProducts />} />
+              <Route path="track" element={<TrackProducts />} />
+              <Route path="about" element={<AboutUs />} />
               <Route path="/customer/*" element={
                 isLoggedIn ? <CustomerRoutes /> : <Navigate to="/login" />
               } />
@@ -106,9 +106,12 @@ function App() {
 
   return (
     <UserContext.Provider value={{ user, setUser }}>
-      <Router>
-        <AppContent isLoggedIn={isLoggedIn} />
-      </Router>
+      {/* WRAP EVERYTHING INSIDE CartProvider */}
+      <CartProvider>
+        <Router>
+          <AppContent isLoggedIn={isLoggedIn} />
+        </Router>
+      </CartProvider>
     </UserContext.Provider>
   );
 }

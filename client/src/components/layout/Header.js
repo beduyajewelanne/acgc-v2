@@ -33,7 +33,7 @@ const Header = ({ isLoggedIn }) => {
           <>
             <Link to="/cart" className="cart-icon" ><FaShoppingCart size={30} /></Link>
             <Link to="/customer/products">Browse Products</Link>
-            <Link to="/customer/orders">Your Orders</Link>
+            <Link to="/orders">Your Orders</Link>
             <Link to="/about">About</Link>
             <Link to="/profile">Profile</Link>
             <button className="logout-btn" onClick={handleLogout}>Log Out</button>

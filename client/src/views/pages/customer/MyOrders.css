@@ -1,0 +1,53 @@
+
+
+.order-main h3 { margin: 0 0 5px; color: #1a1a1a; }
+.order-main p { color: #777; font-size: 0.9rem; }
+
+.badge { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.badge.pending { background: #fff8e1; color: #856404; }
+.badge.delivered { background: #d4edda; color: #155724; }
+
+.orders-container { max-width: 900px; margin: 40px auto; padding: 20px; }
+
+/* Contact Panel */
+.contact-panel {
+  background: #fdf5f5; border: 1px solid #fce8e8;
+  padding: 20px; border-radius: 12px; margin-bottom: 30px;
+  color: #8b0000; display: flex; align-items: center; gap: 15px;
+}
+.contact-panel strong { font-weight: 700; }
+
+/* Order Card Redesign */
+.order-card { 
+  background: white; border: 1px solid #e8e6e3;
+  padding: 24px; border-radius: 16px; margin-bottom: 20px;
+}
+.order-header { display: flex; justify-content: space-between; align-items: start; }
+.upload-section { margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
+.file-input { margin-top: 10px; font-size: 0.85rem; color: #666; }
+
+/* Expansion transition */
+.order-details {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+  animation: fadeIn 0.3s ease;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.detail-grid label { font-size: 0.75rem; color: #888; display: block; }
+.detail-grid p { margin: 0; font-weight: 600; color: #333; }
+
+.order-links { display: flex; gap: 10px; margin-bottom: 20px; }
+.link-btn { 
+  font-size: 0.8rem; text-decoration: none; color: #8b0000; 
+  border: 1px solid #8b0000; padding: 5px 12px; border-radius: 6px;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

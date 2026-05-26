@@ -19,6 +19,7 @@ import CustomerDashboard from './views/pages/customer/CustomerDashboard';
 import TrackProducts from './views/pages/customer/TrackProduct';
 import { CartProvider } from './context/CartContext';
 import CustomerProfile from './views/pages/customer/CustomerProfile';
+import Contracts from './views/pages/customer/Contracts';
 
 export const UserContext = createContext();
 
@@ -63,6 +64,7 @@ const AppContent = ({ isLoggedIn }) => {
               <Route path="track" element={<TrackProducts />} />
               <Route path="about" element={<AboutUs />} />
               <Route path="profile" element={<CustomerProfile />} />
+              <Route path="contracts" element={<Contracts />} />
               <Route path="/customer/*" element={
                 isLoggedIn ? <CustomerRoutes /> : <Navigate to="/login" />
               } />

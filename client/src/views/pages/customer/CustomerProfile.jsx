@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import './CustomerProfile.css';
 import EditProfileModal from './EditProfileModal';
+import { useNavigate } from 'react-router-dom'; // Keep only one instance
 
 const CustomerProfile = () => {
+  const navigate = useNavigate(); // Added navigation hook
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [user, setUser] = useState({
     name: 'Jewel Anne Beduya',
@@ -19,7 +21,6 @@ const CustomerProfile = () => {
 
   const handleSave = (updatedUser) => {
     setUser(updatedUser);
-
   };
 
   return (
@@ -41,7 +42,7 @@ const CustomerProfile = () => {
       </div>
 
       <div className="cp-nav-grid">
-        <div className="cp-nav-item">
+        <div className="cp-nav-item" onClick={() => navigate('/orders')}>
           <svg className="cp-nav-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
             <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
@@ -51,7 +52,7 @@ const CustomerProfile = () => {
           <span className="cp-nav-sub">5 active</span>
         </div>
 
-        <div className="cp-nav-item">
+        <div className="cp-nav-item" onClick={() => navigate('/contracts')}>
           <svg className="cp-nav-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
@@ -63,7 +64,7 @@ const CustomerProfile = () => {
           <span className="cp-nav-sub">3 active</span>
         </div>
 
-        <div className="cp-nav-item">
+        <div className="cp-nav-item" onClick={() => navigate('/receipts')}>
           <svg className="cp-nav-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 11 12 14 22 4"/>
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>

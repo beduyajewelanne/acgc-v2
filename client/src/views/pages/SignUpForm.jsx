@@ -202,7 +202,7 @@ const SignUpForm = () => {
           <aside className="su-brand-panel">
             <div className="brand-panel-inner">
               <div className="brand-logo-wrap">
-                <img src="/images/cutyy.png" alt="ACGC Logo" />
+                <img src="/images/logo.png" alt="ACGC Logo" />
               </div>
               <div className="brand-copy">
                 <span className="brand-small">WELCOME TO</span>

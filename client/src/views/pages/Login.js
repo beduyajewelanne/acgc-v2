@@ -102,7 +102,7 @@ export default function Login() {
           } else if (role === "skilled_worker") {
             navigate("/worker/dashboard");
           } else {
-            navigate("/]");
+            navigate("/");
           }
         }  else {
           setMessage({ type: "error", text: res.message || "Invalid email or password." });
@@ -560,7 +560,7 @@ export default function Login() {
           <aside className="brand-panel">
             <div className="brand-inner">
               <div className="brand-logo">
-                <img src="images/cutyy.png" alt="ACGC Logo" />
+                <img src="images/logo.png" alt="ACGC Logo" />
               </div>
               <div className="brand-text">
                 <div className="small">WELCOME TO</div>

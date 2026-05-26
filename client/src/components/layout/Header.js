@@ -1,8 +1,28 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useContext } from 'react'; // Added useContext
+import { Link, useNavigate } from 'react-router-dom'; // Added useNavigate
+import { UserContext } from '../../App'; // Import UserContext (adjust path if needed)
 import './Header.css';
+import { FaShoppingCart } from 'react-icons/fa';
 
 const Header = ({ isLoggedIn }) => {
+  const navigate = useNavigate(); // Initialize navigate
+  const { setUser } = useContext(UserContext); // Access setUser from Context
+
+  const handleLogout = () => {
+    // 1. Clear local storage
+    localStorage.removeItem("userData");
+
+    // 2. Reset user state to initial empty values
+    setUser({
+      firstName: "", lastName: "", email: "", role: "",
+      token: "", address: "", barangay: "", city: "",
+      phone: "", _id: "",
+    });
+
+    // 3. Redirect to login page
+    navigate("/login");
+  };
+
   return (
     <header className="dashboard-header">
       <div className="logo">
@@ -10,16 +30,15 @@ const Header = ({ isLoggedIn }) => {
       </div>
       <nav className="nav-links">
         {isLoggedIn ? (
-
           <>
+            <Link to="/cart" className="cart-icon" ><FaShoppingCart size={30} /></Link>
             <Link to="/customer/products">Browse Products</Link>
             <Link to="/customer/orders">Your Orders</Link>
-            <Link to="/customer/about">About</Link>
+            <Link to="/about">About</Link>
             <Link to="/customer/profile">Profile</Link>
-            <button className="logout-btn">Log Out</button>
+            <button className="logout-btn" onClick={handleLogout}>Log Out</button>
           </>
         ) : (
-          // Guest Navigation (Not Logged In)
           <>
             <Link to="/customer/products">Browse Products</Link>
             <Link to="/track">Track Products</Link>

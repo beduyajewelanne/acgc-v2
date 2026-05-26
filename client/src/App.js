@@ -22,6 +22,7 @@ import CustomerProfile from './views/pages/customer/CustomerProfile';
 import Contracts from './views/pages/customer/Contracts';
 import Receipts from './views/pages/customer/Receipts';
 import MyOrders from './views/pages/customer/MyOrders';
+import Cart from './views/pages/customer/Cart';
 
 export const UserContext = createContext();
 
@@ -69,6 +70,7 @@ const AppContent = ({ isLoggedIn }) => {
               <Route path="contracts" element={<Contracts />} />
               <Route path="receipts" element={<Receipts />} />
               <Route path="orders" element={<MyOrders />} />
+              <Route path="cart" element={<Cart />} />
               <Route path="/customer/*" element={
                 isLoggedIn ? <CustomerRoutes /> : <Navigate to="/login" />
               } />

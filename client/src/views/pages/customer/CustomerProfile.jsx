@@ -1,17 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './CustomerProfile.css';
+import EditProfileModal from './EditProfileModal';
 
 const CustomerProfile = () => {
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [user, setUser] = useState({
+    name: 'Jewel Anne Beduya',
+    email: 'beduyajewelanne@gmail.com',
+    phone: '',
+  });
+
+  const getInitials = (name) => {
+    const parts = name.trim().split(' ');
+    const first = parts[0]?.[0] || '';
+    const last = parts[parts.length - 1]?.[0] || '';
+    return (first + (parts.length > 1 ? last : '')).toUpperCase();
+  };
+
+  const handleSave = (updatedUser) => {
+    setUser(updatedUser);
+
+  };
+
   return (
     <div className="cp-container">
 
       <div className="cp-profile-card">
-        <div className="cp-avatar">JA</div>
+        <div className="cp-avatar">{getInitials(user.name)}</div>
         <div className="cp-user-meta">
-          <h3 className="cp-name">Jewel Anne Beduya</h3>
-          <p className="cp-email">beduyajewelanne@gmail.com</p>
+          <h3 className="cp-name">{user.name}</h3>
+          <p className="cp-email">{user.email}</p>
         </div>
-        <button className="cp-edit-btn">
+        <button className="cp-edit-btn" onClick={() => setIsEditOpen(true)}>
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -87,6 +107,14 @@ const CustomerProfile = () => {
           </div>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        user={user}
+        onSave={handleSave}
+      />
 
     </div>
   );

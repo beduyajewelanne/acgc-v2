@@ -6,6 +6,50 @@ const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const { get_data_helper, check_record_exists, decrypt, insert_one_helper, validateHash, hashPass, update_one_helper } = require("../helper/Helper");
 
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: {
+        user: process.env.SMTP_EMAIL,
+        pass: process.env.SMTP_PASSWORD
+    }
+});
+
+function renderStatusPage(status, message) {
+    const isSuccess = status === "success";
+    const brandColor = isSuccess ? "#16a34a" : "#dc2626";
+    const icon = isSuccess ? "✓" : "×";
+    const bgIcon = isSuccess ? "#dcfce7" : "#fee2e2";
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>ACGC System - Email Verification</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body { font-family: Arial, sans-serif; background-color: #f3f4f6; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+            .card { background: white; max-width: 420px; width: 90%; padding: 40px 30px; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+            .status-icon { width: 72px; height: 72px; background-color: ${bgIcon}; color: ${brandColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; margin: 0 auto 20px auto; }
+            h2 { color: #1f2937; margin-bottom: 10px; font-size: 24px; }
+            p { color: #6b7280; font-size: 15px; line-height: 1.5; margin-bottom: 30px; }
+            .btn { background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; display: inline-block; }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="status-icon">${icon}</div>
+            <h2>${isSuccess ? 'Email Verified!' : 'Verification Failed'}</h2>
+            <p>${message}</p>
+            <a href="${process.env.CLIENT_URL}/login" class="btn">Go to Login</a>
+        </div>
+    </body>
+    </html>
+    `;
+}
+
 authRoutes.post("/api/login", async (req, res) => {
     try {
         const { payload } = req.body;
@@ -36,6 +80,14 @@ authRoutes.post("/api/login", async (req, res) => {
             const isPasswordValid = await validateHash(decrypted_payload.password, user.password);
 
             if (isPasswordValid) {
+                if (user.is_verified === false || user.is_verified == undefined) {
+                    return res.json({
+                        remarks: "failed",
+                        message: "Your email address has not been verified yet. Please check your inbox.",
+                        payload: null
+                    });
+                }
+
                 const token = crypto.randomBytes(32).toString("hex");
                 await update_one_helper("users", { _id: user._id }, { $set: { token, lastLogin: new Date() } });
 
@@ -99,7 +151,6 @@ authRoutes.post("/api/register", async (req, res) => {
             });
         }
 
-        // Check if username already exists
         const usernameCheckQuery = [
             { 
                 $match: { 
@@ -115,10 +166,9 @@ authRoutes.post("/api/register", async (req, res) => {
             });
         }
 
-        // Hash the password
         const hashedPassword = await hashPass(password);
+        const emailVerificationToken = crypto.randomBytes(32).toString("hex");
 
-        // Construct new user document
         const newUser = {
             firstName,
             lastName,
@@ -132,15 +182,56 @@ authRoutes.post("/api/register", async (req, res) => {
             username,
             password: hashedPassword,
             role: "client",
+            is_verified: false,
+            verificationToken: emailVerificationToken,
             createdAt: new Date()
         };
 
-        // Insert into MongoDB 
         const result = await insert_one_helper("users", newUser);
         if (result.remarks == "success") {
+            const verificationLink = `${process.env.API_URL}verify-email?token=${emailVerificationToken}`;
+
+            const htmlEmailContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333333;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="color: #2563eb; margin-bottom: 5px; font-size: 28px; font-weight: bold;">ACGC System</h1>
+                    <p style="color: #666666; margin: 0; font-size: 14px;">Welcome to the Platform</p>
+                </div>
+                <hr style="border: none; border-top: 2px solid #2563eb; margin-bottom: 20px;" />
+                <p style="font-size: 16px; line-height: 1.5;">Hello,</p>
+                <p style="font-size: 16px; line-height: 1.5;">Thank you for registering with ACGC System! Please click the button below to verify your email address and activate your account profile.</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${verificationLink}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; font-size: 16px; font-weight: bold; text-decoration: none; border-radius: 6px; display: inline-block; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);">
+                        Verify Email Address
+                    </a>
+                </div>
+
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 12px 15px; margin-bottom: 25px; font-size: 13px; color: #64748b; word-break: break-all;">
+                    <strong>If the button doesn't work, copy and paste this link into your browser:</strong><br />
+                    <a href="${verificationLink}" style="color: #2563eb;">${verificationLink}</a>
+                </div>
+
+                <p style="font-size: 14px; color: #5f6368; line-height: 1.5;">If you did not create this account, you can safely ignore this email.</p>
+                <p style="font-size: 14px; color: #333333; margin-top: 25px; line-height: 1.5;">
+                    Best regards,<br />
+                    <strong>ACGC System Team</strong>
+                </p>
+            </div>
+            `;
+
+            const mailOptions = {
+                from: `"ACGC System" <${process.env.SMTP_EMAIL}>`,
+                to: email,
+                subject: "ACGC System - Verify Your Email Address",
+                html: htmlEmailContent
+            };
+
+            await transporter.sendMail(mailOptions);
+
             return res.status(201).json({
                 remarks: "success",
-                message: "Account created successfully",
+                message: "Account created successfully. Please check your email to verify your account.",
                 payload: { userId: result.insertedId }
             });
         } else {
@@ -156,14 +247,29 @@ authRoutes.post("/api/register", async (req, res) => {
     }
 });
 
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-        user: process.env.SMTP_EMAIL,
-        pass: process.env.SMTP_PASSWORD
+authRoutes.get("/api/verify-email", async (req, res) => {
+    try {
+        const { token } = req.query;
+        if (!token) {
+            return res.status(400).send(renderStatusPage("failed", "Missing verification token."));
+        }
+
+        const db = dbo.getDb();
+        const user = await db.collection("users").findOne({ verificationToken: token });
+
+        if (!user) {
+            return res.status(400).send(renderStatusPage("failed", "Invalid or expired verification link."));
+        }
+
+        await update_one_helper("users", { _id: user._id }, { 
+            $set: { is_verified: true },
+            $unset: { verificationToken: "" } 
+        });
+
+        return res.send(renderStatusPage("success", "Email verified successfully! You can now log into your account."));
+    } catch (error) {
+        console.error("Email verification route error:", error);
+        return res.status(500).send(renderStatusPage("error", "An internal server error occurred."));
     }
 });
 
@@ -182,10 +288,7 @@ authRoutes.post("/api/forgot-password", async (req, res) => {
         const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
         const codeExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-        await db.collection("users").updateOne(
-            { _id: user._id },
-            { $set: { resetCode: verificationCode, resetCodeExpiry: codeExpiry } }
-        );
+        await update_one_helper("users", { _id: user._id }, { $set: { resetCode: verificationCode, resetCodeExpiry: codeExpiry } });
 
         const htmlEmailContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333333;">
@@ -245,7 +348,6 @@ authRoutes.post("/api/verify-code", async (req, res) => {
             return res.status(400).json({ remarks: "failed", message: "Invalid verification code" });
         }
 
-        // Check expiration
         if (new Date() > user.resetCodeExpiry) {
             return res.status(400).json({ remarks: "failed", message: "Code has expired. Please request a new one." });
         }
@@ -271,20 +373,17 @@ authRoutes.post("/api/reset-password", async (req, res) => {
             return res.status(400).json({ remarks: "failed", message: "Session expired or invalid code" });
         }
 
-        // Hash and save the brand new password
         const hashedPassword = await hashPass(newPassword);
         
-        await db.collection("users").updateOne(
-            { _id: user._id },
-            { 
-                $set: { password: hashedPassword },
-                $unset: { resetCode: "", resetCodeExpiry: "" } // Wipe token clean after use
-            }
-        );
+        await update_one_helper("users", { _id: user._id }, { 
+            $set: { password: hashedPassword },
+            $unset: { resetCode: "", resetCodeExpiry: "" }
+        });
 
         return res.json({ remarks: "success", message: "Password updated successfully" });
     } catch (error) {
         return res.status(500).json({ remarks: "error", message: "Internal server error" });
     }
 });
+
 module.exports = authRoutes;

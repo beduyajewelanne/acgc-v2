@@ -1,0 +1,260 @@
+/* CustomerProfile.css */
+
+.cp-container {
+  max-width: 860px;
+  margin: 40px auto;
+  padding: 0 20px;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── Profile Card ── */
+.cp-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 24px;
+  background: #fff;
+  border: 1px solid #eeece8;
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+
+.cp-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #faece7;
+  color: #993c1d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 17px;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.cp-user-meta {
+  flex: 1;
+}
+
+.cp-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 3px;
+}
+
+.cp-email {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+
+.cp-edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #993c1d;
+  background: transparent;
+  border: 1px solid #f0997b;
+  border-radius: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.cp-edit-btn:hover {
+  background: #faece7;
+  border-color: #d85a30;
+}
+
+/* ── Nav Grid ── */
+.cp-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.cp-nav-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid #eeece8;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.cp-nav-item:hover {
+  border-color: #d85a30;
+  background: #fffaf8;
+  transform: translateY(-1px);
+}
+
+.cp-nav-icon {
+  color: #993c1d;
+  margin-bottom: 4px;
+}
+
+.cp-nav-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.cp-nav-sub {
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* ── Section Header ── */
+.cp-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.cp-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.cp-view-all {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #993c1d;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.cp-view-all:hover {
+  opacity: 0.75;
+}
+
+/* ── Order List ── */
+.cp-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cp-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #fff;
+  border: 1px solid #eeece8;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.cp-order-item:hover {
+  border-color: #d85a30;
+  background: #fffaf8;
+}
+
+.cp-order-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cp-order-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #faece7;
+  color: #993c1d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cp-order-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 3px;
+}
+
+.cp-order-meta {
+  font-size: 12px;
+  color: #aaa;
+  margin: 0;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.cp-order-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Badges ── */
+.cp-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.cp-badge--pending {
+  background: #faeeda;
+  color: #854f0b;
+}
+
+.cp-badge--completed {
+  background: #eaf3de;
+  color: #3b6d11;
+}
+
+.cp-badge--cancelled {
+  background: #fcebeb;
+  color: #a32d2d;
+}
+
+.cp-chevron {
+  color: #ccc;
+}
+
+/* ── Responsive ── */
+@media (max-width: 580px) {
+  .cp-nav-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .cp-nav-item {
+    padding: 14px 12px;
+  }
+
+  .cp-profile-card {
+    flex-wrap: wrap;
+  }
+
+  .cp-edit-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

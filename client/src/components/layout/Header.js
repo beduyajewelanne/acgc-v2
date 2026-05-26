@@ -10,7 +10,7 @@ const Header = ({ isLoggedIn }) => {
       </div>
       <nav className="nav-links">
         {isLoggedIn ? (
-          // Logged In Navigation
+
           <>
             <Link to="/customer/products">Browse Products</Link>
             <Link to="/customer/orders">Your Orders</Link>

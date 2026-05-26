@@ -1,16 +1,29 @@
-import React , { useState , useCallback, createContext, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, UNSAFE_RouteContext } from 'react-router-dom';
-import Login from './views/pages/Login'; // verify this matches your structure
-import SignUpForm from './views/pages/SignUpForm'; 
+import React, { useState, useCallback, createContext, useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+
+
+// Pages
+import Login from './views/pages/Login';
+import SignUpForm from './views/pages/SignUpForm';
 import ForgotPassword from './views/pages/ForgotPassword';
+
+// Layout & Components
 import DashboardLayout from './components/layout/DashboardLayout';
+import Footer from './components/layout/Footer';
+import AboutUs from './components/AboutUs/AboutUs';
+
+// Customer Pages
 import CustomerRoutes from './views/pages/customer/CustomerRoutes';
 import BrowseProducts from './views/pages/customer/BrowseProducts';
 import CustomerDashboard from './views/pages/customer/CustomerDashboard';
+import TrackProducts from './views/pages/customer/TrackProduct';
+
 export const UserContext = createContext();
+
+// Helper para sa state with callback
 export function useStateCallback(initialState) {
   const [state, setState] = useState(initialState);
-  const cbRef = useRef(null); // init mutable ref container for callbacks
+  const cbRef = useRef(null);
 
   const setStateCallback = useCallback((state, cb) => {
     cbRef.current = cb;
@@ -27,23 +40,51 @@ export function useStateCallback(initialState) {
   return [state, setStateCallback];
 }
 
+// Sub-component para makuha ang location context (dapat nasa loob ng Router)
+const AppContent = ({ isLoggedIn }) => {
+  const location = useLocation();
+  const hideFooterRoutes = ['/login', '/signup', '/forgot-password'];
+  const shouldShowFooter = !hideFooterRoutes.includes(location.pathname);
+
+  return (
+    <>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignUpForm />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        
+        {/* Main Application Routes */}
+        <Route path="/*" element={
+          <DashboardLayout isLoggedIn={isLoggedIn}>
+            <Routes>
+              <Route path="/" element={<CustomerDashboard isLoggedIn={isLoggedIn} />} />
+              <Route path="/customer/products" element={<BrowseProducts />} />
+              <Route path="/track" element={<TrackProducts />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/customer/*" element={
+                isLoggedIn ? <CustomerRoutes /> : <Navigate to="/login" />
+              } />
+            </Routes>
+          </DashboardLayout>
+        } />
+      </Routes>
+      
+      {/* Dynamic Footer Rendering */}
+      {shouldShowFooter && <Footer />}
+    </>
+  );
+};
+
 function App() {
-      window.base_api =
-    typeof process.env.REACT_APP_API !== "undefined"
-      ? process.env.REACT_APP_API
-      : `http://localhost:5000/api/`;
+  // Global API base
+  window.base_api = typeof process.env.REACT_APP_API !== "undefined"
+    ? process.env.REACT_APP_API
+    : `http://localhost:5000/api/`;
+
   const [user, setUser] = useStateCallback({
-    firstName: "",
-    lastName: "",
-    email: "",
-    role: "",
-    token: "",
-    address: "",
-    barangay: "",
-    city: "",
-    email: "",
-    phone: "",
-    _id: "",
+    firstName: "", lastName: "", email: "", role: "",
+    token: "", address: "", barangay: "", city: "",
+    phone: "", _id: "",
   });
 
   const isLoggedIn = !!user.token;
@@ -64,34 +105,12 @@ function App() {
   }, [setUser]);
 
   return (
-    <>
     <UserContext.Provider value={{ user, setUser }}>
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<SignUpForm />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        
-        <Route path="/*" element={
-          <DashboardLayout isLoggedIn={isLoggedIn}>
-            <Routes>
-              {/* Homepage */}
-              <Route path="/" element={<CustomerDashboard isLoggedIn={isLoggedIn} />} />
-              <Route path="/customer/products" element={<BrowseProducts />} />
-              
-              {/* Protected Routes */}
-              <Route path="/customer/*" element={
-                isLoggedIn ? <CustomerRoutes /> : <Navigate to="/login" />
-              } />
-            </Routes>
-          </DashboardLayout>
-        } />
-      </Routes>
-    </Router>
+      <Router>
+        <AppContent isLoggedIn={isLoggedIn} />
+      </Router>
     </UserContext.Provider>
-    </>
   );
 }
 
 export default App;
-

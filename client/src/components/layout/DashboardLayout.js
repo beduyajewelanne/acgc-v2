@@ -1,11 +1,14 @@
 import React from 'react';
-import Header from './Header'; // This looks in the same folder
+import Header from './Header';
 
 const DashboardLayout = ({ children, isLoggedIn }) => {
   return (
-    <div className="app-container">
-      <Header isLoggedIn={isLoggedIn} />
-      <main className="content">
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+
+      <Header isLoggedIn={isLoggedIn} /> 
+
+
+      <main style={{ flex: 1 }}>
         {children}
       </main>
     </div>

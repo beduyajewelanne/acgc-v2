@@ -1,0 +1,40 @@
+.receipts-container { max-width: 900px; margin: 40px auto; padding: 20px; color: #333; }
+
+.receipt-card { 
+  background: #ffffff; 
+  padding: 30px; 
+  border: 1px solid #e8e6e3; 
+  border-radius: 16px; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03); 
+  margin-bottom: 15px;
+}
+
+.receipt-main h3 { margin: 0 0 8px; font-size: 1.25rem; color: #1a1a1a; }
+.receipt-main p { margin: 0; font-size: 0.9rem; color: #777; }
+
+.amount-badge { 
+  display: inline-block;
+  margin-top: 12px;
+  padding: 4px 12px;
+  background: #f0f4f8;
+  color: #2c3e50;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.btn { 
+  padding: 10px 20px; 
+  border-radius: 8px; 
+  border: 1px solid #dcdcdc; 
+  cursor: pointer; 
+  font-weight: 600; 
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  background: #f9f9f9;
+}
+
+.btn:hover { background: #f0f0f0; }

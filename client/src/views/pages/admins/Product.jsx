@@ -157,14 +157,25 @@ function UploadCard({ label, hint, image, onChange, onRemove }) {
   const handleDrop = (e) => {
     e.preventDefault(); setDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) { const r = new FileReader(); r.onload = ev => onChange(ev.target.result); r.readAsDataURL(file); }
+    if (file && file.type.startsWith('image/')) { 
+      const r = new FileReader(); 
+      r.onload = ev => onChange(ev.target.result); 
+      r.readAsDataURL(file); 
+    }
   };
+  
   const handleFile = (e) => {
     const file = e.target.files[0];
-    if (file) { const r = new FileReader(); r.onload = ev => onChange(ev.target.result); r.readAsDataURL(file); }
+    if (file) { 
+      const r = new FileReader(); 
+      r.onload = ev => onChange(ev.target.result); 
+      r.readAsDataURL(file); 
+    }
   };
 
-  const imgUrl = (image && image.startsWith('/uploads/')) ? (window.base_api.replace('/api/', '') + image) : image;
+  const imgUrl = (image && image.startsWith('/uploads/')) 
+    ? (window.base_api.replace('/api/', '') + image) 
+    : image;
 
   return (
     <div
@@ -172,7 +183,7 @@ function UploadCard({ label, hint, image, onChange, onRemove }) {
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
-      onClick={() => !image && inputRef.current?.click()}
+      onClick={() => !image && inputRef.current?.click()} // Fires custom ref click
     >
       {image ? (
         <>
@@ -184,7 +195,15 @@ function UploadCard({ label, hint, image, onChange, onRemove }) {
           <Icon.Upload />
           <span className="upload-card__label">{label}</span>
           {hint && <span className="upload-card__hint">{hint}</span>}
-          <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} />
+          
+          {/* ADD onClick STOP PROPAGATION HERE TO STOP DOUBLE DIALOGS */}
+          <input 
+            ref={inputRef} 
+            type="file" 
+            accept="image/*" 
+            onChange={handleFile} 
+            onClick={(e) => e.stopPropagation()} 
+          />
         </>
       )}
     </div>

@@ -291,7 +291,7 @@ const SignUpForm = () => {
                 </div>
 
                 <div className="form-group span-3">
-                  <label htmlFor="city">City / Municipality *</label>
+                  <label htmlFor="city">City/Municipality*</label>
                   <select id="city" name="city" value={formData.city} onChange={handleInputChange} disabled={!citiesList.length} required>
                     <option value="">Select City</option>
                     {citiesList.map((city) => (

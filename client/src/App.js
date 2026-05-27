@@ -293,8 +293,12 @@ function App() {
         setPermissionsLoaded(true);
       });
     } else {
-      setPermissions(null);
-      setPermissionsLoaded(true);
+      getAccessLevels(user, (data) => {
+        if (data) {
+          setPermissions(data);
+        }
+        setPermissionsLoaded(true);
+      });
     }
   }, [user]);
 

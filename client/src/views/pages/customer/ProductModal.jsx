@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X, ChevronLeft, ChevronRight, ShoppingCart, Zap, Phone,
   Ruler, Calculator, Info, ArrowLeft, CheckCircle2
 } from 'lucide-react';
 import OrderRequestForm from './OrderRequestForm';
+import {isEmpty} from "services/data.services"
 
 /* ─── Unit conversion helpers ────────────────────────────────────────────── */
 const toFeet = (value, unit) => {
@@ -115,16 +117,21 @@ const PriceEstimator = ({ product, measurements, onMeasurementsChange }) => {
 };
 
 /* ─── Product Modal ──────────────────────────────────────────────────────── */
-const ProductModal = ({ product, initialIntent, onClose, onAddToCart }) => {
+const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, permissions }) => {
+  const navigate = useNavigate();
   const [imgIndex, setImgIndex] = useState(0);
   const [measurements, setMeasurements] = useState({ width: '', height: '', unit: 'ft' });
   const [view, setView] = useState(initialIntent === 'order' ? 'order' : 'detail');
   const overlayRef = useRef(null);
-
+  const [showEstimate, setShowEstimate] = useState(false);
   /* Close on overlay click */
   const handleOverlayClick = (e) => {
     if (e.target === overlayRef.current) onClose();
   };
+
+  useEffect(() => {
+    console.log(permissions)
+  }, [permissions])
 
   /* Keyboard ESC */
   useEffect(() => {
@@ -232,18 +239,45 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart }) => {
             <hr className="detail-divider" />
 
             {/* Price Estimator */}
-            <PriceEstimator
-              product={product}
-              measurements={measurements}
-              onMeasurementsChange={setMeasurements}
-            />
+              {permissions?.modules?.[ "Client" ]?.["Estimate Pricing"] == 1 && (
+              <PriceEstimator
+                product={product}
+                measurements={measurements}
+                onMeasurementsChange={setMeasurements}
+              />
+              )}
 
             {/* CTA Buttons */}
             <div className="modal-cta">
-              <button className="cta-order" onClick={() => setView('order')}>
+              <button 
+                className="cta-order" 
+                onClick={() => {
+                  if (user && user.token) {
+                    if (permissions?.modules?.["Client"]?.["Request Orders"] === 1) {
+                      setView('order');
+                    }
+                  } else {
+                    navigate('/login');
+                  }
+                }}
+                hidden={user && user.token && permissions?.modules?.["Client"]?.["Request Orders"] !== 1}
+              >
                 <Zap size={16} /> Place Order Request
               </button>
-              <button className="cta-cart" onClick={handleAddToCart}>
+              
+              <button 
+                className="cta-cart" 
+                onClick={() => {
+                  if (user && user.token) {
+                    if (permissions?.modules?.["Client"]?.["Request Orders"] === 1) {
+                      handleAddToCart();
+                    }
+                  } else {
+                    navigate('/login');
+                  }
+                }}
+                hidden={user && user.token && permissions?.modules?.["Client"]?.["Request Orders"] !== 1}
+              >
                 <ShoppingCart size={16} /> Add to Cart
               </button>
             </div>

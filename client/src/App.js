@@ -229,43 +229,33 @@ const AppContent = ({ isLoggedIn }) => {
         
         {/* Customer & Shared Guest Route Layout Mappings */}
         <Route path="/*" element={
-          <Routes>
-            {/* 1. Group all paths that NEED the Dashboard Layout together */}
-            <Route path="/" element={
-              <DashboardLayout isLoggedIn={isLoggedIn}>
-                <Routes>
-                  <Route index element={<CustomerDashboard isLoggedIn={isLoggedIn} />} />
-                  <Route path="customer/products" element={<BrowseProducts />} />
-                  <Route path="about" element={<AboutUs />} />
+          <DashboardLayout isLoggedIn={isLoggedIn}>
+            <Routes>
+              <Route index element={<CustomerDashboard isLoggedIn={isLoggedIn} />} />
+              <Route path="customer/products" element={<BrowseProducts />} />
+              <Route path="about" element={<AboutUs />} />
 
-                  {/* Secure Customer Portal Route Blocks */}
-                  <Route path="track" element={<ProtectedRoute allowedRoles={['Customer']}><TrackProducts /></ProtectedRoute>} />
-                  <Route path="profile" element={<ProtectedRoute allowedRoles={['Customer']}><CustomerProfile /></ProtectedRoute>} />
-                  <Route path="contracts" element={<ProtectedRoute allowedRoles={['Customer']}><Contracts /></ProtectedRoute>} />
-                  <Route path="receipts" element={<ProtectedRoute allowedRoles={['Customer']}><Receipts /></ProtectedRoute>} />
-                  <Route path="orders" element={<ProtectedRoute allowedRoles={['Customer']}><MyOrders /></ProtectedRoute>} />
-                  <Route path="cart" element={<ProtectedRoute allowedRoles={['Customer']}><Cart /></ProtectedRoute>} />
-                  
-                  <Route path="customer/*" element={
-                    isLoggedIn ? (
-                      <ProtectedRoute allowedRoles={['Customer']}>
-                        <CustomerRoutes />
-                      </ProtectedRoute>
-                    ) : (
-                      <Navigate to="/login" replace />
-                    )
-                  } />
-                  
-                  {/* This handles missing routes INSIDE the customer dashboard layout context */}
-                  <Route path="*" element={<Navigate to="/not-found" replace />} />
-                </Routes>
-              </DashboardLayout>
-            } />
+              {/* Secure Customer Portal Route Blocks - Bypasses structural moduleKey checks */}
+              <Route path="track" element={<ProtectedRoute allowedRoles={['Client']}><TrackProducts /></ProtectedRoute>} />
+              <Route path="profile" element={<ProtectedRoute allowedRoles={['Client']}><CustomerProfile /></ProtectedRoute>} />
+              <Route path="contracts" element={<ProtectedRoute allowedRoles={['Client']}><Contracts /></ProtectedRoute>} />
+              <Route path="receipts" element={<ProtectedRoute allowedRoles={['Client']}><Receipts /></ProtectedRoute>} />
+              <Route path="orders" element={<ProtectedRoute allowedRoles={['Client']}><MyOrders /></ProtectedRoute>} />
+              <Route path="cart" element={<ProtectedRoute allowedRoles={['Client']}><Cart /></ProtectedRoute>} />
+              
+              <Route path="customer/*" element={
+                isLoggedIn ? (
+                  <ProtectedRoute allowedRoles={['Client']}>
+                    <CustomerRoutes />
+                  </ProtectedRoute>
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              } />
 
-            {/* 2. Isolated Clean 404 Route (No Navbars, No Footers) */}
-            <Route path="not-found" element={<NotFound />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </DashboardLayout>
         } />
       </Routes>
       

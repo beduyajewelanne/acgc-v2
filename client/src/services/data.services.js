@@ -82,3 +82,18 @@ export function isEmpty(data) {
   if (data instanceof Map || data instanceof Set) return data.size === 0;
   return false;
 }
+
+export function getAccessLevels(user, callback) {
+  const requestOptions = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: user.token, _id: user._id })
+  };
+  CRUD(window.base_api + "get_user_access_level", requestOptions, (res) => {
+    if (res.remarks === "success") {
+      callback(res.payload);
+    } else {
+      callback([]);
+    }
+  });
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Settings.css';
-
+import { UserContext } from 'App';
+import { CRUD } from 'services/data.services';
 // ─── Static Dummy Data ────────────────────────────────────────────────────────
 
 const ALL_MODULES = [
@@ -475,19 +476,45 @@ const FILTER_OPTIONS = [
 ];
 
 const UserManagement = ({ showToast }) => {
+  const { user, setUser } = React.useContext(UserContext);
   const [users, setUsers] = useState(INITIAL_USERS);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [modalType, setModalType] = useState(null); // 'rbac' | 'customer'
 
-  const filtered = users.filter(u => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase());
+  useEffect(() => {
+    if (user.token !== '' || user.token !== null) {
+      _getUsers(user, setUsers);
+    }
+  }, [user])
+
+  function _getUsers(user, callback) {
+    callback([])
+    var token = user.token;
+    var _id = user._id;
+
+    var requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, _id })
+    };
+
+    CRUD(window.base_api + "get_settings_users", requestOptions, (res) => {
+      if (res && res.remarks === "success") {
+        callback(res.payload);
+      } else {
+        callback([])
+      }
+    });
+  }
+
+  const filtered = users?.filter(u => {
+    const matchSearch = u?.firstName?.toLowerCase().includes(search.toLowerCase()) || u?.lastName?.toLowerCase().includes(search.toLowerCase()) || u?.email?.toLowerCase().includes(search.toLowerCase());
     const matchFilter =
       filter === 'all' ? true :
-      filter === 'Staff' ? u.role === 'Staff' :
-      filter === 'Customer' ? u.role === 'Customer' :
+      filter === 'Staff' ? u.role === 'staff' :
+      filter === 'Customer' ? u.role === 'customer' :
       u.subrole === filter;
     return matchSearch && matchFilter;
   });
@@ -508,11 +535,11 @@ const UserManagement = ({ showToast }) => {
   };
 
   const counts = {
-    all: users.length,
-    Customer: users.filter(u => u.role === 'Customer').length,
-    Staff: users.filter(u => u.role === 'Staff').length,
-    Helper: users.filter(u => u.subrole === 'Helper').length,
-    'Skilled Worker': users.filter(u => u.subrole === 'Skilled Worker').length,
+    all: users?.length || 0,
+    Customer: users?.filter(u => u.role === 'customer')?.length || 0,
+    Staff: users?.filter(u => u.role === 'staff')?.length || 0,
+    Helper: users?.filter(u => u.subrole === 'helper')?.length || 0,
+    'Skilled Worker': users?.filter(u => u.subrole === 'skilled_worker')?.length || 0,
   };
 
   return (
@@ -585,14 +612,23 @@ const UserManagement = ({ showToast }) => {
                 <tr key={u.id} className="table-row">
                   <td>
                     <div className="user-cell">
-                      <Avatar initials={u.avatar} role={u.role} />
+                      <Avatar initials={u.firstName?.charAt(0) + u.lastName?.charAt(0)} role={u.role} />
                       <div className="user-info">
-                        <span className="user-name">{u.name}</span>
+                        <span className="user-name">{u.firstName} {u.lastName}</span>
                         <span className="user-email">{u.email}</span>
                       </div>
                     </div>
                   </td>
-                  <td><RoleBadge role={u.role} subrole={u.subrole} /></td>
+                  <td>
+                    <RoleBadge
+                      role={u.role
+                        ?.replace(/_/g, " ")
+                        .replace(/\b\w/g, (c) => c.toUpperCase())}
+                      subrole={u.subrole
+                        ?.replace(/_/g, " ")
+                        .replace(/\b\w/g, (c) => c.toUpperCase())}
+                    />
+                  </td>
                   <td><StatusBadge status={u.status} /></td>
                   <td>
                     {u.role === 'Staff' ? (

@@ -33,6 +33,9 @@ const CustomerDashboard = ({ isLoggedIn }) => {
 
   useEffect(() => {
     if (user && !isEmpty(user.token)) {
+      if (user.role === "admin" || user.role === "staff") {
+        navigate("/admin");
+      }
       console.log("User is logged in:", user);
     }
   }, [user]);

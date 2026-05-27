@@ -27,6 +27,7 @@ import Cart from './views/pages/customer/Cart';
 
 // Admin Pages
 import AdminDashboard from './views/pages/admins/AdminDashboard';
+import Products from './views/pages/admins/Product';
 
 export const UserContext = createContext();
 
@@ -66,6 +67,7 @@ const AppContent = ({ isLoggedIn }) => {
         <Route path="admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="products" element={<Products />} />
         </Route>
         
         {/* Customer Routes - Inside DashboardLayout */}

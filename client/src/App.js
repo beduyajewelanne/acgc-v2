@@ -28,6 +28,7 @@ import Cart from './views/pages/customer/Cart';
 // Admin Pages
 import AdminDashboard from './views/pages/admins/AdminDashboard';
 import Products from './views/pages/admins/Product';
+import SiteInspection from './views/pages/admins/SiteInspection';
 
 export const UserContext = createContext();
 
@@ -68,6 +69,7 @@ const AppContent = ({ isLoggedIn }) => {
           <Route index element={<AdminDashboard />} />
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="products" element={<Products />} />
+          <Route path="site-inspections" element={<SiteInspection />} />
         </Route>
         
         {/* Customer Routes - Inside DashboardLayout */}

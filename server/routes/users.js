@@ -3,9 +3,10 @@ const port = process.env.PORT || 5000;
 const dbo = require("../helper/db");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
-const { ObjectId } = require("mongodb"); // Ensure ObjectId is imported
+const { ObjectId } = require("mongodb");
 const { get_data_helper, check_record_exists, decrypt, insert_one_helper, validateHash, hashPass, update_one_helper, delete_or_archive_helper, checkAuth, actionLog } = require("../helper/Helper");
 const userRoutes = express.Router();
+
 // 1. GET ALL SYSTEM USERS WITH THEIR CUSTOM ACCESS LEVELS
 userRoutes.post("/api/get_settings_users", async (req, res) => {
     const { token, _id } = req.body;
@@ -21,21 +22,22 @@ userRoutes.post("/api/get_settings_users", async (req, res) => {
             ]);
             const usersList = usersResult.payload || [];
 
+            const db = dbo.getDb();
+
             // Stitch user documents with their respective configurations inside "access_level"
             const detailedUsers = await Promise.all(usersList.map(async (u) => {
-                const accessResult = await get_data_helper("access_level", [
-                    { $match: { userId: new ObjectId(u._id) } }
-                ]);
+                // Find matching access level by string identifier to preserve consistency
+                const accessResult = await db.collection("access_level").findOne({ user_id: new ObjectId(u._id) });
                 
                 return {
                     _id: u._id,
                     firstName: u.firstName,
                     lastName: u.lastName,
                     email: u.email,
-                    role: u.role,          // "Staff" or "Customer"
+                    role: u.role,          // "staff" or "client"
                     subrole: u.subrole,    // "Skilled Worker", "Helper", etc.
                     status: u.status || "Active",
-                    modules: accessResult.payload?.[0]?.modules || null
+                    modules: accessResult ? accessResult.modules : null
                 };
             }));
 
@@ -47,111 +49,89 @@ userRoutes.post("/api/get_settings_users", async (req, res) => {
     }
 });
 
-// 2. GET BASE SYSTEM ACCESS MATRIX TEMPLATE
-userRoutes.post("/api/get_base_access_level", async (req, res) => {
-    const { token, _id } = req.body;
+// Individual User Access Matrix Persist Update (Upgrades / Downgrades / Fine-grained Staff Permissions)
+userRoutes.post("/api/update_user_access_level", async (req, res) => {
     try {
-        checkAuth(token, _id, async (isValid) => {
-            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+        const db = dbo.getDb();
+        const { target_user_id, role, subrole, modules } = req.body;
 
-            const baseResult = await get_data_helper("base_access_level", [{$limit: 1}]);
-            if (!baseResult?.payload?.length) {
-                return res.status(404).json({ remarks: "failed", message: "Base layout matrix not found" });
-            }
-            return res.status(200).json({ remarks: "success", payload: baseResult.payload[0] });
-        });
+        if (!target_user_id) {
+            return res.status(400).json({ remarks: "failed", message: "Missing targeted identifier token" });
+        }
+
+        await db.collection("users").updateOne(
+            { _id: new ObjectId(target_user_id) },
+            { $set: { role: role.toLowerCase(), subrole: subrole || null } }
+        );
+
+        const isStaffTier = role?.toLowerCase() === 'staff' || role?.toLowerCase() === 'admin';
+        let updateOperations = {};
+
+        if (isStaffTier) {
+            const safeStaffModules = { ...modules };
+            updateOperations = {
+                $set: { modules: safeStaffModules },
+            };
+        } else {
+            updateOperations = {
+                $set: { modules: modules }
+            };
+        }
+
+        // 2. Synchronize target security data matching by user_id string
+        await db.collection("access_level").updateOne(
+            { user_id: new ObjectId(target_user_id) }, 
+            updateOperations,
+            { upsert: true }
+        );
+
+        res.json({ remarks: "success", message: "User privileges written successfully" });
+
     } catch (err) {
-        return res.status(500).json({ error: err.message });
+        console.error("Individual User Permission Write Fail:", err);
+        res.status(500).json({ remarks: "failed", message: "Internal server error occurred", error: err.message });
     }
 });
 
-// 3. SAVE INDIVIDUAL CUSTOM ACCESS PERMISSIONS
-userRoutes.post("/api/save_user_access_level", async (req, res) => {
-    const { token, _id, targetUserId, modules, subrole, fullName } = req.body;
-    const adminName = fullName || "Admin";
-
-    if (!token || !targetUserId || !modules) return res.status(400).json({ error: "Missing properties" });
-
-    try {
-        checkAuth(token, _id, async (isValid) => {
-            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
-
-            // 1. Update user profile details (like dynamic subroles if changed)
-            if (subrole) {
-                await update_one_helper("users", 
-                    { _id: new ObjectId(targetUserId) }, 
-                    { $set: { subrole, updatedAt: new Date() } }
-                );
-            }
-
-            // 2. Update or insert the custom user override access matrix
-            const db_connect = dbo.getDb();
-            await db_connect.collection("access_level").updateOne(
-                { userId: new ObjectId(targetUserId) },
-                { 
-                    $set: { 
-                        modules: modules,
-                        updatedAt: new Date()
-                    } 
-                },
-                { upsert: true }
-            );
-
-            // Fetch target user's details for historical tracking context
-            const targetUser = await db_connect.collection("users").findOne({ _id: new ObjectId(targetUserId) });
-            const targetName = targetUser ? `${targetUser.firstName} ${targetUser.lastName}` : "Personnel";
-
-            // Trigger log registration tracking
-            await actionLog(_id, "Manage Access", `${adminName} modified access permission criteria configurations for ${targetName}`);
-
-            return res.status(200).json({ remarks: "success", message: "Permissions updated successfully" });
-        });
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
+// GLOBAL MASS UPDATE CONFIGURATOR FOR CLIENTS
+userRoutes.post("/api/update_global_customer_permissions", async (req, res) => {
+    const db = dbo.getDb();
+    const { client_modules } = req.body;
+    
+    // Normalize fetching target client roles
+    const users = await db.collection("users").find({ role: { $in: ["client", "customer"] } }).project({ _id: 1 }).toArray();
+    const user_ids = users.map(u => u._id.toString()); 
+    
+    if (user_ids.length === 0) {
+        return res.json({ remarks: "success", message: "No customer users found to update" });
     }
-});
+    
+    const baseTemplate = {
+        type: "client",
+        modules: {
+            "Client": client_modules,
+            "Dashboard": { "View": 0 },
+            "Site Inspection": { "View": 0, "Add": 0, "View Details": 0, "Edit": 0, "Cancel": 0, "Generate Contract": 0 },
+            "Progress Monitor": { "View": 0, "View Details": 0, "Edit": 0 },
+            "Products": { "View": 0, "Add": 0, "Edit": 0, "Delete": 0 },
+            "Transactions": { "View": 0, "View Details": 0, "Edit": 0, "View Contract": 0, "Download Contract": 0 },
+            "Settings": { "View": 0, "Manage Access": 0, "Back Up": 0 },
+            "Profile": { "View": 1, "Edit Profile": 1 }
+        }
+    };
+    
+    await db.collection("base_access_level").updateOne(
+        { type: "client" },
+        { $set: baseTemplate },
+        { upsert: true }
+    );
+    
+    await db.collection("access_level").updateMany(
+        { user_id : { $in : user_ids }},
+        { $set: { "modules.Client": client_modules } }
+    );
 
-// 4. GLOBAL MASS UPDATE CONFIGURATOR FOR CLIENTS
-userRoutes.post("/api/apply_global_client_permissions", async (req, res) => {
-    const { token, _id, clientModulePermissions, fullName } = req.body;
-    const adminName = fullName || "Admin";
-
-    if (!token || !clientModulePermissions) return res.status(400).json({ error: "Payload parameters missing" });
-
-    try {
-        checkAuth(token, _id, async (isValid) => {
-            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
-
-            const db_connect = dbo.getDb();
-            
-            // Fetch all users designated under the 'Customer' profile tier
-            const customers = await db_connect.collection("users").find({ role: "Customer", archive: { $ne: 1 } }).toArray();
-            
-            if (customers.length > 0) {
-                const bulkOps = customers.map(customer => ({
-                    updateOne: {
-                        filter: { userId: new ObjectId(customer._id) },
-                        update: { 
-                            $set: { 
-                                "modules.Client": clientModulePermissions,
-                                updatedAt: new Date()
-                            } 
-                        },
-                        upsert: true
-                    }
-                }));
-                
-                await db_connect.collection("access_level").bulkWrite(bulkOps);
-            }
-
-            // Record structural configuration modification event log
-            await actionLog(_id, "Manage Access", `${adminName} executed global permissions sync patch deployment to all (${customers.length}) active Client portal accounts`);
-
-            return res.status(200).json({ remarks: "success", message: "Global permissions synced across portals successfully" });
-        });
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
-    }
+    res.json({ remarks: "success", message: "Global configurations synchronized" });
 });
 
 userRoutes.post("/api/get_user_access_level", async (req, res) => {
@@ -173,6 +153,35 @@ userRoutes.post("/api/get_user_access_level", async (req, res) => {
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
+});
+
+userRoutes.post("/api/get_global_client_template", async (req, res) => {
+  try {
+    const db = dbo.getDb();
+    const baseTemplate = await db.collection("base_access_level").findOne({ type: "client" });
+    
+    if (baseTemplate && baseTemplate.modules && baseTemplate.modules.Client) {
+      return res.json({ 
+        remarks: "success", 
+        payload: baseTemplate.modules.Client 
+      });
+    }
+    
+    return res.json({ 
+      remarks: "success", 
+      payload: {
+        "Request Orders": 0,
+        "View Only": 0,
+        "Track Project Progress": 0,
+        "Request Site Inspection": 0,
+        "Estimate Pricing": 0
+      } 
+    });
+    
+  } catch (err) {
+    console.error("Fetch global template error:", err);
+    res.status(500).json({ remarks: "failed", message: "Server error reading base matrix template" });
+  }
 });
 
 module.exports = userRoutes;

@@ -231,8 +231,8 @@ authRoutes.post("/api/register", async (req, res) => {
             await transporter.sendMail(mailOptions);
 
             const rawUserId = Buffer.from(result.return, "base64").toString("utf8");
-            const base_access_level = await get_data_helper("base_access_level", [{ $limit: 1 }]);
-            base_access_level.payload[0].modules["Client"]["Request Orders"] = 1;
+            const base_access_level = await get_data_helper("base_access_level", [{ type: "client" }]);
+            // base_access_level.payload[0].modules["Client"]["Request Orders"] = 1;
             const modulesTemplate = base_access_level?.payload?.[0]?.modules || {};
             await insert_one_helper("access_level", {
                 user_id: new ObjectId(rawUserId),

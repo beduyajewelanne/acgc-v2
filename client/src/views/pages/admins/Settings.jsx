@@ -1,86 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Settings.css';
-import { UserContext } from 'App';
-import { CRUD } from 'services/data.services';
-// ─── Static Dummy Data ────────────────────────────────────────────────────────
+import { UserContext } from '../../../App'; 
+import { CRUD } from '../../../services/data.services'; 
 
+// ─── Map Frontend Layout Fields to Backend Matrix JSON Keys ─────────────────
 const ALL_MODULES = [
-  { id: 'dashboard', label: 'Dashboard', icon: '▦' },
-  { id: 'products', label: 'Product Management', icon: '⬡' },
-  { id: 'inspection', label: 'Site Inspection', icon: '◈' },
-  { id: 'progress', label: 'Progress Monitoring', icon: '◎' },
-  { id: 'transactions', label: 'Transactions', icon: '⬕' },
-  { id: 'reports', label: 'Reports', icon: '▤' },
-  { id: 'settings', label: 'Settings', icon: '⚙' },
+  { id: 'Dashboard', label: 'Dashboard', icon: '▦', actions: ['View'] },
+  { id: 'Products', label: 'Product Management', icon: '⬡', actions: ['View', 'Add', 'Edit', 'Delete'] },
+  { id: 'Site Inspection', label: 'Site Inspection', icon: '◈', actions: ['View', 'Add', 'View Details', 'Edit'] },
+  { id: 'Progress Monitor', label: 'Progress Monitoring', icon: '◎', actions: ['View', 'View Details', 'Edit'] },
+  { id: 'Transactions', label: 'Transactions', icon: '⬕', actions: ['View', 'View Details', 'Edit'] },
+  { id: 'Settings', label: 'Settings', icon: '⚙', actions: ['View'] },
+  { id: 'Profile', label: 'Profile', icon: '👤', actions: ['View'] },
 ];
+
+const BASE_TEMPLATE = {
+  "Client": { "Request Orders": 0, "View Only": 0, "Track Project Progress": 0, "Request Site Inspection": 0, "Estimate Pricing": 0 },
+  "Dashboard": { "View": 0 },
+  "Site Inspection": { "View": 0, "Add": 0, "View Details": 0, "Edit": 0, "Cancel": 0, "Generate Contract": 0 },
+  "Progress Monitor": { "View": 0, "View Details": 0, "Edit": 0 },
+  "Products": { "View": 0, "Add": 0, "Edit": 0, "Delete": 0 },
+  "Transactions": { "View": 0, "View Details": 0, "Edit": 0, "View Contract": 0, "Download Contract": 0 },
+  "Settings": { "View": 0, "Manage Access": 0, "Back Up": 0 },
+  "Profile": { "View": 0, "Edit Profile": 0 }
+};
 
 const CUSTOMER_PERMS = [
-  { id: 'canRequestOrders', label: 'Can Request Orders', desc: 'Submit new glass/aluminum orders' },
-  { id: 'canEstimatePricing', label: 'Can Estimate Pricing', desc: 'Access the pricing estimator tool' },
-  { id: 'viewOnly', label: 'View Only Access', desc: 'Read-only access to their account' },
-  { id: 'canRequestInspection', label: 'Can Request Site Inspection', desc: 'Schedule on-site inspections' },
-  { id: 'canTrackProgress', label: 'Can Track Project Progress', desc: 'Monitor active project status' },
-];
-
-const INITIAL_USERS = [
-  {
-    id: 1, name: 'Marco Reyes', email: 'marco.reyes@glasspro.ph',
-    role: 'Staff', subrole: 'Skilled Worker', status: 'Active',
-    avatar: 'MR',
-    modules: { dashboard: true, products: true, inspection: true, progress: true, transactions: false, reports: false, settings: false },
-    permissions: {},
-  },
-  {
-    id: 2, name: 'Liza Santos', email: 'liza.santos@glasspro.ph',
-    role: 'Staff', subrole: 'Helper', status: 'Active',
-    avatar: 'LS',
-    modules: { dashboard: true, products: false, inspection: true, progress: true, transactions: false, reports: false, settings: false },
-    permissions: {},
-  },
-  {
-    id: 3, name: 'Rodrigo Bautista', email: 'r.bautista@glasspro.ph',
-    role: 'Staff', subrole: 'Skilled Worker', status: 'Inactive',
-    avatar: 'RB',
-    modules: { dashboard: true, products: true, inspection: false, progress: false, transactions: true, reports: true, settings: false },
-    permissions: {},
-  },
-  {
-    id: 4, name: 'Ana Torres', email: 'ana.torres@client.com',
-    role: 'Customer', subrole: null, status: 'Active',
-    avatar: 'AT',
-    modules: {},
-    permissions: { canRequestOrders: true, canEstimatePricing: true, viewOnly: false, canRequestInspection: true, canTrackProgress: true },
-  },
-  {
-    id: 5, name: 'Jose Dela Cruz', email: 'jose.delacruz@client.com',
-    role: 'Customer', subrole: null, status: 'Active',
-    avatar: 'JD',
-    modules: {},
-    permissions: { canRequestOrders: false, canEstimatePricing: false, viewOnly: true, canRequestInspection: false, canTrackProgress: true },
-  },
-  {
-    id: 6, name: 'Maria Gonzales', email: 'mgonzales@client.com',
-    role: 'Customer', subrole: null, status: 'Inactive',
-    avatar: 'MG',
-    modules: {},
-    permissions: { canRequestOrders: true, canEstimatePricing: true, viewOnly: false, canRequestInspection: true, canTrackProgress: true },
-  },
-  {
-    id: 7, name: 'Carlo Mendez', email: 'carlo.m@glasspro.ph',
-    role: 'Staff', subrole: 'Helper', status: 'Active',
-    avatar: 'CM',
-    modules: { dashboard: true, products: false, inspection: true, progress: true, transactions: false, reports: false, settings: false },
-    permissions: {},
-  },
+  { id: 'Request Orders', label: 'Can Request Orders', desc: 'Submit new glass/aluminum orders' },
+  { id: 'Estimate Pricing', label: 'Can Estimate Pricing', desc: 'Access the pricing estimator tool' },
+  { id: 'View Only', label: 'View Only Access', desc: 'Read-only access to their account' },
+  { id: 'Request Site Inspection', label: 'Can Request Site Inspection', desc: 'Schedule on-site inspections' },
+  { id: 'Track Project Progress', label: 'Can Track Project Progress', desc: 'Monitor active project status' },
 ];
 
 const INITIAL_BACKUPS = [
   { id: 1, name: 'FULL_BACKUP_2026-05-25', date: 'May 25, 2026', type: 'Full System', size: '142.3 MB', status: 'Success' },
   { id: 2, name: 'WEEKLY_BACKUP_2026-05-18', date: 'May 18, 2026', type: 'Weekly', size: '98.7 MB', status: 'Success' },
-  { id: 3, name: 'WEEKLY_BACKUP_2026-05-11', date: 'May 11, 2026', type: 'Weekly', size: '91.2 MB', status: 'Success' },
-  { id: 4, name: 'MONTHLY_BACKUP_2026-04-30', date: 'Apr 30, 2026', type: 'Monthly', size: '210.5 MB', status: 'Success' },
-  { id: 5, name: 'WEEKLY_BACKUP_2026-04-27', date: 'Apr 27, 2026', type: 'Weekly', size: '88.9 MB', status: 'Failed' },
-  { id: 6, name: 'YEARLY_BACKUP_2025-12-31', date: 'Dec 31, 2025', type: 'Yearly', size: '1.04 GB', status: 'Success' },
 ];
 
 // ─── Utility Components ───────────────────────────────────────────────────────
@@ -106,27 +61,24 @@ const Toggle = ({ checked, onChange, disabled }) => (
 );
 
 const Avatar = ({ initials, role }) => {
-  const colors = {
-    'Staff': 'avatar-staff',
-    'Customer': 'avatar-customer',
-  };
+  const normalizedRole = role?.trim().toLowerCase();
+  const styleClass = normalizedRole === 'staff' || normalizedRole === 'admin' ? 'avatar-staff' : 'avatar-customer';
+  return <div className={`avatar ${styleClass}`}>{initials}</div>;
+};
+
+const StatusBadge = ({ status }) => {
+  const displayStatus = status || 'Active';
   return (
-    <div className={`avatar ${colors[role] || 'avatar-default'}`}>
-      {initials}
-    </div>
+    <span className={`status-badge ${displayStatus === 'Active' ? 'status-active' : 'status-inactive'}`}>
+      <span className="status-dot" />
+      {displayStatus}
+    </span>
   );
 };
 
-const StatusBadge = ({ status }) => (
-  <span className={`status-badge ${status === 'Active' ? 'status-active' : 'status-inactive'}`}>
-    <span className="status-dot" />
-    {status}
-  </span>
-);
-
 const RoleBadge = ({ role, subrole }) => (
   <div className="role-cell">
-    <span className={`role-badge ${role === 'Staff' ? 'role-staff' : 'role-customer'}`}>{role}</span>
+    <span className={`role-badge ${role?.toLowerCase() === 'client' || role?.toLowerCase() === 'customer' ? 'role-customer' : 'role-staff'}`}>{role}</span>
     {subrole && <span className="subrole-badge">{subrole}</span>}
   </div>
 );
@@ -144,16 +96,42 @@ const ConfirmDialog = ({ title, message, onConfirm, onCancel, confirmLabel = 'Co
   </div>
 );
 
-// ─── RBAC Modal ───────────────────────────────────────────────────────────────
+// ─── RBAC Modal (Staff & Admins Fine-Grained Controls) ─────────────────────────
 
 const RBACModal = ({ user, onClose, onSave, showToast }) => {
-  const [modules, setModules] = useState({ ...user.modules });
-  const [subrole, setSubrole] = useState(user.subrole || 'Helper');
-  const [customRoles, setCustomRoles] = useState([]);
-  const [newRole, setNewRole] = useState('');
-  const [convertConfirm, setConvertConfirm] = useState(false);
+  const [modules, setModules] = useState(() => {
+    const merged = JSON.parse(JSON.stringify(BASE_TEMPLATE));
+    const userModules = user?.modules || {};
+    
+    Object.keys(merged).forEach(m => {
+      if (userModules[m]) merged[m] = { ...merged[m], ...userModules[m] };
+    });
+    return merged;
+  });
 
-  const toggleModule = (id) => setModules(prev => ({ ...prev, [id]: !prev[id] }));
+  const [subrole, setSubrole] = useState(user?.subrole || 'Helper');
+  const [newRole, setNewRole] = useState('');
+  const [customRoles, setCustomRoles] = useState([]);
+  const [convertConfirm, setConvertConfirm] = useState(false);
+  const [expandedModule, setExpandedModule] = useState(null);
+
+  const toggleActionPermission = (moduleId, actionKey) => {
+    setModules(prev => {
+      const currentVal = prev[moduleId]?.[actionKey] === 1 ? 0 : 1;
+      const updatedModule = { ...prev[moduleId], [actionKey]: currentVal };
+      
+      // Safety rule: If an operational action is allowed, View must also be enabled
+      if (actionKey !== 'View' && currentVal === 1) {
+        updatedModule.View = 1;
+      }
+      // Safety rule: If View is unchecked, turn off all sub-actions
+      if (actionKey === 'View' && currentVal === 0) {
+        Object.keys(updatedModule).forEach(k => { updatedModule[k] = 0; });
+      }
+
+      return { ...prev, [moduleId]: updatedModule };
+    });
+  };
 
   const handleAddRole = () => {
     const trimmed = newRole.trim();
@@ -164,44 +142,58 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
   };
 
   const handleSave = () => {
-    onSave(user.id, { modules, subrole });
-    showToast('Staff permissions updated successfully', 'success');
-    onClose();
+    const updatedPayload = {
+      role: 'staff',
+      subrole: subrole,
+      modules: modules
+    };
+
+    onSave(user?._id, updatedPayload, () => {
+      showToast(`${user?.firstName || 'User'}'s administrative matrix access synced`, 'success');
+      onClose();
+    });
   };
 
   const handleConvert = () => {
-    onSave(user.id, { role: 'Customer', subrole: null, modules: {}, permissions: { canRequestOrders: true, canEstimatePricing: true, viewOnly: false, canRequestInspection: true, canTrackProgress: true } });
-    showToast(`${user.name} has been downgraded to Customer`, 'success');
-    onClose();
+    const clientDefault = {};
+    CUSTOMER_PERMS.forEach(p => { clientDefault[p.id] = 1; });
+
+    const downgradePayload = {
+      role: 'client',
+      subrole: null,
+      modules: { Client: clientDefault }
+    };
+
+    onSave(user?._id, downgradePayload, () => {
+      showToast(`${user?.firstName || 'User'} successfully converted to Customer profile`, 'success');
+      onClose();
+    });
   };
 
   const allRoles = ['Helper', 'Skilled Worker', ...customRoles];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal rbac-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className="pm-overlay" onClick={onClose}>
+      <div className="pm-modal rbac-modal text-left" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px' }}>
+        <div className="pm-modal-header">
           <div className="modal-user-info">
-            <Avatar initials={user.avatar} role={user.role} />
+            <Avatar initials={(user?.firstName?.charAt(0) || '') + (user?.lastName?.charAt(0) || '')} role={user?.role} />
             <div>
               <h2 className="modal-title">Staff Access Control</h2>
-              <p className="modal-subtitle">{user.name} · {user.email}</p>
+              <p className="modal-subtitle">{user?.firstName} {user?.lastName} · Permission Matrix</p>
             </div>
           </div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
         <div className="modal-body">
-          {/* Subrole */}
           <div className="modal-section">
-            <h3 className="section-label">Staff Subrole</h3>
+            <h3 className="section-label">Staff Subrole Designation</h3>
             <div className="subrole-row">
-              <select
-                className="styled-select"
-                value={subrole}
-                onChange={e => setSubrole(e.target.value)}
-              >
-                {allRoles.map(r => <option key={r} value={r}>{r}</option>)}
+              <select className="styled-select" value={subrole} onChange={e => setSubrole(e.target.value)}>
+                {allRoles.map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
               </select>
               <div className="custom-role-input">
                 <input
@@ -211,69 +203,76 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
                   onChange={e => setNewRole(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAddRole()}
                 />
-                <button className="btn-outline-sm" onClick={handleAddRole}>Add</button>
+                <button type="button" className="btn-outline-sm" onClick={handleAddRole}>Add</button>
               </div>
             </div>
-            {customRoles.length > 0 && (
-              <div className="custom-roles-list">
-                {customRoles.map(r => (
-                  <span key={r} className="custom-role-tag">
-                    {r}
-                    <button onClick={() => setCustomRoles(prev => prev.filter(x => x !== r))}>×</button>
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Module Access */}
           <div className="modal-section">
-            <h3 className="section-label">Module Access Control</h3>
-            <p className="section-desc">Toggle which admin modules this staff member can access.</p>
-            <div className="modules-grid">
-              {ALL_MODULES.map(mod => (
-                <div key={mod.id} className={`module-card ${modules[mod.id] ? 'module-enabled' : 'module-disabled'}`}>
-                  <div className="module-info">
-                    <span className="module-icon">{mod.icon}</span>
-                    <span className="module-label">{mod.label}</span>
+            <h3 className="section-label">Module System Permissions</h3>
+            <p className="section-desc">Click on a module block to configure individual CRUD / View action overrides.</p>
+            
+            <div className="modules-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+              {ALL_MODULES.map(mod => {
+                const isViewEnabled = modules[mod.id]?.View === 1;
+                const isExpanded = expandedModule === mod.id;
+
+                return (
+                  <div key={mod.id} className="module-item-container" style={{ border: '1px solid #eee', borderRadius: '6px', padding: '0.75rem' }}>
+                    <div 
+                      className="module-main-row" 
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                      onClick={() => setExpandedModule(isExpanded ? null : mod.id)}
+                    >
+                      <div className="module-info" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span className="module-icon">{mod.icon}</span>
+                        <strong className="module-label">{mod.label}</strong>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                          {isExpanded ? '▲ Hide Sub-actions' : '▼ Manage Sub-actions'}
+                        </span>
+                        <Toggle checked={isViewEnabled} onChange={() => toggleActionPermission(mod.id, 'View')} />
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="module-actions-dropdown" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #eee', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                        {mod.actions.map(action => (
+                          <div key={action} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.25rem 0.5rem', background: '#f9f9f9', borderRadius: '4px' }}>
+                            <span style={{ fontSize: '0.85rem' }}>{action}</span>
+                            <Toggle 
+                              checked={modules[mod.id]?.[action] === 1} 
+                              onChange={() => toggleActionPermission(mod.id, action)} 
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <Toggle checked={!!modules[mod.id]} onChange={() => toggleModule(mod.id)} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Access Preview */}
-          <div className="modal-section">
-            <h3 className="section-label">Access Preview</h3>
-            <div className="access-preview">
-              {ALL_MODULES.map(mod => (
-                <div key={mod.id} className={`preview-item ${modules[mod.id] ? 'preview-allowed' : 'preview-blocked'}`}>
-                  <span>{mod.icon} {mod.label}</span>
-                  <span className="preview-status">{modules[mod.id] ? '✓ Accessible' : '✕ Blocked'}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
 
-        <div className="modal-footer">
+        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
           <button className="btn-danger-outline" onClick={() => setConvertConfirm(true)}>
-            ↓ Downgrade to Customer
+            ↓ Convert to Customer
           </button>
           <div className="footer-right">
             <button className="btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="btn-primary" onClick={handleSave}>Save Changes</button>
+            <button className="btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Settings</button>
           </div>
         </div>
 
         {convertConfirm && (
           <ConfirmDialog
-            title="Downgrade to Customer?"
-            message={`${user.name} will lose all staff privileges and be converted to a Customer account.`}
+            title="Convert to Customer Profile?"
+            message={`${user?.firstName || 'This user'} will lose all staff configuration variables and immediately downgrade into a standard client dashboard portal configuration.`}
             onConfirm={handleConvert}
             onCancel={() => setConvertConfirm(false)}
-            confirmLabel="Downgrade"
+            confirmLabel="Confirm Conversion"
             danger
           />
         )}
@@ -282,90 +281,103 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
   );
 };
 
-// ─── Customer Permissions Modal ───────────────────────────────────────────────
+// ─── Customer Permissions Modal (Individual Customer Settings & Upgrading) ───
 
 const CustomerModal = ({ user, onClose, onSave, showToast }) => {
-  const [perms, setPerms] = useState({ ...user.permissions });
+  const [perms, setPerms] = useState(() => {
+    const baseClient = BASE_TEMPLATE.Client || {};
+    const userClient = user?.modules?.Client || {};
+    console.log(userClient, baseClient)
+    return { ...baseClient, ...userClient };
+  });
+
   const [upgradeConfirm, setUpgradeConfirm] = useState(false);
 
-  const toggle = (id) => setPerms(prev => ({ ...prev, [id]: !prev[id] }));
+  const togglePerm = (id) => {
+    setPerms(prev => ({ ...prev, [id]: prev[id] === 1 ? 0 : 1 }));
+  };
 
   const handleSave = () => {
-    onSave(user.id, { permissions: perms });
-    showToast('Customer permissions updated successfully', 'success');
-    onClose();
+    const updatedPayload = {
+      role: 'client',
+      subrole: null,
+      modules: { Client: perms }
+    };
+
+    onSave(user?._id, updatedPayload, () => {
+      showToast(`${user?.firstName || 'Customer'}'s portal matrix attributes updated`, 'success');
+      onClose();
+    });
   };
 
   const handleUpgrade = () => {
-    onSave(user.id, {
-      role: 'Staff', subrole: 'Helper', permissions: {},
-      modules: { dashboard: true, products: false, inspection: false, progress: true, transactions: false, reports: false, settings: false }
+    // Setup fallback view permissions when upgrading a client to base operational staff
+    const staffBaseModules = {};
+    ALL_MODULES.forEach(m => {
+      staffBaseModules[m.id] = { View: 1, Add: 0, Edit: 0, Delete: 0, "View Details": 1 };
     });
-    showToast(`${user.name} has been upgraded to Staff`, 'success');
-    onClose();
+
+    const upgradePayload = {
+      role: 'staff',
+      subrole: 'Helper',
+      modules: staffBaseModules
+    };
+
+    onSave(user?._id, upgradePayload, () => {
+      showToast(`${user?.firstName || 'Customer'} successfully upgraded to Staff level privileges`, 'success');
+      onClose();
+    });
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal customer-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className="pm-overlay" onClick={onClose}>
+      <div className="pm-modal pm-modal-lg animate-modal" onClick={e => e.stopPropagation()}>
+        <div className="pm-modal-header">
           <div className="modal-user-info">
-            <Avatar initials={user.avatar} role={user.role} />
+            <Avatar initials={(user?.firstName?.charAt(0) || '') + (user?.lastName?.charAt(0) || '')} role={user?.role} />
             <div>
-              <h2 className="modal-title">Customer Permissions</h2>
-              <p className="modal-subtitle">{user.name} · {user.email}</p>
+              <h2 className="modal-title">Customer Matrix Permissions</h2>
+              <p className="modal-subtitle">{user?.firstName} {user?.lastName} · Client Profile</p>
             </div>
           </div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
         <div className="modal-body">
-          <div className="modal-section">
-            <h3 className="section-label">Feature Access</h3>
-            <p className="section-desc">Control what this customer can do within the customer portal.</p>
-            <div className="perms-list">
-              {CUSTOMER_PERMS.map(p => (
-                <div key={p.id} className={`perm-card ${perms[p.id] ? 'perm-enabled' : 'perm-disabled'}`}>
+          <p className="section-desc">Toggle specific baseline visibility rules for this customer portal view layout configuration.</p>
+          <div className="global-perms-grid" style={{ marginTop: '1rem' }}>
+            {CUSTOMER_PERMS.map(p => {
+              const isEnabled = perms[p.id] === 1;
+              return (
+                <div key={p.id} className={`global-perm-card ${isEnabled ? 'gperm-enabled' : 'gperm-disabled'}`}>
                   <div className="perm-text">
                     <span className="perm-label">{p.label}</span>
                     <span className="perm-desc">{p.desc}</span>
                   </div>
-                  <Toggle checked={!!perms[p.id]} onChange={() => toggle(p.id)} />
+                  <Toggle checked={isEnabled} onChange={() => togglePerm(p.id)} />
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="modal-section">
-            <h3 className="section-label">Portal Preview</h3>
-            <div className="portal-preview">
-              {CUSTOMER_PERMS.map(p => (
-                <div key={p.id} className={`preview-item ${perms[p.id] ? 'preview-allowed' : 'preview-blocked'}`}>
-                  <span>{p.label}</span>
-                  <span className="preview-status">{perms[p.id] ? '✓ Enabled' : '✕ Disabled'}</span>
-                </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="modal-footer">
-          <button className="btn-upgrade" onClick={() => setUpgradeConfirm(true)}>
+        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+          <button className="btn-primary" style={{ background: '#28a745', borderColor: '#28a745' }} onClick={() => setUpgradeConfirm(true)}>
             ↑ Upgrade to Staff
           </button>
           <div className="footer-right">
             <button className="btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="btn-primary" onClick={handleSave}>Save Changes</button>
+            <button className="btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Matrix</button>
           </div>
         </div>
 
         {upgradeConfirm && (
           <ConfirmDialog
-            title="Upgrade to Staff?"
-            message={`${user.name} will be promoted to Staff with Helper subrole and basic module access.`}
+            title="Upgrade Customer to Operational Staff?"
+            message={`This action grants administrative properties to ${user?.firstName || 'this user'}. You will be able to customize their granular module access right away.`}
             onConfirm={handleUpgrade}
             onCancel={() => setUpgradeConfirm(false)}
-            confirmLabel="Upgrade"
+            confirmLabel="Confirm Upgrade"
           />
         )}
       </div>
@@ -375,30 +387,60 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
 
 // ─── Global Customer Permissions Helpers ─────────────────────────────────────
 
-const deriveGlobalPerms = (users) => {
-  const customers = users.filter(u => u.role === 'Customer');
-  if (!customers.length) return Object.fromEntries(CUSTOMER_PERMS.map(p => [p.id, false]));
-  return Object.fromEntries(
-    CUSTOMER_PERMS.map(p => [p.id, customers.every(c => c.permissions[p.id])])
-  );
-};
-
 const GlobalCustomerPerms = ({ users, onApply, showToast }) => {
-  const [globalPerms, setGlobalPerms] = React.useState(() => deriveGlobalPerms(users));
-  const [expanded, setExpanded] = React.useState(false);
-  const [confirmOpen, setConfirmOpen] = React.useState(false);
-  const customerCount = users.filter(u => u.role === 'Customer').length;
+  const { user } = React.useContext(UserContext);
+  const [globalPerms, setGlobalPerms] = useState({
+    "Request Orders": false,
+    "View Only": false,
+    "Track Project Progress": false,
+    "Request Site Inspection": false,
+    "Estimate Pricing": false
+  });
+  const [expanded, setExpanded] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  
+  const customerCount = users?.filter(u => {
+    const cleanRole = u?.role?.trim().toLowerCase();
+    return cleanRole === 'client' || cleanRole === 'customer';
+  }).length || 0;
 
-  React.useEffect(() => {
-    setGlobalPerms(deriveGlobalPerms(users));
-  }, [users]);
+  const userToken = user?.token;
+  const userId = user?._id;
 
-  const toggle = (id) => setGlobalPerms(prev => ({ ...prev, [id]: !prev[id] }));
+  useEffect(() => {
+    if (userToken && userId) {
+      const requestOptions = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: userToken, _id: userId })
+      };
+
+      CRUD(window.base_api + "get_global_client_template", requestOptions, (res) => {
+        if (res && res.remarks === "success" && res.payload) {
+          const loadedPerms = {};
+          CUSTOMER_PERMS.forEach(p => {
+            loadedPerms[p.id] = res.payload[p.id] === 1;
+          });
+          setGlobalPerms(loadedPerms);
+        }
+      });
+    }
+  }, [userToken, userId]);
+
+  const toggleGlobal = (id) => {
+    setGlobalPerms(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleApply = () => {
-    onApply(globalPerms);
-    setConfirmOpen(false);
-    showToast(`Global permissions applied to all ${customerCount} customers`, 'success');
+    const mappedDatabasePayload = {};
+    CUSTOMER_PERMS.forEach(p => {
+      mappedDatabasePayload[p.id] = globalPerms[p.id] ? 1 : 0;
+    });
+
+    onApply(mappedDatabasePayload, () => {
+      setConfirmOpen(false);
+      showToast(`Global operational parameters saved and synchronized across ${customerCount} clients`, 'success');
+    });
   };
 
   return (
@@ -409,7 +451,7 @@ const GlobalCustomerPerms = ({ users, onApply, showToast }) => {
           <div>
             <span className="global-perms-title">Global Customer Permissions</span>
             <span className="global-perms-sub">
-              Changes apply to all <strong>{customerCount}</strong> customer accounts at once
+              Changes mirror the master <code>base_access_level</code> template and sync profiles
             </span>
           </div>
         </div>
@@ -437,16 +479,16 @@ const GlobalCustomerPerms = ({ users, onApply, showToast }) => {
                   <span className="perm-label">{p.label}</span>
                   <span className="perm-desc">{p.desc}</span>
                 </div>
-                <Toggle checked={!!globalPerms[p.id]} onChange={() => toggle(p.id)} />
+                <Toggle checked={globalPerms[p.id]} onChange={() => toggleGlobal(p.id)} />
               </div>
             ))}
           </div>
           <div className="global-perms-actions">
             <span className="global-perms-hint">
-              &#9888; This will overwrite all individual customer permission settings.
+              &#9888; This updates your baseline reference layout and pushes the changes instantly.
             </span>
             <button className="btn-apply-global" onClick={() => setConfirmOpen(true)}>
-              Apply to All Customers
+              Apply & Save Master Template
             </button>
           </div>
         </div>
@@ -454,11 +496,11 @@ const GlobalCustomerPerms = ({ users, onApply, showToast }) => {
 
       {confirmOpen && (
         <ConfirmDialog
-          title="Apply to All Customers?"
-          message={`This will overwrite the permissions of all ${customerCount} customer accounts with the current global settings. Individual overrides will be replaced.`}
+          title="Save & Propagate Global Matrix?"
+          message={`This will overwrite the master client template and run updates across all ${customerCount} active client accounts.`}
           onConfirm={handleApply}
           onCancel={() => setConfirmOpen(false)}
-          confirmLabel="Apply to All"
+          confirmLabel="Apply & Save"
         />
       )}
     </div>
@@ -476,70 +518,122 @@ const FILTER_OPTIONS = [
 ];
 
 const UserManagement = ({ showToast }) => {
-  const { user, setUser } = React.useContext(UserContext);
-  const [users, setUsers] = useState(INITIAL_USERS);
+  const { user } = React.useContext(UserContext);
+  const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
-  const [modalType, setModalType] = useState(null); // 'rbac' | 'customer'
+  const [modalType, setModalType] = useState(null);
+
+  const rootUserToken = user?.token;
+  const rootUserId = user?._id;
+
+  const refreshUserData = () => {
+    if (rootUserToken && rootUserId) {
+      const requestOptions = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: rootUserToken, _id: rootUserId })
+      };
+
+      CRUD(window.base_api + "get_settings_users", requestOptions, (res) => {
+        if (res && res.remarks === "success" && Array.isArray(res.payload)) {
+          setUsers(res.payload);
+        } else {
+          setUsers([]);
+        }
+      });
+    }
+  };
 
   useEffect(() => {
-    if (user.token !== '' || user.token !== null) {
-      _getUsers(user, setUsers);
-    }
-  }, [user])
+    refreshUserData();
+  }, [rootUserToken, rootUserId]);
 
-  function _getUsers(user, callback) {
-    callback([])
-    var token = user.token;
-    var _id = user._id;
-
-    var requestOptions = {
+  const handleSaveUserAccess = (targetUserId, updates, onCompleteSuccess) => {
+    const requestOptions = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, _id })
+      body: JSON.stringify({
+        token: user.token,
+        admin_id: user._id,
+        target_user_id: targetUserId,
+        role: updates.role,
+        subrole: updates.subrole,
+        modules: updates.modules
+      })
     };
 
-    CRUD(window.base_api + "get_settings_users", requestOptions, (res) => {
+    CRUD(window.base_api + "update_user_access_level", requestOptions, (res) => {
       if (res && res.remarks === "success") {
-        callback(res.payload);
+        refreshUserData();
+        if (onCompleteSuccess) onCompleteSuccess();
       } else {
-        callback([])
+        showToast(res?.message || 'Error executing transactional update', 'error');
       }
     });
-  }
+  };
+
+  const handleGlobalCustomerApply = (globalClientModules, onCompleteSuccess) => {
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: user.token,
+        admin_id: user._id,
+        client_modules: globalClientModules
+      })
+    };
+
+    CRUD(window.base_api + "update_global_customer_permissions", requestOptions, (res) => {
+      if (res && res.remarks === "success") {
+        refreshUserData();
+        if (onCompleteSuccess) onCompleteSuccess();
+      } else {
+        showToast(res?.message || 'Batch update transaction dropped', 'error');
+      }
+    });
+  };
 
   const filtered = users?.filter(u => {
-    const matchSearch = u?.firstName?.toLowerCase().includes(search.toLowerCase()) || u?.lastName?.toLowerCase().includes(search.toLowerCase()) || u?.email?.toLowerCase().includes(search.toLowerCase());
+    const firstNameStr = u?.firstName || '';
+    const lastNameStr = u?.lastName || '';
+    const emailStr = u?.email || '';
+    const roleStr = u?.role || '';
+    const subroleStr = u?.subrole || '';
+
+    const matchSearch = firstNameStr.toLowerCase().includes(search.toLowerCase()) || 
+                        lastNameStr.toLowerCase().includes(search.toLowerCase()) || 
+                        emailStr.toLowerCase().includes(search.toLowerCase());
+    
     const matchFilter =
       filter === 'all' ? true :
-      filter === 'Staff' ? u.role === 'staff' :
-      filter === 'Customer' ? u.role === 'customer' :
-      u.subrole === filter;
+      filter === 'Staff' ? roleStr.toLowerCase() === 'staff' || roleStr.toLowerCase() === 'admin' :
+      filter === 'Customer' ? roleStr.toLowerCase() === 'client' || roleStr.toLowerCase() === 'customer' :
+      subroleStr.replace(/_/g, " ").toLowerCase() === filter.toLowerCase();
+      
     return matchSearch && matchFilter;
-  });
+  }) || [];
 
-  const handleManage = (user) => {
-    setSelectedUser(user);
-    setModalType(user.role === 'Staff' ? 'rbac' : 'customer');
-  };
-
-  const handleSave = (id, updates) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
-  };
-
-  const handleGlobalPerms = (globalPerms) => {
-    setUsers(prev => prev.map(u =>
-      u.role === 'Customer' ? { ...u, permissions: { ...globalPerms } } : u
-    ));
+  const handleManage = (u) => {
+    setSelectedUser(u);
+    const normalizedRole = u?.role?.trim().toLowerCase();
+    if (normalizedRole === 'staff' || normalizedRole === 'admin') {
+      setModalType('rbac');
+    } else {
+      setModalType('client');
+    }
   };
 
   const counts = {
     all: users?.length || 0,
-    Customer: users?.filter(u => u.role === 'customer')?.length || 0,
-    Staff: users?.filter(u => u.role === 'staff')?.length || 0,
-    Helper: users?.filter(u => u.subrole === 'helper')?.length || 0,
-    'Skilled Worker': users?.filter(u => u.subrole === 'skilled_worker')?.length || 0,
+    Customer: users?.filter(u => {
+      const cleanRole = u?.role?.trim().toLowerCase();
+      return cleanRole === 'client' || cleanRole === 'customer';
+    })?.length || 0,
+    Staff: users?.filter(u => u?.role?.toLowerCase() === 'staff' || u?.role?.toLowerCase() === 'admin')?.length || 0,
+    Helper: users?.filter(u => u?.subrole?.toLowerCase() === 'helper')?.length || 0,
+    'Skilled Worker': users?.filter(u => u?.subrole?.toLowerCase() === 'skilled worker' || u?.subrole?.toLowerCase() === 'skilled_worker')?.length || 0,
   };
 
   return (
@@ -547,7 +641,7 @@ const UserManagement = ({ showToast }) => {
       <div className="section-header">
         <div>
           <h2 className="section-title">User Management</h2>
-          <p className="section-subtitle">Manage roles, permissions, and access for all system users.</p>
+          <p className="section-subtitle">Manage dynamic security levels and permissions across administrative profiles.</p>
         </div>
         <div className="user-stats">
           <div className="stat-pill"><span className="stat-num">{counts.all}</span> Total</div>
@@ -556,10 +650,8 @@ const UserManagement = ({ showToast }) => {
         </div>
       </div>
 
-      {/* Global Customer Permissions */}
-      <GlobalCustomerPerms users={users} onApply={handleGlobalPerms} showToast={showToast} />
+      <GlobalCustomerPerms users={users} onApply={handleGlobalCustomerApply} showToast={showToast} />
 
-      {/* Filter Tabs */}
       <div className="filter-tabs">
         {FILTER_OPTIONS.map(opt => (
           <button
@@ -573,7 +665,6 @@ const UserManagement = ({ showToast }) => {
         ))}
       </div>
 
-      {/* Search */}
       <div className="search-row">
         <div className="search-wrap">
           <span className="search-icon">⌕</span>
@@ -588,12 +679,11 @@ const UserManagement = ({ showToast }) => {
         <span className="result-count">{filtered.length} user{filtered.length !== 1 ? 's' : ''} found</span>
       </div>
 
-      {/* Table */}
       {filtered.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">◈</div>
-          <h3>No users found</h3>
-          <p>Try adjusting your search or filter criteria.</p>
+          <h3>No records found</h3>
+          <p>Modify search criteria or filters to expand your search query.</p>
         </div>
       ) : (
         <div className="table-wrap">
@@ -608,67 +698,68 @@ const UserManagement = ({ showToast }) => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(u => (
-                <tr key={u.id} className="table-row">
-                  <td>
-                    <div className="user-cell">
-                      <Avatar initials={u.firstName?.charAt(0) + u.lastName?.charAt(0)} role={u.role} />
-                      <div className="user-info">
-                        <span className="user-name">{u.firstName} {u.lastName}</span>
-                        <span className="user-email">{u.email}</span>
+              {filtered.map(u => {
+                const isStaffTier = u?.role?.toLowerCase() === 'staff' || u?.role?.toLowerCase() === 'admin';
+                return (
+                  <tr key={u._id} className="table-row">
+                    <td>
+                      <div className="user-cell">
+                        <Avatar initials={(u?.firstName?.charAt(0) || '') + (u?.lastName?.charAt(0) || '')} role={u?.role} />
+                        <div className="user-info">
+                          <span className="user-name">{u?.firstName} {u?.lastName}</span>
+                          <span className="user-email">{u?.email}</span>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    <RoleBadge
-                      role={u.role
-                        ?.replace(/_/g, " ")
-                        .replace(/\b\w/g, (c) => c.toUpperCase())}
-                      subrole={u.subrole
-                        ?.replace(/_/g, " ")
-                        .replace(/\b\w/g, (c) => c.toUpperCase())}
-                    />
-                  </td>
-                  <td><StatusBadge status={u.status} /></td>
-                  <td>
-                    {u.role === 'Staff' ? (
-                      <div className="module-dots">
-                        {ALL_MODULES.map(m => (
-                          <span
-                            key={m.id}
-                            className={`module-dot ${u.modules[m.id] ? 'dot-on' : 'dot-off'}`}
-                            title={`${m.label}: ${u.modules[m.id] ? 'Accessible' : 'Blocked'}`}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="portal-access">Customer Portal</span>
-                    )}
-                  </td>
-                  <td>
-                    <button className="btn-manage" onClick={() => handleManage(u)}>
-                      {u.role === 'Staff' ? 'Manage Access' : 'View Permissions'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <RoleBadge
+                        role={u?.role?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                        subrole={u?.subrole?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                      />
+                    </td>
+                    <td><StatusBadge status={u?.status} /></td>
+                    <td>
+                      {isStaffTier ? (
+                        <div className="module-dots">
+                          {ALL_MODULES.map(m => {
+                            const isAccessible = u?.modules?.[m.id]?.View === 1;
+                            return (
+                              <span
+                                key={m.id}
+                                className={`module-dot ${isAccessible ? 'dot-on' : 'dot-off'}`}
+                                title={`${m.label}: ${isAccessible ? 'Accessible' : 'Blocked'}`}
+                              />
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className="portal-access">Customer Portal Matrix</span>
+                      )}
+                    </td>
+                    <td>
+                      <button className="btn-manage" onClick={() => handleManage(u)}>
+                        {isStaffTier ? 'Manage Access' : 'View Permissions'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Modals */}
       {selectedUser && modalType === 'rbac' && (
-        <RBACModal user={selectedUser} onClose={() => { setSelectedUser(null); setModalType(null); }} onSave={handleSave} showToast={showToast} />
+        <RBACModal user={selectedUser} onClose={() => { setSelectedUser(null); setModalType(null); }} onSave={handleSaveUserAccess} showToast={showToast} />
       )}
-      {selectedUser && modalType === 'customer' && (
-        <CustomerModal user={selectedUser} onClose={() => { setSelectedUser(null); setModalType(null); }} onSave={handleSave} showToast={showToast} />
+      {selectedUser && modalType === 'client' && (
+        <CustomerModal user={selectedUser} onClose={() => { setSelectedUser(null); setModalType(null); }} onSave={handleSaveUserAccess} showToast={showToast} />
       )}
     </div>
   );
 };
 
-// ─── Backup & Recovery Section ────────────────────────────────────────────────
+// ─── Backup & Recovery Section ───────────────────────────────────────────────
 
 const SCHEDULE_OPTIONS = [
   { id: 'weekly', label: 'Weekly', icon: '◷', desc: 'Every Sunday at midnight' },
@@ -730,22 +821,16 @@ const BackupRecovery = ({ showToast }) => {
   };
 
   const successCount = backups.filter(b => b.status === 'Success').length;
-  const totalSize = backups.reduce((acc, b) => {
-    const num = parseFloat(b.size);
-    const unit = b.size.includes('GB') ? 1024 : 1;
-    return acc + (isNaN(num) ? 0 : num * unit);
-  }, 0);
 
   return (
     <div className="section-container">
       <div className="section-header">
         <div>
           <h2 className="section-title">Backup & Recovery</h2>
-          <p className="section-subtitle">Manage system backups, schedules, and data restoration.</p>
+          <p className="section-subtitle">Manage system backups, schedules, and data restoration snapshots.</p>
         </div>
       </div>
 
-      {/* Summary Cards */}
       <div className="backup-summary">
         <div className="summary-card">
           <span className="summary-icon">◷</span>
@@ -777,7 +862,6 @@ const BackupRecovery = ({ showToast }) => {
         </div>
       </div>
 
-      {/* Schedule Selection */}
       <div className="backup-panel">
         <h3 className="panel-title">Backup Schedule</h3>
         <div className="schedule-grid">
@@ -800,77 +884,56 @@ const BackupRecovery = ({ showToast }) => {
         </div>
 
         <div className="backup-actions">
-          <button
-            className={`btn-backup-now ${isLoading ? 'btn-loading' : ''}`}
-            onClick={handleBackupNow}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <><span className="spinner" /> Processing...</>
-            ) : (
-              <> ▶ Backup Now</>
-            )}
+          <button className={`btn-backup-now ${isLoading ? 'btn-loading' : ''}`} onClick={handleBackupNow} disabled={isLoading}>
+            {isLoading ? <><span className="spinner" /> Processing...</> : <> ▶ Backup Now</>}
           </button>
         </div>
       </div>
 
-      {/* Backup History Table */}
       <div className="backup-panel">
         <h3 className="panel-title">Backup History</h3>
-        {backups.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">▦</div>
-            <h3>No backup records</h3>
-            <p>Run your first backup to see history here.</p>
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Backup Name</th>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Size</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Backup Name</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {backups.map(b => (
+                <tr key={b.id} className="table-row">
+                  <td><span className="backup-name">{b.name}</span></td>
+                  <td className="text-muted">{b.date}</td>
+                  <td><span className="type-badge">{b.type}</span></td>
+                  <td className="text-muted">{b.size}</td>
+                  <td>
+                    <span className={`backup-status ${b.status === 'Success' ? 'backup-success' : 'backup-failed'}`}>
+                      {b.status === 'Success' ? '✓' : '✕'} {b.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="backup-row-actions">
+                      <button className="action-btn" title="Restore" onClick={() => setRestoreConfirm(b)}>↺</button>
+                      <button className="action-btn" title="Download" onClick={() => handleDownload(b)}>↓</button>
+                      <button className="action-btn" title="Delete" onClick={() => setDeleteConfirm(b)}>✕</button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {backups.map(b => (
-                  <tr key={b.id} className="table-row">
-                    <td>
-                      <span className="backup-name">{b.name}</span>
-                    </td>
-                    <td className="text-muted">{b.date}</td>
-                    <td>
-                      <span className="type-badge">{b.type}</span>
-                    </td>
-                    <td className="text-muted">{b.size}</td>
-                    <td>
-                      <span className={`backup-status ${b.status === 'Success' ? 'backup-success' : 'backup-failed'}`}>
-                        {b.status === 'Success' ? '✓' : '✕'} {b.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="backup-row-actions">
-                        <button className="action-btn" title="Restore" onClick={() => setRestoreConfirm(b)}>↺</button>
-                        <button className="action-btn" title="Download" onClick={() => handleDownload(b)}>↓</button>
-                        <button className="action-btn action-delete" title="Delete" onClick={() => setDeleteConfirm(b)}>✕</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {deleteConfirm && (
         <ConfirmDialog
           title="Delete Backup Record?"
-          message={`This will permanently remove "${deleteConfirm.name}" from the history. This cannot be undone.`}
+          message={`This will permanently remove "${deleteConfirm.name}". This cannot be undone.`}
           onConfirm={() => handleDelete(deleteConfirm.id)}
           onCancel={() => setDeleteConfirm(null)}
           confirmLabel="Delete"
@@ -881,7 +944,7 @@ const BackupRecovery = ({ showToast }) => {
       {restoreConfirm && !isLoading && (
         <ConfirmDialog
           title="Restore System Backup?"
-          message={`Restoring from "${restoreConfirm.name}" (${restoreConfirm.date}). All current data will be replaced.`}
+          message={`Restoring from "${restoreConfirm.name}". All current transactional modifications will be dropped.`}
           onConfirm={() => handleRestore(restoreConfirm)}
           onCancel={() => setRestoreConfirm(null)}
           confirmLabel="Restore"
@@ -891,8 +954,6 @@ const BackupRecovery = ({ showToast }) => {
     </div>
   );
 };
-
-// ─── Root Settings Component ──────────────────────────────────────────────────
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('users');
@@ -904,11 +965,8 @@ const Settings = () => {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
-  const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
-
   return (
     <div className="settings-root">
-      {/* Page Header */}
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Settings</h1>
@@ -916,34 +974,23 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
       <div className="tab-nav">
-        <button
-          className={`tab-btn ${activeTab === 'users' ? 'tab-active' : ''}`}
-          onClick={() => setActiveTab('users')}
-        >
-          <span className="tab-icon">◎</span>
-          User Management
+        <button className={`tab-btn ${activeTab === 'users' ? 'tab-active' : ''}`} onClick={() => setActiveTab('users')}>
+          <span className="tab-icon">◎</span> User Management
         </button>
-        <button
-          className={`tab-btn ${activeTab === 'backup' ? 'tab-active' : ''}`}
-          onClick={() => setActiveTab('backup')}
-        >
-          <span className="tab-icon">▦</span>
-          Backup & Recovery
+        <button className={`tab-btn ${activeTab === 'backup' ? 'tab-active' : ''}`} onClick={() => setActiveTab('backup')}>
+          <span className="tab-icon">▦</span> Backup & Recovery
         </button>
       </div>
 
-      {/* Content */}
       <div className="settings-content">
         {activeTab === 'users' && <UserManagement showToast={showToast} />}
         {activeTab === 'backup' && <BackupRecovery showToast={showToast} />}
       </div>
 
-      {/* Toast Container */}
       <div className="toast-container">
         {toasts.map(t => (
-          <Toast key={t.id} message={t.message} type={t.type} onClose={() => removeToast(t.id)} />
+          <Toast key={t.id} message={t.message} type={t.type} onClose={() => setToasts(prev => prev.filter(x => x.id !== t.id))} />
         ))}
       </div>
     </div>

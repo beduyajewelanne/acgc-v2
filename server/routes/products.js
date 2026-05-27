@@ -367,7 +367,7 @@ productRoutes.post("/api/delete_product/:id", async (req, res) => {
                 }
 
                 const result = await delete_or_archive_helper("products", { _id: new ObjectId(id) });
-                await actionLog(userId, "Delete Product", `${fullName} Deleted product: ${result.payload[0].name}`);
+                await actionLog(userId, "Delete Product", `${fullName} Deleted product: ${productResult.payload[0].name}`);
                 response = { remarks: "success", message: "Product and associated images deleted successfully", payload: result };
             } else {
                 response = { remarks: "failed", message: "Product not found" };

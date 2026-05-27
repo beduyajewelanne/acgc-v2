@@ -97,10 +97,8 @@ export default function Login() {
           setMessage({ type: "success", text: "Login successful." });
           const { role } = data;
           await setUser(data);
-          if (role === "admin") {
+          if (role === "admin" || role === "staff") {
             navigate("/admin");
-          } else if (role === "skilled_worker") {
-            navigate("/worker/dashboard");
           } else {
             navigate("/");
           }

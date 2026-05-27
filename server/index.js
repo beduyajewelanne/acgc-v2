@@ -21,6 +21,9 @@ try {
 
   const productRoutes = require("./routes/products");
   app.use(productRoutes);
+
+  const userRoutes = require("./routes/users");
+  app.use(userRoutes);
 } catch (err) {
   console.error("Error setting up routes:", err.message);
 }

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import './AdminDashboard.css';
 
 const PROJECTS = [
@@ -101,9 +101,9 @@ export default function AdminDashboard() {
             <h2 className="adm-section-title">Recent Transactions</h2>
             <p className="adm-section-desc">Recent activity in the Customer Website</p>
           </div>
-          <button className="adm-viewall-btn" onClick={() => navigate('/admin/site-inspection', { state: { view: 'recent-orders' } })}>
+          <Link to="/admin/site-inspections" state={{ view: "recent-orders" }} className="adm-viewall-btn" >
             View all <i className="ti ti-arrow-right" aria-hidden="true"></i>
-          </button>
+            </Link>
         </div>
 
         <div className="adm-table-wrap">

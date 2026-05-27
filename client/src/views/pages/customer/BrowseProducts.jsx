@@ -1,107 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, Zap, Eye, Search, SlidersHorizontal, X, CheckCircle2 } from 'lucide-react';
 import ProductModal from './ProductModal';
+import { CRUD } from 'services/data.services';
+import { UserContext } from 'App';
 import './BrowseProduct.css';
-
-const PRODUCTS = [
-  {
-    id: 1,
-    name: 'Frosted Tempered Glass',
-    type: 'Glass',
-    category: 'Interior',
-    price: 1500,
-    description:
-      'Premium frosted tempered glass panels engineered for interior partitions, office dividers, and feature walls. The fine-grain frosting diffuses light beautifully while maintaining privacy. Available in 6mm and 10mm thicknesses with polished or beveled edge options. Heat-strengthened to withstand thermal stress and impact without shattering.',
-    images: [
-      'https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&q=80',
-      'https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=600&q=80',
-      'https://images.unsplash.com/photo-1497366754035-f200968a7eed?w=600&q=80',
-    ],
-  },
-  {
-    id: 2,
-    name: 'Clear Float Glass Panel',
-    type: 'Glass',
-    category: 'Windows',
-    price: 1200,
-    description:
-      'Ultra-clear float glass with minimal green tint for maximum light transmission. Ideal for showcase windows, display cabinets, and architectural glazing. Manufactured using the float process for optical clarity and surface flatness. Compatible with all standard aluminum and steel framing systems.',
-    images: [
-      'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=600&q=80',
-      'https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&q=80',
-    ],
-  },
-  {
-    id: 3,
-    name: 'Powder-Coated Aluminum Frame',
-    type: 'Aluminum',
-    category: 'Windows',
-    price: 950,
-    description:
-      'Heavy-duty aluminum window frame with factory-applied powder coat finish in your choice of color. The thermally broken profile significantly reduces heat transfer, improving energy efficiency. Features multi-point locking, stainless hardware, and a weather seal rated for typhoon conditions. Low maintenance and corrosion-resistant.',
-    images: [
-      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&q=80',
-      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&q=80',
-    ],
-  },
-  {
-    id: 4,
-    name: 'Aluminum Curtain Wall System',
-    type: 'Aluminum',
-    category: 'Facade',
-    price: 2200,
-    description:
-      'Structural aluminum curtain wall system designed for commercial and mid-rise buildings. Features a unitized grid with pressure-plate glazing that accommodates glass from 6mm to 28mm IGU. Engineered for wind loads up to 200 kph. Integrated drainage channels and weep holes prevent water infiltration. Finishes include anodized and PVDF coatings.',
-    images: [
-      'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=600&q=80',
-      'https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&q=80',
-      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&q=80',
-    ],
-  },
-  {
-    id: 5,
-    name: 'Tinted Reflective Glass',
-    type: 'Glass',
-    category: 'Facade',
-    price: 1800,
-    description:
-      'Bronze-tinted solar-control glass that reduces heat gain by up to 55% while maintaining outward visibility. The metallic reflective coating gives facades a sleek, modern appearance. Suitable for curtain walls, storefronts, and canopy glazing. Compatible with silicone structural glazing and wet-seal systems.',
-    images: [
-      'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=600&q=80',
-      'https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&q=80',
-    ],
-  },
-  {
-    id: 6,
-    name: 'Sliding Door Aluminum Track',
-    type: 'Aluminum',
-    category: 'Doors',
-    price: 1100,
-    description:
-      'Precision-extruded aluminum sliding door track system with nylon rollers and soft-close dampeners. The heavy-duty profile supports panels weighing up to 120 kg. Includes top and bottom guide channels, anti-lift device, and adjustable roller carriages. Suitable for interior and exterior applications with optional weather strip integration.',
-    images: [
-      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&q=80',
-      'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=600&q=80',
-    ],
-  },
-];
 
 const CATEGORIES = ['All Products', 'Glass', 'Aluminum', 'Interior', 'Windows', 'Facade', 'Doors'];
 
-/* ─── Cart Toast ─────────────────────────────────────────────────────────── */
-const CartToast = ({ product, onDismiss }) => (
+const CartToast = ({ product, message, onDismiss }) => (
   <div className="cart-toast">
     <CheckCircle2 size={18} className="toast-icon" />
-    <span><strong>{product.name}</strong> added to cart</span>
+    <span>{message || <span><strong>{product.name}</strong> added to cart</span>}</span>
     <button onClick={onDismiss} className="toast-close"><X size={14} /></button>
   </div>
 );
 
-/* ─── Product Card ───────────────────────────────────────────────────────── */
 const ProductCard = ({ product, onView, onAddToCart }) => (
   <div className="product-card">
     <div className="card-image-wrap">
-      <img src={product.images[0]} alt={product.name} className="card-image" />
+      <img src={product.images[0] || 'https://via.placeholder.com/600x400?text=No+Image'} alt={product.name} className="card-image" />
       <span className="card-badge">{product.type}</span>
     </div>
     <div className="card-body">
@@ -127,17 +45,50 @@ const ProductCard = ({ product, onView, onAddToCart }) => (
   </div>
 );
 
-/* ─── Browse Products Page ───────────────────────────────────────────────── */
 const BrowseProducts = () => {
+  const { user, permissions } = useContext(UserContext);
+  const navigate = useNavigate();
+  const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All Products');
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [modalIntent, setModalIntent] = useState('view'); // 'view' | 'order'
+  const [modalIntent, setModalIntent] = useState('view');
   const [cart, setCart] = useState([]);
   const [toast, setToast] = useState(null);
+  const [toastMsg, setToastMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/get_products_client';
+    CRUD(apiUri, { method: 'GET' }, (res) => {
+      if (res && res.remarks === 'success' && Array.isArray(res.payload)) {
+        const baseUrl = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '');
+        const normalized = res.payload.map(p => {
+          const mainImgUrl = p.mainImg ? (p.mainImg.startsWith('http') ? p.mainImg : `${baseUrl}${p.mainImg}`) : 'https://via.placeholder.com/600x400?text=No+Image';
+          const validAngles = Array.isArray(p.angleImgs) 
+            ? p.angleImgs.filter(img => img).map(img => img.startsWith('http') ? img : `${baseUrl}${img}`) 
+            : [];
+          return {
+            id: p._id || p.id,
+            name: p.name || '',
+            type: p.type || '',
+            category: p.category || '',
+            price: p.pricePerSqFt || p.estimatedCost || 0,
+            description: p.description || '',
+            images: [mainImgUrl, ...validAngles],
+            variant: p.variant || '',
+            width: p.width || 0,
+            height: p.height || 0,
+            unit: p.unit || 'in'
+          };
+        });
+        setProducts(normalized);
+      }
+    });
+  }, []);
 
   const filtered = useMemo(() => {
-    return PRODUCTS.filter((p) => {
+    return products.filter((p) => {
       const matchCat =
         activeCategory === 'All Products' ||
         p.type === activeCategory ||
@@ -148,27 +99,70 @@ const BrowseProducts = () => {
         p.category.toLowerCase().includes(search.toLowerCase());
       return matchCat && matchSearch;
     });
-  }, [search, activeCategory]);
+  }, [search, activeCategory, products]);
 
   const handleView = (product, intent = 'view') => {
+    if (intent === 'order' && (!user || !user.token)) {
+      navigate('/login');
+      return;
+    }
     setSelectedProduct(product);
     setModalIntent(intent);
   };
 
   const handleAddToCart = (product, measurements = null) => {
-    const item = { ...product, measurements, addedAt: Date.now() };
+    if (!user || !user.token) {
+      navigate('/login');
+      return;
+    }
+    const finalMeasurements = measurements || {
+      width: product.width || 0,
+      height: product.height || 0,
+      unit: product.unit || 'in'
+    };
+    const item = { ...product, measurements: finalMeasurements, addedAt: Date.now() };
     setCart((prev) => [...prev, item]);
-    showToast(product);
+    showToast(product, `Added ${product.name} to cart`);
   };
 
-  const showToast = (product) => {
-    setToast(product);
-    setTimeout(() => setToast(null), 3000);
+  const handleSubmitOrder = () => {
+    if (!user || !user.token) {
+      navigate('/login');
+      return;
+    }
+    if (cart.length === 0) return;
+    setIsSubmitting(true);
+
+    const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/submit_order';
+    const payload = {
+      user_id: user._id,
+      items: cart.map(item => ({
+        product_id: item.id,
+        width: item.measurements.width,
+        height: item.measurements.height,
+        unit: item.measurements.unit
+      }))
+    };
+
+    CRUD(apiUri, { method: 'POST', body: JSON.stringify(payload) }, (res) => {
+      setIsSubmitting(false);
+      if (res && res.remarks === 'success') {
+        showToast(null, "Order submitted successfully!");
+        setCart([]);
+      } else {
+        alert("Failed to submit order.");
+      }
+    });
+  };
+
+  const showToast = (product, message = '') => {
+    setToast(product || { name: 'Success' });
+    setToastMsg(message);
+    setTimeout(() => { setToast(null); setToastMsg(''); }, 3000);
   };
 
   return (
     <div className="browse-page">
-      {/* ── Hero Header ── */}
       <div className="browse-hero">
         <div className="hero-inner">
           <p className="hero-eyebrow">Premium Selection</p>
@@ -179,7 +173,6 @@ const BrowseProducts = () => {
         </div>
       </div>
 
-      {/* ── Controls ── */}
       <div className="controls-row">
         <div className="search-wrap">
           <Search size={16} className="search-icon" />
@@ -210,19 +203,26 @@ const BrowseProducts = () => {
         </div>
       </div>
 
-      {/* ── Results Count ── */}
       <div className="results-row">
         <span className="results-count">
           {filtered.length} product{filtered.length !== 1 ? 's' : ''} found
         </span>
         {cart.length > 0 && (
-          <span className="cart-count">
-            <ShoppingCart size={14} /> {cart.length} in cart
-          </span>
+          <div className="cart-status-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span className="cart-count">
+              <ShoppingCart size={14} /> {cart.length} in cart
+            </span>
+            <button 
+              className="btn-submit-order" 
+              onClick={handleSubmitOrder} 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Processing...' : 'Submit Order'}
+            </button>
+          </div>
         )}
       </div>
 
-      {/* ── Product Grid ── */}
       {filtered.length > 0 ? (
         <div className="product-grid">
           {filtered.map((p) => (
@@ -248,18 +248,18 @@ const BrowseProducts = () => {
         </div>
       )}
 
-      {/* ── Modal ── */}
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}
           initialIntent={modalIntent}
           onClose={() => setSelectedProduct(null)}
           onAddToCart={handleAddToCart}
+          user={user}
+          permissions={permissions}
         />
       )}
 
-      {/* ── Cart Toast ── */}
-      {toast && <CartToast product={toast} onDismiss={() => setToast(null)} />}
+      {toast && <CartToast product={toast} message={toastMsg} onDismiss={() => { setToast(null); setToastMsg(''); }} />}
     </div>
   );
 };

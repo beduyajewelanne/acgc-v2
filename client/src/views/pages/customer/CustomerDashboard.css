@@ -81,6 +81,7 @@
     border-radius: 12px;
     border: 1px solid #eee;
     transition: transform 0.2s;
+    max-width: 340px;
 }
 .product-item-wrapper:hover {
   transform: translateY(-5px);
@@ -94,6 +95,7 @@
     flex-grow: 1; /* Makes the card content take up all available space */
     display: flex;
     flex-direction: column;
+    max-width: 340px;
 }
 
 .product-card:hover {

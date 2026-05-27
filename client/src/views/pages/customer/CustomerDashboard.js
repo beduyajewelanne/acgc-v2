@@ -82,7 +82,7 @@ const CustomerDashboard = ({ isLoggedIn }) => {
               Loading featured selections...
             </div>
           ) : (
-            featuredProducts.map((p) => (
+            featuredProducts.slice(0, 3).map((p) => (
               <ProductCard key={p._id || p.id} product={p} />
             ))
           )}

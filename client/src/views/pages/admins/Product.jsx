@@ -1,5 +1,7 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect, useContext } from 'react';
 import './Product.css';
+import { UserContext } from 'App';
+import { isEmpty, CRUD } from 'services/data.services';
 
 const INIT_TYPES = ['Glass & Aluminum', 'Steel Fabrication', 'Wooden Frame'];
 const INIT_CATEGORIES = ['Windows', 'Doors', 'Partitions', 'Railings', 'Curtain Walls'];
@@ -51,7 +53,6 @@ function ExpandableDropdown({ label, required, value, options, onChange, onAddNe
   const [addError, setAddError] = useState('');
   const wrapRef  = useRef();
   const inputRef = useRef();
-
 
   useEffect(() => {
     const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) { setOpen(false); setAdding(false); setNewValue(''); setAddError(''); } };
@@ -163,6 +164,8 @@ function UploadCard({ label, hint, image, onChange, onRemove }) {
     if (file) { const r = new FileReader(); r.onload = ev => onChange(ev.target.result); r.readAsDataURL(file); }
   };
 
+  const imgUrl = (image && image.startsWith('/uploads/')) ? (window.base_api.replace('/api/', '') + image) : image;
+
   return (
     <div
       className={`upload-card${dragging ? ' dragging' : ''}${image ? ' has-image' : ''}`}
@@ -173,7 +176,7 @@ function UploadCard({ label, hint, image, onChange, onRemove }) {
     >
       {image ? (
         <>
-          <img src={image} alt={label} className="upload-card__preview" />
+          <img src={imgUrl} alt={label} className="upload-card__preview" />
           <button type="button" className="upload-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>✕</button>
         </>
       ) : (
@@ -187,7 +190,6 @@ function UploadCard({ label, hint, image, onChange, onRemove }) {
     </div>
   );
 }
-
 
 function DeleteModal({ product, onConfirm, onCancel }) {
   return (
@@ -208,7 +210,7 @@ function DeleteModal({ product, onConfirm, onCancel }) {
 }
 
 function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes, categories, setCategories, variantMap, setVariantMap }) {
-  const isEdit = !!initial?.id;
+  const isEdit = !!(initial?._id || initial?.id);
 
   const defaultForm = {
     type: productTypes[0] || '',
@@ -275,13 +277,12 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
 
   const handleSubmit = () => {
     if (!validate()) return;
-    onSave({ ...form, mainImg, angleImgs, id: initial?.id || Date.now() });
+    onSave({ ...form, mainImg, angleImgs });
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-    
         <div className="modal-header">
           <div>
             <div className="modal-title">{isEdit ? 'Edit Product' : 'Add New Product'}</div>
@@ -291,10 +292,7 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
         </div>
 
         <div className="modal-body">
-
-       
           <div className="section-label">Product Information</div>
-
           <div className="form-row">
             <ExpandableDropdown
               label="Product Type"
@@ -351,14 +349,12 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
             <textarea
               className="field-textarea"
               placeholder="Describe this product — materials, use case, special features..."
-              value={form.description}
+              value={form.description || ''}
               onChange={(e) => update('description', e.target.value)}
             />
           </div>
 
-      
           <div className="section-label" style={{ marginTop: '0.75rem' }}>Measurements & Pricing</div>
-
           <div className="measurements-row" style={{ marginBottom: '0.85rem' }}>
             <div>
               <label className="field-label">Width <span className="field-required">*</span></label>
@@ -402,7 +398,6 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
           </div>
 
           <div className="section-label" style={{ marginTop: '0.75rem' }}>Product Images</div>
-
           <div className="upload-main-wrap" style={{ marginBottom: '0.75rem' }}>
             <label className="field-label" style={{ marginBottom: '0.5rem' }}>Main Product Image</label>
             <UploadCard label="Main Image" hint="Drag & drop or click to upload" image={mainImg} onChange={setMainImg} onRemove={() => setMainImg(null)} />
@@ -421,9 +416,7 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
             ))}
           </div>
 
-     
           <div className="section-label" style={{ marginTop: '0.75rem' }}>Status</div>
-
           <label className="toggle-row">
             <div className="toggle-switch">
               <input type="checkbox" checked={form.active} onChange={(e) => update('active', e.target.checked)} />
@@ -448,13 +441,16 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
   );
 }
 
-
 function ProductCard({ product, onEdit, onDelete, index }) {
+  const mainImgUrl = (product.mainImg && product.mainImg.startsWith('/uploads/')) 
+    ? (window.base_api.replace('/api/', '') + product.mainImg) 
+    : product.mainImg;
+
   return (
     <div className="product-card" style={{ animationDelay: `${index * 0.04}s` }}>
       <div className="card-image">
         {product.mainImg
-          ? <img src={product.mainImg} alt={product.name} />
+          ? <img src={mainImgUrl} alt={product.name} />
           : <div className="card-image__placeholder"><Icon.Image /><span>No Image</span></div>
         }
         <span className={`card-status-badge ${product.active ? 'active' : 'inactive'}`}>
@@ -493,7 +489,6 @@ function ProductCard({ product, onEdit, onDelete, index }) {
   );
 }
 
-
 function Toast({ message, type, visible }) {
   if (!visible) return null;
   return (
@@ -504,8 +499,8 @@ function Toast({ message, type, visible }) {
   );
 }
 
-
 const Products = () => {
+  const { user } = useContext(UserContext);
   const [productTypes, setProductTypes] = useState(INIT_TYPES);
   const [categories,   setCategories]   = useState(INIT_CATEGORIES);
   const [variantMap,   setVariantMap]   = useState(INIT_VARIANT_MAP);
@@ -518,6 +513,37 @@ const Products = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toast,        setToast]        = useState({ visible: false, message: '', type: 'success' });
 
+  function _getProducts(currentUser, callback) {
+    if (!currentUser || !currentUser.token) return;
+
+    const payload = {
+      token: currentUser.token,
+      _id: currentUser._id,
+      archive: 0
+    };
+  
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    };
+
+    CRUD(window.base_api + "get_products", requestOptions, (res) => {
+      if(res.remarks === "success") {
+        callback(res.payload || []);
+      } else {
+        console.error("Failed to fetch products:", res.message);
+        callback([]);
+      }
+    });
+  }
+
+  useEffect(() => {
+    if(user && !isEmpty(user.token)) {
+      _getProducts(user, setProducts);
+    }
+  }, [user]);
+
   const showToast = useCallback((message, type = 'success') => {
     setToast({ visible: true, message, type });
     setTimeout(() => setToast((t) => ({ ...t, visible: false })), 3000);
@@ -526,31 +552,67 @@ const Products = () => {
   const openAdd  = () => { setEditTarget(null); setModalOpen(true); };
   const openEdit = (p)  => { setEditTarget(p);   setModalOpen(true); };
 
-  const handleSave = useCallback((product) => {
-    setProducts((prev) => {
-      const exists = prev.find((p) => p.id === product.id);
-      return exists ? prev.map((p) => p.id === product.id ? product : p) : [product, ...prev];
+  const handleSave = useCallback((productData) => {
+    if (!user || !user.token) return;
+    const isEditing = !!(productData._id || productData.id);
+
+    const payload = {
+      token: user.token,
+      userId: user._id,
+      product: productData
+    };
+
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    };
+
+    const endpoint = isEditing ? "update_product" : "add_product";
+
+    CRUD(window.base_api + endpoint, requestOptions, (res) => {
+      if (res.remarks === "success") {
+        _getProducts(user, setProducts);
+        setModalOpen(false);
+        showToast(isEditing ? 'Product updated successfully.' : 'Product created successfully.', 'success');
+      } else {
+        console.error("Failed to save product:", res.message);
+        showToast("Error saving product: " + (res.message || "Unknown error"), 'error');
+      }
     });
-    setModalOpen(false);
-    showToast(editTarget ? 'Product updated successfully.' : 'Product created successfully.');
-  }, [editTarget, showToast]);
+  }, [user, showToast]);
 
   const handleDelete = useCallback(() => {
-    if (!deleteTarget) return;
-    setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-    setDeleteTarget(null);
-    showToast('Product deleted.');
-  }, [deleteTarget, showToast]);
+    if (!deleteTarget || !user || !user.token) return;
+    const targetId = deleteTarget._id || deleteTarget.id;
+
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: user.token, _id: user._id })
+    };
+
+    CRUD(window.base_api + `delete_product/${targetId}`, requestOptions, (res) => {
+      if (res.remarks === "success") {
+        _getProducts(user, setProducts);
+        setDeleteTarget(null);
+        showToast('Product deleted successfully.', 'success');
+      } else {
+        console.error("Failed to delete product:", res.message);
+        showToast("Error removing item: " + (res.message || "Unknown error"), 'error');
+      }
+    });
+  }, [deleteTarget, user, showToast]);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     return products.filter((p) => {
       const matchesCat = filterCat === 'All' || p.category === filterCat;
       const matchesSearch = !q
-        || p.name.toLowerCase().includes(q)
-        || p.category.toLowerCase().includes(q)
-        || p.variant.toLowerCase().includes(q)
-        || p.type.toLowerCase().includes(q);
+        || p.name?.toLowerCase().includes(q)
+        || p.category?.toLowerCase().includes(q)
+        || p.variant?.toLowerCase().includes(q)
+        || p.type?.toLowerCase().includes(q);
       return matchesCat && matchesSearch;
     });
   }, [products, searchTerm, filterCat]);
@@ -565,7 +627,6 @@ const Products = () => {
 
   return (
     <div className="pms-page">
-
       <div className="pms-header">
         <div>
           <div className="pms-header__title">Product Management</div>
@@ -584,7 +645,6 @@ const Products = () => {
           <div className="stat-card"><div className="stat-card__value">{filtered.length}</div><div className="stat-card__label">Showing</div></div>
         </div>
       )}
-
 
       <div className="pms-toolbar">
         <div className="pms-search-wrap">
@@ -606,7 +666,7 @@ const Products = () => {
             <div className="pms-empty__desc">{products.length === 0 ? 'Click "Add New Product" to get started.' : 'Try adjusting your search or filter.'}</div>
           </div>
         ) : (
-          filtered.map((p, i) => <ProductCard key={p.id} product={p} index={i} onEdit={openEdit} onDelete={setDeleteTarget} />)
+          filtered.map((p, i) => <ProductCard key={p._id || p.id} product={p} index={i} onEdit={openEdit} onDelete={setDeleteTarget} />)
         )}
       </div>
 

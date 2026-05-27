@@ -151,7 +151,7 @@ const ForgotPassword = () => {
               <p>Enter your email account to receive a verification code.</p>
               <input 
                 type="email" 
-                placeholder="name@company.com" 
+                placeholder="name@gmail.com" 
                 className="form-input" 
                 name="email"
                 value={formData.email}

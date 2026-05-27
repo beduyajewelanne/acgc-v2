@@ -1,19 +1,41 @@
-import React, { useContext, useEffect} from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import './CustomerDashboard.css'; 
 import { useNavigate } from 'react-router-dom';
 import FeatureCard from '../../../components/FeatureCard'; 
 import ProductCard from '../../../components/ProductCard';
-import { products } from '../../../data/productData';
 import { UserContext } from 'App';
-import { isEmpty } from 'services/data.services';
+import { isEmpty, CRUD } from 'services/data.services';
+
 const CustomerDashboard = ({ isLoggedIn }) => {
-  const navigate = useNavigate(); //
+  const navigate = useNavigate();
   const { user } = useContext(UserContext);
+
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+
+  useEffect(() => {
+    const requestOptions = {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    };
+
+    CRUD(window.base_api + "featured_products", requestOptions, (res) => {
+      if (res && res.remarks === "success") {
+        setFeaturedProducts(res.payload || []);
+      } else if (Array.isArray(res)) {
+        setFeaturedProducts(res);
+      } else if (res && Array.isArray(res.payload)) {
+        setFeaturedProducts(res.payload);
+      } else {
+        console.warn("Unexpected featured products payload format:", res);
+      }
+    });
+  }, []);
+
   useEffect(() => {
     if (user && !isEmpty(user.token)) {
       console.log("User is logged in:", user);
     }
-  }, [user])
+  }, [user]);
 
   return (
     <div className="homepage-container">
@@ -30,35 +52,42 @@ const CustomerDashboard = ({ isLoggedIn }) => {
         </div>
       </section>
 
-     <section className="features">
-      <FeatureCard 
-        title="Quality Guaranteed" 
-        description="Premium materials..." 
-        image="/images/shield.png" 
-      />
-      <FeatureCard 
-        title="Fast Turnaround" 
-        description="Efficient production..." 
-        image="/images/clock.png" 
-      />
-      <FeatureCard 
-        title="Expert Installation" 
-        description="Professional site inspection..." 
-        image="/images/tools.png" 
-      />
-    </section>
+      <section className="features">
+        <FeatureCard 
+          title="Quality Guaranteed" 
+          description="Premium materials..." 
+          image="/images/shield.png" 
+        />
+        <FeatureCard 
+          title="Fast Turnaround" 
+          description="Efficient production..." 
+          image="/images/clock.png" 
+        />
+        <FeatureCard 
+          title="Expert Installation" 
+          description="Professional site inspection..." 
+          image="/images/tools.png" 
+        />
+      </section>
 
       <section className="product-preview">
-      <div className="preview-header">
-        <h2>Our Products</h2>
-        <span className="view-all" onClick={() => navigate('/customer/products')}>View All &gt;</span>
-      </div>
-      <div className="product-grid">
-        {products.slice(0, 3).map((p) => (
-          <ProductCard key={p.id} product={p} />
-        ))}
-      </div>
-    </section>
+        <div className="preview-header">
+          <h2>Our Products</h2>
+          <span className="view-all" onClick={() => navigate('/customer/products')}>View All &gt;</span>
+        </div>
+        
+        <div className="product-grid">
+          {featuredProducts.length === 0 ? (
+            <div className="pms-loading-shimmer" style={{ padding: "2rem", gridColumn: "1/-1", textAlign: "center", color: "var(--text-muted)" }}>
+              Loading featured selections...
+            </div>
+          ) : (
+            featuredProducts.map((p) => (
+              <ProductCard key={p._id || p.id} product={p} />
+            ))
+          )}
+        </div>
+      </section>
 
       <section className="cta-section">
         <h2>Ready to Start Your Project?</h2>

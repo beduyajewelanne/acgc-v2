@@ -30,6 +30,7 @@ import AdminDashboard from './views/pages/admins/AdminDashboard';
 import Products from './views/pages/admins/Product';
 import SiteInspection from './views/pages/admins/SiteInspection';
 import ProgressMonitor from './views/pages/admins/ProgressMonitor';
+import Transactions from './views/pages/admins/Transactions';
 
 export const UserContext = createContext();
 
@@ -72,6 +73,7 @@ const AppContent = ({ isLoggedIn }) => {
           <Route path="products" element={<Products />} />
           <Route path="site-inspections" element={<SiteInspection />} />
           <Route path="monitor" element={<ProgressMonitor />} />
+          <Route path="transactions" element={<Transactions />} />
         </Route>
         
         {/* Customer Routes - Inside DashboardLayout */}

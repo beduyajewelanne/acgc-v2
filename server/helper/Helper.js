@@ -334,3 +334,41 @@ async function restore_data(target_collection, _id, db) {
     return false;
   }
 }
+
+export async function checkAuth(token, _id, callback) {
+  if (!token || !ObjectId.isValid(_id)) {
+    return callback(false);
+  }
+
+  try {
+    const user_query = [
+      {
+        $match: {
+          _id: new ObjectId(_id),
+          token: token,
+          is_verified: true,
+        }
+      }
+    ];
+
+    const result = await check_record_exists("users", user_query);
+
+    if (result?.payload?.length > 0) {
+      const user = result.payload[0];
+
+      const expiryLimit = new Date();
+      expiryLimit.setHours(expiryLimit.getHours() - 24);
+
+      if (user.lastLogin && new Date(user.lastLogin) < expiryLimit) {
+        return callback(false);
+      }
+
+      return callback(true);
+    }
+
+    return callback(false);
+  } catch (error) {
+    console.error("Auth check error:", error);
+    return callback(false);
+  }
+}

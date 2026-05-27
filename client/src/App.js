@@ -32,6 +32,7 @@ import SiteInspection from './views/pages/admins/SiteInspection';
 import ProgressMonitor from './views/pages/admins/ProgressMonitor';
 import Transactions from './views/pages/admins/Transactions';
 import Settings from './views/pages/admins/Settings';
+import AdminProfile from './views/pages/admins/AdminProfile';
 
 export const UserContext = createContext();
 
@@ -76,6 +77,7 @@ const AppContent = ({ isLoggedIn }) => {
           <Route path="monitor" element={<ProgressMonitor />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="profile" element={<AdminProfile />} />
         </Route>
         
         {/* Customer Routes - Inside DashboardLayout */}

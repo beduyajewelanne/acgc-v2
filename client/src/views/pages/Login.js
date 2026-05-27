@@ -98,7 +98,7 @@ export default function Login() {
           const { role } = data;
           await setUser(data);
           if (role === "admin") {
-            navigate("/admin/dashboard");
+            navigate("/admin");
           } else if (role === "skilled_worker") {
             navigate("/worker/dashboard");
           } else {

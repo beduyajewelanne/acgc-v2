@@ -11,6 +11,7 @@ import ForgotPassword from './views/pages/ForgotPassword';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Footer from './components/layout/Footer';
 import AboutUs from './components/AboutUs/AboutUs';
+import AdminLayout from './components/layout/adminLayout/AdminLayout';
 
 // Customer Pages
 import CustomerRoutes from './views/pages/customer/CustomerRoutes';
@@ -23,6 +24,9 @@ import Contracts from './views/pages/customer/Contracts';
 import Receipts from './views/pages/customer/Receipts';
 import MyOrders from './views/pages/customer/MyOrders';
 import Cart from './views/pages/customer/Cart';
+
+// Admin Pages
+import AdminDashboard from './views/pages/admins/AdminDashboard';
 
 export const UserContext = createContext();
 
@@ -53,16 +57,22 @@ const AppContent = ({ isLoggedIn }) => {
 
   return (
     <>
-      <Routes>
+     <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUpForm />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         
-        {/* Main Application Routes */}
+        {/* Admin Routes - Outside DashboardLayout so no header/footer */}
+        <Route path="admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+        </Route>
+        
+        {/* Customer Routes - Inside DashboardLayout */}
         <Route path="/*" element={
           <DashboardLayout isLoggedIn={isLoggedIn}>
             <Routes>
-             ]<Route index element={<CustomerDashboard isLoggedIn={isLoggedIn} />} />
+              <Route index element={<CustomerDashboard isLoggedIn={isLoggedIn} />} />
               <Route path="customer/products" element={<BrowseProducts />} />
               <Route path="track" element={<TrackProducts />} />
               <Route path="about" element={<AboutUs />} />
@@ -71,7 +81,7 @@ const AppContent = ({ isLoggedIn }) => {
               <Route path="receipts" element={<Receipts />} />
               <Route path="orders" element={<MyOrders />} />
               <Route path="cart" element={<Cart />} />
-              <Route path="/customer/*" element={
+              <Route path="customer/*" element={
                 isLoggedIn ? <CustomerRoutes /> : <Navigate to="/login" />
               } />
             </Routes>
@@ -80,7 +90,7 @@ const AppContent = ({ isLoggedIn }) => {
       </Routes>
       
       {/* Dynamic Footer Rendering */}
-      {shouldShowFooter && <Footer />}
+      {shouldShowFooter && !location.pathname.startsWith('/admin') && <Footer />}
     </>
   );
 };

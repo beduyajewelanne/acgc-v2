@@ -1,0 +1,12 @@
+.admin-layout { display: flex; min-height: 100vh; background: #f9fbfd; }
+.sidebar { 
+  width: 250px; background: #1a1c24; color: white; padding: 20px; 
+  display: flex; flex-direction: column;
+}
+.sidebar h2 { color: white; margin-bottom: 30px; font-size: 1.2rem; }
+.sidebar a { 
+  display: block; color: #a1a1aa; padding: 15px 0; 
+  text-decoration: none; font-weight: 500;
+}
+.sidebar a:hover { color: white; }
+.content { flex: 1; padding: 30px; }

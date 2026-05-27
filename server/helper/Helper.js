@@ -372,3 +372,17 @@ export async function checkAuth(token, _id, callback) {
     return callback(false);
   }
 }
+
+export async function actionLog(userId, actionType, description) {
+  const db_connect = getDb();
+  try {
+    await db_connect.collection("action_logs").insertOne({
+      userId: userId ? new ObjectId(userId): null,
+      actionType,
+      description,
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    console.error("Action log error:", err.message);
+  }
+}

@@ -578,7 +578,8 @@ const Products = () => {
     const payload = {
       token: user.token,
       userId: user._id,
-      product: productData
+      product: productData,
+      fullName: `${user.firstName} ${user.lastName}`,
     };
 
     const requestOptions = {
@@ -608,7 +609,7 @@ const Products = () => {
     const requestOptions = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: user.token, _id: user._id })
+      body: JSON.stringify({ token: user.token, _id: user._id, fullName: `${user.firstName} ${user.lastName}` })
     };
 
     CRUD(window.base_api + `delete_product/${targetId}`, requestOptions, (res) => {

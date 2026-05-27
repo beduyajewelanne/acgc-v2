@@ -4,7 +4,7 @@ const port = process.env.PORT || 5000;
 const dbo = require("../helper/db");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
-const { get_data_helper, check_record_exists, decrypt, insert_one_helper, validateHash, hashPass, update_one_helper } = require("../helper/Helper");
+const { get_data_helper, check_record_exists, decrypt, insert_one_helper, validateHash, hashPass, update_one_helper, actionLog } = require("../helper/Helper");
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -87,7 +87,7 @@ authRoutes.post("/api/login", async (req, res) => {
                         payload: null
                     });
                 }
-
+                actionLog(user._id, "Login", `${user.firstName} ${user.lastName} logged in`);
                 const token = crypto.randomBytes(32).toString("hex");
                 await update_one_helper("users", { _id: user._id }, { $set: { token, lastLogin: new Date() } });
 
@@ -186,7 +186,7 @@ authRoutes.post("/api/register", async (req, res) => {
             verificationToken: emailVerificationToken,
             createdAt: new Date()
         };
-
+        await actionLog(null, "Register", `${firstName} ${lastName} registered`);
         const result = await insert_one_helper("users", newUser);
         if (result.remarks == "success") {
             const verificationLink = `${process.env.API_URL}verify-email?token=${emailVerificationToken}`;
@@ -265,6 +265,7 @@ authRoutes.get("/api/verify-email", async (req, res) => {
             $set: { is_verified: true },
             $unset: { verificationToken: "" } 
         });
+        await actionLog(user._id, "Email Verified", `${user.firstName} ${user.lastName} verified their email address`);
 
         return res.send(renderStatusPage("success", "Email verified successfully! You can now log into your account."));
     } catch (error) {
@@ -374,7 +375,7 @@ authRoutes.post("/api/reset-password", async (req, res) => {
         }
 
         const hashedPassword = await hashPass(newPassword);
-        
+        await actionLog(user._id, "Password Reset", `${user.firstName} ${user.lastName} reset their password`);
         await update_one_helper("users", { _id: user._id }, { 
             $set: { password: hashedPassword },
             $unset: { resetCode: "", resetCodeExpiry: "" }
@@ -383,6 +384,32 @@ authRoutes.post("/api/reset-password", async (req, res) => {
         return res.json({ remarks: "success", message: "Password updated successfully" });
     } catch (error) {
         return res.status(500).json({ remarks: "error", message: "Internal server error" });
+    }
+});
+
+authRoutes.post("/api/get_audit_logs", async (req, res) => {
+    var token = req.body.token;
+    var archive = req.body.archive;
+    var response = {}
+    if (!token) return res.status(400).json({ error: "Token is required" });
+
+    try {
+        checkAuth(token, req.body._id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+            const product_query = [
+                { $sort: { createdAt: -1 } }
+            ];
+            const result = await get_data_helper("action_logs", product_query);
+            if (result?.payload?.length > 0) {
+                response = { remarks: "success", message: "Data fetched successfully", payload: result.payload };
+            } else {
+                response = { remarks: "failed", message: "No data found", payload: null };
+            }
+            res.status(200).json(response);
+        })
+    } catch (err) {
+        console.error("Error in /api/get_audit_logs:", err);
+        res.status(500).json({ error: err });
     }
 });
 

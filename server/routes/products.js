@@ -77,6 +77,26 @@ productRoutes.post("/api/get_products", async (req, res) => {
     }
 });
 
+productRoutes.get("/api/get_products_client", async (req, res) => {
+    try {
+        const product_query = [{
+            $match: {
+                active: true
+            }
+        }]
+        const result = await get_data_helper("products", product_query);
+        if (result?.payload?.length > 0) {
+            response = { remarks: "success", message: "Data fetched successfully", payload: result.payload };
+        } else {
+            response = { remarks: "failed", message: "No data found", payload: null };
+        }
+        res.status(200).json(response);
+    } catch (err) {
+        console.error("Error in /api/get_products:", err);
+        res.status(500).json({ error: err });
+    }
+});
+
 productRoutes.post("/api/get_product/:id", async (req, res) => {
     var token = req.body.token;
     var id = req.params.id;
@@ -352,6 +372,19 @@ productRoutes.post("/api/delete_product/:id", async (req, res) => {
         });
     } catch (err) {
         console.error("Error in /api/delete_product:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
+
+productRoutes.get("/api/featured_products", async (req, res) => {
+    try {
+        const result = await get_data_helper("products", [
+            { $match: { active: true } },
+            { $sample: { size: 3 } }
+        ]);
+        return res.status(200).json(result);
+    } catch (err) {
+        console.error("Error in /api/featured_products:", err);
         return res.status(500).json({ error: err.message || err });
     }
 });

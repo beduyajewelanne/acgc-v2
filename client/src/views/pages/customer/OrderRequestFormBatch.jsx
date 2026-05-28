@@ -7,36 +7,23 @@ import { useNavigate } from 'react-router-dom';
 import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
 
-/* ─── Unit helpers (duplicated here for standalone use) ──────────────────── */
-const toFeet = (value, unit) => {
-  const n = parseFloat(value) || 0;
-  if (unit === 'ft') return n;
-  if (unit === 'm')  return n * 3.28084;
-  if (unit === 'in') return n / 12;
-  if (unit === 'cm') return n / 30.48;
-  return n;
-};
-
 /* ─── Order Summary Modal ────────────────────────────────────────────────── */
 const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
-  const { product, measurements, customer } = order;
+  const { items, customer } = order;
 
-  const hasMeas = measurements && parseFloat(measurements.width) > 0 && parseFloat(measurements.height) > 0;
-  const wFt = hasMeas ? toFeet(measurements.width, measurements.unit) : 0;
-  const hFt = hasMeas ? toFeet(measurements.height, measurements.unit) : 0;
-  const area = wFt * hFt;
-  const total = hasMeas ? area * product.price : product.price;
-  const downpay = total * 0.5;
+  // Compute grand total calculations across all batch elements
+  const grandTotal = items.reduce((sum, item) => sum + item.price, 0);
+  const downpay = grandTotal * 0.5;
 
   return (
     <div className="summary-overlay">
-      <div className="summary-modal">
+      <div className="summary-modal" style={{ maxWidth: '600px' }}>
         <div className="summary-header">
           <CheckCircle2 size={22} className="summary-icon" />
-          <h3 className="summary-title">Order Request Summary</h3>
+          <h3 className="summary-title">Confirm Batch Order Request</h3>
         </div>
 
-        <div className="summary-body">
+        <div className="summary-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           {/* Customer */}
           <div className="summary-section">
             <p className="summary-section-label">Customer Information</p>
@@ -46,57 +33,32 @@ const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
             <div className="summary-row"><MapPin size={13} /><span>{customer?.address || ''}</span></div>
           </div>
 
-          {/* Product */}
+          {/* Items Compilation List */}
           <div className="summary-section">
-            <p className="summary-section-label">Product Details</p>
-            <div className="summary-row"><Package size={13} /><span>{product.name}</span></div>
-            <div className="summary-row-plain">
-              <span className="sl">Type</span><span>{product.type}</span>
-            </div>
-            <div className="summary-row-plain">
-              <span className="sl">Category</span><span>{product.category}</span>
+            <p className="summary-section-label">Selected Products ({items.length})</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {items.map((item, index) => (
+                <div key={index} style={{ padding: '8px', border: '1px solid #eee', borderRadius: '4px', fontSize: '13px' }}>
+                  <div style={{ fontWeight: '600', color: '#333' }}>{item.name}</div>
+                  <div style={{ display: 'flex', justifyContent: 'between', color: '#666', marginTop: '3px' }}>
+                    <span>Size: {item.dimensions} ({item.area} sq ft)</span>
+                    <span style={{ marginLeft: 'auto', fontWeight: '500' }}>₱{item.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Measurements & Pricing */}
+          {/* Pricing Summary */}
           <div className="summary-section">
-            <p className="summary-section-label">
-              <Calculator size={13} style={{ display: 'inline', marginRight: 4 }} />
-              Pricing Estimate
-            </p>
-            {hasMeas ? (
-              <>
-                <div className="summary-row-plain">
-                  <span className="sl">Dimensions</span>
-                  <span>{measurements.width} × {measurements.height} {measurements.unit}</span>
-                </div>
-                <div className="summary-row-plain">
-                  <span className="sl">Area</span>
-                  <span>{area.toFixed(2)} sq ft</span>
-                </div>
-              </>
-            ) : (
-              <div className="summary-row-plain">
-                <span className="sl">Measurements</span>
-                <span className="text-muted">Not provided (base rate applied)</span>
-              </div>
-            )}
-            <div className="summary-row-plain">
-              <span className="sl">Rate</span>
-              <span>₱{product.price.toLocaleString()} / sq ft</span>
-            </div>
+            <p className="summary-section-label">Pricing Compilation</p>
             <div className="summary-row-plain total">
-              <span className="sl">Est. Total</span>
-              <span>
-                ₱{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                {!hasMeas && ' (base rate)'}
-              </span>
+              <span className="sl">Est. Grand Total</span>
+              <span>₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="summary-row-plain downpay">
               <span className="sl">50% Downpayment</span>
-              <span>
-                ₱{downpay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
+              <span>₱{downpay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
 
@@ -118,22 +80,22 @@ const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
 };
 
 /* ─── Order Success Page ─────────────────────────────────────────────────── */
-const OrderSuccessPage = ({ onClose,backToOrders }) => (
+const OrderSuccessPage = ({ onClose, backToOrders }) => (
   <div className="success-overlay">
     <div className="success-card">
       <div className="success-icon-wrap">
         <CheckCircle2 size={48} />
       </div>
-      <h2 className="success-title">Order Request Submitted!</h2>
+      <h2 className="success-title">Batch Requests Submitted!</h2>
       <p className="success-sub">
-        Thank you! Your order request has been received. Our team will contact you
-        shortly to confirm the details and discuss final pricing.
+        Thank you! Your architectural order requests have been received. Our estimating team will contact you
+        shortly to schedule your site inspection and finalize quotation blueprints.
       </p>
       <p className="success-contact">
         <Phone size={14} /> Questions? Call us at <strong>09123456789</strong>
       </p>
       <div className="success-actions">
-        <button className="btn-your-orders" onClick={() => backToOrders()}>
+        <button className="btn-your-orders" onClick={backToOrders}>
           View Your Orders
         </button>
         <button className="btn-back-browse" onClick={onClose}>
@@ -145,22 +107,19 @@ const OrderSuccessPage = ({ onClose,backToOrders }) => (
 );
 
 /* ─── Order Request Form ─────────────────────────────────────────────────── */
-const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
+const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
   const { user } = useContext(UserContext);
-  const hasMeas =
-    measurements && parseFloat(measurements.width) > 0 && parseFloat(measurements.height) > 0;
   const navigate = useNavigate();
-  const wFt = hasMeas ? toFeet(measurements.width, measurements.unit) : 0;
-  const hFt = hasMeas ? toFeet(measurements.height, measurements.unit) : 0;
-  const area = wFt * hFt;
-  const total = hasMeas ? area * product.price : product.price;
-  const downpay = total * 0.5;
 
   const [customer, setCustomer] = useState({ fullName: '', email: '', phone: '', address: '' });
   const [clientNotes, setClientNotes] = useState('');
   const [showSummary, setShowSummary] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // Dynamic Grand aggregation
+  const grandTotal = items.reduce((acc, item) => acc + item.price, 0);
+  const downpay = grandTotal * 0.5;
 
   useEffect(() => {
     if (user && user.token) {
@@ -171,7 +130,6 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
       const city = user.city || '';
       const prov = user.province || '';
 
-      // Construct components with space matching filtering out undefined properties safely
       const fullAddress = [street, brgy, city, prov].filter(Boolean).join(' ');
 
       setCustomer({
@@ -200,32 +158,35 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
   const handleProceed = async () => {
     const token = user?.token;
     const userId = user?._id;
-    console.log(product)
+
+    // Transform normalized cart array into items array structure required by the backend API
+    const API_items_payload = items.map(item => ({
+      product_id: item.product_id,
+      width: item.width !== undefined ? item.width.toString() : "",
+      height: item.height !== undefined ? item.height.toString() : "",
+      unit: item.unit || "in",
+      cart_id: item.id // Passes entry identity so backend removes it from collection automatically
+    }));
+
     const payload = {
       token,
       userId,
-      product_id: product.id,
       customer,
-      clientNotes,
-      measurements: {
-        width: measurements?.width || "",
-        height: measurements?.height || "",
-        unit: measurements?.unit || "ft"
-      }
+      clientNotes: clientNotes,
+      items: API_items_payload
     };
 
     try {
-      CRUD(window.base_api + "submit_order_request", {
+      CRUD((window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + "/api/submit_order_request_batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       }, (res) => {
         if (res && res.remarks === "success") {
-          console.log("Order Request successfully processed:", res);
           setShowSummary(false);
           setShowSuccess(true);
         } else {
-          alert(res?.message || "Something went wrong while submitting your request.");
+          alert(res?.message || "Something went wrong while submitting your batch request.");
         }
       });
     } catch (error) {
@@ -239,25 +200,25 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-container order-form-container" role="dialog" aria-modal="true">
+    <div className="modal-overlay" style={{ position: 'relative', top: 0, left: 0, zIndex: 999 }}>
+      <div className="modal-container order-form-container" style={{ maxWidth: '950px' }} role="dialog" aria-modal="true">
 
         <button className="modal-close" onClick={onClose} aria-label="Close">
           <X size={18} />
         </button>
 
         <button className="modal-back" onClick={onBack}>
-          <ArrowLeft size={15} /> Back to Product
+          <ArrowLeft size={15} /> Back to Cart
         </button>
 
         <div className="form-page">
           <div className="form-page-header">
-            <h2 className="form-page-title">Place Order Request</h2>
-            <p className="form-page-sub">Review your details and submit your request.</p>
+            <h2 className="form-page-title">Place Batch Order Request</h2>
+            <p className="form-page-sub">Review your contact data and selected items to compile requests.</p>
           </div>
 
           <div className="form-layout">
-            {/* ── Left: Customer Info ── */}
+            {/* ── Left Side: Customer Info ── */}
             <div className="form-section">
               <p className="form-section-title">
                 <User size={15} /> Customer Information
@@ -297,7 +258,7 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
               </div>
 
               <div className="form-field">
-                <label className="form-label">Complete Address *</label>
+                <label className="form-label">Complete Installation Address *</label>
                 <div className={`editable-field ${errors.address ? 'field-error' : ''}`}>
                   <MapPin size={13} className="field-icon" />
                   <textarea
@@ -325,87 +286,57 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
               </div>
             </div>
 
-            {/* ── Right: Order Summary ── */}
-            <div className="form-section order-summary-panel">
+            {/* ── Right Side: Dynamic Multi-product Panel Summary ── */}
+            <div className="form-section order-summary-panel" style={{ display: 'flex', flexDirection: 'column' }}>
               <p className="form-section-title">
-                <Package size={15} /> Order Summary
+                <Package size={15} /> Batch Review ({items.length} items)
               </p>
 
-              <div className="order-product-card">
-                {product.images && product.images[0] && (
-                  <img
-                    src={`${product.images[0]}`}
-                    alt={product.name}
-                    className="order-product-img"
-                  />
-                )}
-                <div className="order-product-info">
-                  <p className="op-name">{product.name}</p>
-                  <p className="op-meta">{product.type} · {product.category}</p>
-                  <p className="op-rate">₱{product.price.toLocaleString()} / sq ft</p>
-                </div>
+              {/* Scrollable container if cart has many items */}
+              <div className="items-scroll-review" style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '15px', paddingRight: '4px' }}>
+                {items.map((item) => (
+                  <div className="order-product-card" key={item.id} style={{ marginBottom: '8px', padding: '8px' }}>
+                    {item.image && (
+                      <img src={item.image} alt={item.name} className="order-product-img" style={{ width: '45px', height: '45px' }} />
+                    )}
+                    <div className="order-product-info">
+                      <p className="op-name" style={{ fontSize: '13px' }}>{item.name}</p>
+                      <p className="op-meta" style={{ fontSize: '11px' }}>{item.dimensions} ({item.area} sq.ft) x{item.quantity}</p>
+                      <p className="op-rate" style={{ fontSize: '12px', fontWeight: 'bold' }}>₱{item.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              {hasMeas && (
-                <div className="order-meas-box">
-                  <p className="meas-label">Measurements</p>
-                  <div className="meas-grid">
-                    <span>W: <strong>{measurements.width} {measurements.unit}</strong></span>
-                    <span>H: <strong>{measurements.height} {measurements.unit}</strong></span>
-                    <span>Area: <strong>{area.toFixed(2)} sq ft</strong></span>
-                  </div>
-                </div>
-              )}
-
-              <div className="order-price-breakdown">
-                <div className="pb-row">
-                  <span>Rate</span>
-                  <span>₱{product.price.toLocaleString()} / sq ft</span>
-                </div>
-                {hasMeas && (
-                  <div className="pb-row">
-                    <span>Area</span>
-                    <span>{area.toFixed(2)} sq ft</span>
-                  </div>
-                )}
+              <div className="order-price-breakdown" style={{ marginTop: 'auto' }}>
                 <div className="pb-row pb-total">
-                  <span>Estimated Total</span>
-                  <span>
-                    ₱{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    {!hasMeas && ' *'}
-                  </span>
+                  <span>Grand Estimated Total</span>
+                  <span>₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="pb-row pb-downpay">
-                  <span>50% Downpayment</span>
-                  <span>₱{downpay.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span>50% Required Downpayment</span>
+                  <span>₱{downpay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
 
-              {!hasMeas && (
-                <p className="no-meas-note">
-                  * No measurements provided. Base rate shown.
-                </p>
-              )}
-
-              <div className="order-inquiry">
+              <div className="order-inquiry" style={{ marginTop: '10px' }}>
                 <Phone size={13} />
-                <span>Call for inquiries: <strong>09123456789</strong></span>
+                <span>Structural inquiries support: <strong>09123456789</strong></span>
               </div>
             </div>
           </div>
 
-          {/* Submit */}
+          {/* Submit Action */}
           <div className="form-submit-row">
             <button className="btn-submit-order" onClick={handleSubmit}>
-              <Zap size={16} /> Submit Order Request
+              <Zap size={16} /> Submit Order Requests Bunch
             </button>
           </div>
         </div>
 
-        {/* Summary Modal Component Trigger Block */}
         {showSummary && (
           <OrderSummaryModal
-            order={{ product, measurements, customer }}
+            order={{ items, customer }}
             onCancel={() => setShowSummary(false)}
             onProceed={handleProceed}
           />
@@ -415,4 +346,4 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
   );
 };
 
-export default OrderRequestForm;
+export default OrderRequestFormBatch;

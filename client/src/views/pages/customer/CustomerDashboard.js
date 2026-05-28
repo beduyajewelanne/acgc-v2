@@ -48,7 +48,7 @@ const CustomerDashboard = ({ isLoggedIn }) => {
           <p>Professional fabrication and installation of glass windows, doors, partitions, and aluminum works. Get a custom quote in seconds.</p>
           <div className="button-group">
             <button className="btn-primary" onClick={() => navigate('/customer/products')}>Browse Products</button>
-            <button className="btn-secondary" onClick={() => navigate(isLoggedIn ? '/customer/orders' : '/login')}>
+            <button className="btn-secondary" onClick={() => navigate(isLoggedIn ? '/orders' : '/login')}>
               {isLoggedIn ? "View My Orders" : "Login/SignUp"}
             </button>
           </div>

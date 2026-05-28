@@ -3,14 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
 import './Cart.css';
+import OrderRequestFormBatch from './OrderRequestFormBatch';
 
 const Cart = () => {
   const { user } = useContext(UserContext);
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState([]);
-  
-  // Track array of selected product_ids
   const [selectedIds, setSelectedIds] = useState([]);
+  
+  // View states: 'cart' or 'checkout'
+  const [view, setView] = useState('cart');
+  const [checkoutItems, setCheckoutItems] = useState([]);
 
   // 1. Fetch live cart items from database
   const fetchCartItems = () => {
@@ -48,20 +51,23 @@ const Cart = () => {
           const computedPrice = calculatedArea * rate * qty;
 
           return {
-            id: item._id || item.product_id,
+            id: item._id || item.product_id, // This acts as the cart item entry identity
             product_id: item.product_id,
             name: item.name || "Architectural Product Placement",
             dimensions: `${w}" x ${h}"`,
+            width: w,
+            height: h,
+            unit: item.unit || 'in',
             area: parseFloat(calculatedArea.toFixed(3)),
             rate: rate,
             price: computedPrice,
-            image: item.image,
+            image: item.mainImg,
             quantity: qty
           };
         });
 
         setCartItems(normalized);
-        setSelectedIds([]); // Clear selections after live dataset update
+        setSelectedIds([]); 
       }
     });
   };
@@ -117,8 +123,15 @@ const Cart = () => {
   const handleCheckoutSelected = () => {
     const itemsToCheckout = cartItems.filter(item => selectedIds.includes(item.product_id));
     if (itemsToCheckout.length === 0) return;
-    
-    navigate('/customer/checkout', { state: { checkoutBatch: itemsToCheckout } });
+    setCheckoutItems(itemsToCheckout);
+    setView('checkout');
+  };
+
+  // 4. Checkout all items
+  const handleCheckOutAll = () => {
+    if (cartItems.length === 0) return;
+    setCheckoutItems(cartItems);
+    setView('checkout');
   };
 
   // Calculations are dynamic based on item selections
@@ -126,6 +139,23 @@ const Cart = () => {
   const subtotal = selectedIds.length > 0 
     ? selectedItems.reduce((acc, item) => acc + item.price, 0)
     : cartItems.reduce((acc, item) => acc + item.price, 0);
+
+  // If view is switched to checkout, render the Batch Order Form component
+  if (view === 'checkout') {
+    return (
+      <OrderRequestFormBatch
+        items={checkoutItems}
+        onBack={() => {
+          setView('cart');
+          fetchCartItems(); // Refresh live items state
+        }}
+        onClose={() => {
+          setView('cart');
+          fetchCartItems();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="cart-container">
@@ -172,7 +202,7 @@ const Cart = () => {
                     
                     {item.image ? (
                       <img 
-                        src={item.image} 
+                        src={window.base_api.replace('/api/', '') + item.image} 
                         alt={item.name} 
                         className="item-image-placeholder" 
                         style={{ objectFit: 'cover', background: 'none' }}
@@ -193,7 +223,10 @@ const Cart = () => {
                 </div>
                 <button 
                   className="place-item-btn"
-                  onClick={() => navigate('/customer/checkout', { state: { directItem: item } })}
+                  onClick={() => {
+                    setCheckoutItems([item]);
+                    setView('checkout');
+                  }}
                 >
                   Place Order for This Item →
                 </button>
@@ -214,17 +247,15 @@ const Cart = () => {
           </div>
           <small className="checkout-note">* Final pricing confirmed after site inspection</small>
 
-          {/* Checkout All / Selected Action Button */}
           <button 
             className="place-item-btn" 
             style={{ marginTop: '20px', fontWeight: 'bold' }}
             disabled={cartItems.length === 0}
-            onClick={selectedIds.length > 0 ? handleCheckoutSelected : () => navigate('/customer/checkout', { state: { checkoutBatch: cartItems } })}
+            onClick={selectedIds.length > 0 ? handleCheckoutSelected : handleCheckOutAll}
           >
             {selectedIds.length > 0 ? `Checkout Selected (${selectedIds.length}) →` : 'Checkout All Items →'}
           </button>
 
-          {/* Conditional batch removal link button */}
           {selectedIds.length > 0 && (
             <button 
               className="place-item-btn" 

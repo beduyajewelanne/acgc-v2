@@ -67,3 +67,19 @@ hr { border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0; }
   overflow-y: auto; 
   padding: 0; /* Siguraduhing walang extra padding na nakakaabala */
 }
+
+.admin-logout-btn{
+  margin-top: auto; /* Pushes the logout button to the bottom */
+  padding: 12px 16px;
+  color: black;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+.admin-logout-btn:hover{
+  background-color: #6d0f0f;
+  color: white;
+}

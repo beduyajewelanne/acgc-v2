@@ -1,11 +1,18 @@
 import React, { useContext, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { UserContext } from '../../../App'; // Adjust this import path to point to your App.js
 import './AdminLayout.css'; 
 
 const AdminLayout = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, permissions, permissionsLoaded } = useContext(UserContext);
+
+  const handleLogout = () => {
+  localStorage.clear();
+  navigate('/login');
+};
+
   useEffect(() => {
     console.log(permissions);
   }, [permissions]);
@@ -60,6 +67,7 @@ const AdminLayout = () => {
           {hasViewAccess('Profile') && (
             <Link to="/admin/profile" className={location.pathname.includes('profile') ? 'active' : ''}>Profile</Link>
           )}
+          <button onClick={handleLogout} className="admin-logout-btn"> Logout </button>
         </nav>
       </aside>
       <main className="content">

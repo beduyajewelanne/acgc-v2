@@ -234,9 +234,10 @@ const AppContent = ({ isLoggedIn }) => {
               <Route index element={<CustomerDashboard isLoggedIn={isLoggedIn} />} />
               <Route path="customer/products" element={<BrowseProducts />} />
               <Route path="about" element={<AboutUs />} />
+              <Route path="track" element={<TrackProducts />} />
 
               {/* Secure Customer Portal Route Blocks - Bypasses structural moduleKey checks */}
-              <Route path="track" element={<ProtectedRoute allowedRoles={['Client']}><TrackProducts /></ProtectedRoute>} />
+        
               <Route path="profile" element={<ProtectedRoute allowedRoles={['Client']}><CustomerProfile /></ProtectedRoute>} />
               <Route path="contracts" element={<ProtectedRoute allowedRoles={['Client']}><Contracts /></ProtectedRoute>} />
               <Route path="receipts" element={<ProtectedRoute allowedRoles={['Client']}><Receipts /></ProtectedRoute>} />

@@ -284,8 +284,8 @@ function App() {
 
   // Trigger permission fetcher sequence strictly for personnel tiers
   useEffect(() => {
-    const roleNormalized = user?.role?.trim().toLowerCase();
-    if (user && user.token && (roleNormalized === 'admin' || roleNormalized === 'staff')) {
+    // const roleNormalized = user?.role?.trim().toLowerCase();
+    if (user && user.token) {
       setPermissionsLoaded(false);
       getAccessLevels(user, (data) => {
         if (data) {
@@ -294,12 +294,10 @@ function App() {
         setPermissionsLoaded(true);
       });
     } else {
-      getAccessLevels(user, (data) => {
-        if (data) {
-          setPermissions(data);
-        }
-        setPermissionsLoaded(true);
-      });
+      setPermissions(null);
+      setPermissionsLoaded(true);
+      console.log("No valid user session detected, skipping access level fetch.");
+      // localStorage.removeItem("userData");
     }
   }, [user]);
 

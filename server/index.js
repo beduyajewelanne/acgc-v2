@@ -24,6 +24,9 @@ try {
 
   const userRoutes = require("./routes/users");
   app.use(userRoutes);
+
+  const cartRoutes = require("./routes/cart");
+  app.use(cartRoutes);
 } catch (err) {
   console.error("Error setting up routes:", err.message);
 }

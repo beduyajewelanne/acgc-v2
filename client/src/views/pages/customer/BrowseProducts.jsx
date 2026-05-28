@@ -56,7 +56,25 @@ const BrowseProducts = () => {
   const [cart, setCart] = useState([]);
   const [toast, setToast] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchCartItems = () => {
+    if (!user || !user.token) return;
+    const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/get_cart';
+    const payload = {
+      token: user.token,
+      _id: user._id
+    };
+    const requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload })
+    }
+    CRUD(apiUri, requestOptions, (res) => {
+      if (res && res.remarks === 'success' && Array.isArray(res.payload)) {
+        setCart(res.payload);
+      }
+    });
+  };
 
   useEffect(() => {
     const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/get_products_client';
@@ -86,6 +104,10 @@ const BrowseProducts = () => {
       }
     });
   }, []);
+
+  useEffect(() => {
+    fetchCartItems();
+  }, [user]);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -120,37 +142,28 @@ const BrowseProducts = () => {
       height: product.height || 0,
       unit: product.unit || 'in'
     };
-    const item = { ...product, measurements: finalMeasurements, addedAt: Date.now() };
-    setCart((prev) => [...prev, item]);
-    showToast(product, `Added ${product.name} to cart`);
-  };
 
-  const handleSubmitOrder = () => {
-    if (!user || !user.token) {
-      navigate('/login');
-      return;
-    }
-    if (cart.length === 0) return;
-    setIsSubmitting(true);
-
-    const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/submit_order';
+    const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/add_to_cart';
     const payload = {
-      user_id: user._id,
-      items: cart.map(item => ({
-        product_id: item.id,
-        width: item.measurements.width,
-        height: item.measurements.height,
-        unit: item.measurements.unit
-      }))
+      token: user.token,
+      _id: user._id,
+      product_id: product.id,
+      width: finalMeasurements.width,
+      height: finalMeasurements.height,
+      unit: finalMeasurements.unit
     };
+    const requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload })
+    }
 
-    CRUD(apiUri, { method: 'POST', body: JSON.stringify(payload) }, (res) => {
-      setIsSubmitting(false);
+    CRUD(apiUri, requestOptions, (res) => {
       if (res && res.remarks === 'success') {
-        showToast(null, "Order submitted successfully!");
-        setCart([]);
+        showToast(product, `Added ${product.name} to cart`);
+        fetchCartItems();
       } else {
-        alert("Failed to submit order.");
+        alert("Failed to add product to database cart.");
       }
     });
   };
@@ -208,18 +221,9 @@ const BrowseProducts = () => {
           {filtered.length} product{filtered.length !== 1 ? 's' : ''} found
         </span>
         {cart.length > 0 && (
-          <div className="cart-status-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span className="cart-count">
-              <ShoppingCart size={14} /> {cart.length} in cart
-            </span>
-            <button 
-              className="btn-submit-order" 
-              onClick={handleSubmitOrder} 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Processing...' : 'Submit Order'}
-            </button>
-          </div>
+          <span className="cart-count">
+            <ShoppingCart size={14} /> {cart.reduce((sum, item) => sum + (item.quantity || 1), 0)} in cart
+          </span>
         )}
       </div>
 

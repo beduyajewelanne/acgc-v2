@@ -470,4 +470,18 @@ cartRoutes.post("/api/cancel_order_request", async (req, res) => {
         return res.status(500).json({ error: err.message || err });
     }
 });
+
+cartRoutes.get("/api/test_cart_endpoint/:orderId", async (req, res) => {
+    const { orderId } = req.params;
+
+    try {
+        const result = await get_data_helper("order_requests", [
+            { $match: { orderId: orderId, status: { $ne: "Cancelled" } } }
+        ]);
+        return res.status(200).json(result);
+    } catch (err) {
+        console.error("Critical error mapping execution processing inside /api/test_cart_endpoint handler:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+})
 module.exports = cartRoutes;

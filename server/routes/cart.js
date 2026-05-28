@@ -242,7 +242,9 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
                         ratePerSqFt: ratePerSqFt,
                         estimatedCost: parseFloat(estimatedCost.toFixed(2))
                     },
+                    orderId: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                     status: "Pending",
+                    isCancelled: 0,
                     createdAt: new Date()
                 };
 
@@ -313,8 +315,10 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
                     ratePerSqFt: parseFloat(product.ratePerSqFt) || 0,
                     estimatedCost: parseFloat(product.estimatedCost) || 0
                 },
+                orderId: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 clientNotes: clientNotes || "",
                 status: "Pending",
+                isCancelled: 0,
                 createdAt: new Date()
             };
 
@@ -334,6 +338,135 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
         });
     } catch (err) {
         console.error("Critical error inside /api/submit_order_request handler:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
+
+// ─── 1. FETCH ALL ACTIVE ORDER REQUESTS ───────────────────────────────────
+cartRoutes.post("/api/get_my_orders", async (req, res) => {
+    const { token, userId } = req.body;
+
+    if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing identity token" });
+    if (!userId) return res.status(400).json({ remarks: "failed", message: "Missing tracking identification user properties" });
+
+    try {
+        // Authenticate the session context token
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authentication failed" });
+
+            // Fetch flat order records belonging to the authenticated client user
+            const ordersResult = await get_data_helper("order_requests", [
+                { $match: { user_id: new ObjectId(userId), isCancelled: 0 } },
+                { $sort: { createdAt: -1 } },
+                
+            ]);
+
+            const rawOrdersList = ordersResult?.payload || ordersResult || [];
+
+            // Normalize database records into the explicit key definitions expected by your MyOrders React component
+            const normalizedOrders = rawOrdersList.map(order => {
+                const details = order.itemDetails || {};
+                const cost = parseFloat(details.estimatedCost) || 0;
+                
+                // Uniformly calculate required downpayment (e.g., 50%) matching checkout rules
+                const requiredDpAmount = cost * 0.5;
+                const paidDpAmount = parseFloat(order.downpaymentPaid) || 0;
+
+                // Format textual representations for dimensions fallback
+                const dimensionString = (details.width && details.height) 
+                    ? `${details.width}${details.unit} x ${details.height}${details.unit}` 
+                    : "Base Configuration Dimensions";
+
+                return {
+                    id: order._id ? order._id.toString() : "",
+                    name: details.name || "Architectural Product Placement",
+                    date: order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric', month: 'long', day: 'numeric'
+                    }) : "Date Unspecified",
+                    status: order.status || "Pending",
+                    price: `₱ ${cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                    downpayment: `₱ ${paidDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                    requiredDownpayment: `₱ ${requiredDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                    siteInspection: (order.status === "Pending Inspection" || order.status === "Pending") ? "Pending" : "Done",
+                    measurements: dimensionString,
+                    contractLink: order.contractLink || "#",
+                    receiptLink: order.receiptLink || "#",
+                    orderId: order.orderId || "",
+                    is_cancelledAllowed: (order?.is_cancelledAllowed == 1 || order?.is_cancelledAllowed === "1") ? 1 : 0
+                };
+            });
+
+            return res.status(200).json({
+                remarks: "success",
+                message: "Client order requests compilation successfully gathered",
+                payload: normalizedOrders
+            });
+        });
+    } catch (err) {
+        console.error("Critical server error executing fetch matching customer orders processing:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
+
+
+// ─── 2. CANCEL / UPDATE SPECIFIC ORDER REQUEST STATUS ─────────────────────
+cartRoutes.post("/api/cancel_order_request", async (req, res) => {
+    const { token, userId, order_id } = req.body;
+
+    if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session tokens" });
+    if (!userId) return res.status(400).json({ remarks: "failed", message: "Missing security tracking identity coordinates" });
+    if (!order_id) return res.status(400).json({ remarks: "failed", message: "Missing order transaction key parameter reference" });
+
+    try {
+        // Authenticate user token profile validity before modifying collections
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
+
+            // 1. Verify target order existence and ownership profile before executing update
+            const findResult = await get_data_helper("order_requests", [
+                { $match: { _id: new ObjectId(order_id), user_id: new ObjectId(userId) } }
+            ]);
+            const existingOrderList = findResult?.payload || findResult || [];
+
+            if (existingOrderList.length === 0) {
+                return res.status(404).json({ remarks: "failed", message: "Target document order request profile not found or access unauthorized" });
+            }
+
+            const targetOrder = existingOrderList[0];
+
+            // 2. Prevent cancellation if design process has proceeded past initial verification status unless explicitly allowed
+            const isPending = targetOrder.status === "Pending" || targetOrder.status === "Pending Inspection";
+            const isExplicitlyAllowed = targetOrder.is_cancelledAllowed == 1 || targetOrder.is_cancelledAllowed === "1";
+
+            if (!isPending && !isExplicitlyAllowed) {
+                return res.status(400).json({ 
+                    remarks: "failed", 
+                    message: "Cannot cancel order requests already processed into production status or inspection clearance loops" 
+                });
+            }
+
+            // 3. Instead of deleting, update the document status to "Cancelled"
+            const updateResult = await update_one_helper(
+                "order_requests", 
+                { _id: new ObjectId(order_id) }, 
+                { $set: { status: "Cancelled", isCancelled: 1, updatedAt: new Date() } }
+            );
+
+            if (updateResult.remarks === "success" || updateResult.modifiedCount > 0 || updateResult.matchedCount > 0) {
+                
+                // Write transaction operations log tracking details
+                await actionLog(userId, "Cancel Order Request", `Updated structural order request status to Cancelled for tracking key ID: ${order_id}`);
+
+                return res.status(200).json({
+                    remarks: "success",
+                    message: "Order request transaction status updated to Cancelled successfully"
+                });
+            } else {
+                return res.status(500).json({ remarks: "failed", message: "Database update engine failed to process transaction profile status modifications." });
+            }
+        });
+    } catch (err) {
+        console.error("Critical error mapping execution processing inside /api/cancel_order_request handler:", err);
         return res.status(500).json({ error: err.message || err });
     }
 });

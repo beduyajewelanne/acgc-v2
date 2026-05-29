@@ -3,29 +3,30 @@ import { CRUD } from 'services/data.services';
 import './TrackProduct.css';
 
 /**
- * Parses a dimensions string, converts measurements to feet, 
- * and calculates the true square footage line total.
+ * Calculates the line total using backend fields.
+ * If areaSqFt is 0, converts square inches or cm to square feet cleanly.
  */
-const calcTrueLineTotal = (width, height, unit, rate, quantity) => {
-  const w = parseFloat(width) || 0;
-  const h = parseFloat(height) || 0;
-  const pRate = parseFloat(rate) || 0;
-  const qty = parseInt(quantity) || 1;
-  const currentUnit = (unit || 'in').toLowerCase().trim();
+const calcExactLineTotal = (details, docQty) => {
+  const qty = parseInt(docQty) || 1;
+  const rate = parseFloat(details.ratePerSqFt || details.price || 0);
+  let area = parseFloat(details.areaSqFt || details.area || 0);
 
-  // Convert unit values safely to feet
-  const convertToFeet = (val) => {
-    if (currentUnit === 'ft' || currentUnit === 'feet') return val;
-    if (currentUnit === 'm' || currentUnit === 'meter') return val * 3.28084;
-    if (currentUnit === 'cm' || currentUnit === 'centimeter') return val / 30.48;
-    return val / 12; // Fallback defaults to inches ('in')
-  };
+  // If area is 0 from backend, calculate areaSqFt based on unit dimensions
+  if (area === 0) {
+    const width = parseFloat(details.width) || 0;
+    const height = parseFloat(details.height) || 0;
+    const unit = (details.unit || 'in').toLowerCase().trim();
 
-  const widthInFt = convertToFeet(w);
-  const heightInFt = convertToFeet(h);
-  const sqFtArea = widthInFt * heightInFt;
+    if (unit === 'in' || unit === 'inch') {
+      area = (width * height) / 144;
+    } else if (unit === 'cm' || unit === 'centimeter') {
+      area = (width * height) / 929.0304;
+    } else if (unit === 'ft' || unit === 'feet') {
+      area = width * height;
+    }
+  }
 
-  return sqFtArea * pRate * qty;
+  return area * rate * qty;
 };
 
 const TrackProducts = () => {
@@ -53,77 +54,47 @@ const TrackProducts = () => {
         
         if (Array.isArray(rawList) && rawList.length > 0) {
           const baselineDoc = rawList[0];
-          const condensedItemsMap = {};
+          
+          let processedTotalCost = 0;
+          const normalizedItems = [];
 
           rawList.forEach(doc => {
             if (!doc.itemDetails) return;
             const details = doc.itemDetails;
-            
-            const nameKey = details.name || "Architectural Product Placement";
-            const width = details.width || '';
-            const height = details.height || '';
-            const unit = details.unit || 'in';
-            const itemUniqueId = `${nameKey}-${width}-${height}`;
-
-            const basePrice = parseFloat(details.pricePerSqFt || details.price || details.estimatedCost) || 0;
             const qty = parseInt(doc.quantity) || 1;
 
-            // Calculate true total by factoring in the Square Footage Area
-            const computedRowTotal = calcTrueLineTotal(width, height, unit, basePrice, qty);
+            const computedLineTotal = calcExactLineTotal(details, qty);
+            processedTotalCost += computedLineTotal;
 
-            if (condensedItemsMap[itemUniqueId]) {
-              condensedItemsMap[itemUniqueId].quantity += qty;
-              // Accumulate dynamically recalculating via current aggregate qty total
-              condensedItemsMap[itemUniqueId].lineTotal += computedRowTotal;
-            } else {
-              condensedItemsMap[itemUniqueId] = {
-                name: nameKey,
-                price: basePrice,
-                quantity: qty,
-                lineTotal: computedRowTotal,
-                dimensions: (width && height) ? `${width}${unit} x ${height}${unit}` : "Base Configuration Dimensions",
-                area: details.areaSqFt || details.area || 0
-              };
-            }
+            normalizedItems.push({
+              name: details.name || "Architectural Product Placement",
+              price: parseFloat(details.ratePerSqFt || details.price || 0),
+              quantity: qty,
+              lineTotal: computedLineTotal,
+              dimensions: `${details.width}${details.unit || 'in'} x ${details.height}${details.unit || 'in'}`
+            });
           });
-
-          const normalizedItems = Object.values(condensedItemsMap);
 
           if (normalizedItems.length === 0) {
             setErrorMessage("No valid product properties mapped within tracking context data rows.");
             return;
           }
 
-          // Compute matching accurate total balances across aggregated list values
-          const totalCost = normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0);
-          const requiredDpAmount = totalCost * 0.5;
+          const finalGrandTotal = parseFloat(baselineDoc.estimatedTotal) || processedTotalCost;
+          const requiredDpAmount = finalGrandTotal * 0.5;
           const paidDpAmount = parseFloat(baselineDoc.downpaymentPaid) || 0;
 
           const trackingStatus = baselineDoc.status || "Pending";
-          
-          const stepsArr = [
-            "Pending Inspection", 
-            "Downpayment Verification", 
-            "In Fabrication", 
-            "Ready for Install", 
-            "Completed"
-          ];
+          const stepsArr = ["Pending Inspection", "Downpayment Verification", "In Fabrication", "Ready for Install", "Completed"];
 
-          let matchedStepIndex = stepsArr.findIndex(
-            step => step.toLowerCase() === trackingStatus.toLowerCase()
-          );
+          let matchedStepIndex = stepsArr.findIndex(step => step.toLowerCase() === trackingStatus.toLowerCase());
+          if (trackingStatus === "Pending") matchedStepIndex = 0;
+          if (matchedStepIndex === -1) matchedStepIndex = trackingStatus === "Cancelled" ? -1 : 1;
 
-          if (trackingStatus === "Pending") {
-            matchedStepIndex = 0;
-          }
-
-          if (matchedStepIndex === -1) {
-            if (trackingStatus === "Cancelled") {
-              matchedStepIndex = -1;
-            } else {
-              matchedStepIndex = 1; 
-            }
-          }
+          // Align Site Inspection status tracking directly from baseline fields
+          const derivedInspectionStatus = baselineDoc.inspectionDate 
+            ? "Done" 
+            : (baselineDoc.siteInspection || ((trackingStatus === "Pending Inspection" || trackingStatus === "Pending") ? "Pending" : "Done"));
 
           setOrder({
             code: baselineDoc.orderId || trackingCode,
@@ -132,10 +103,10 @@ const TrackProducts = () => {
               year: 'numeric', month: 'long', day: 'numeric'
             }) : "Date Unspecified",
             status: trackingStatus,
-            price: `₱ ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            price: `₱ ${finalGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             downpayment: `₱ ${paidDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             requiredDownpayment: `₱ ${requiredDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-            siteInspection: (trackingStatus === "Pending Inspection" || trackingStatus === "Pending") ? "Pending" : "Done",
+            siteInspection: derivedInspectionStatus,
             contractLink: baselineDoc.contractLink || "#",
             receiptLink: baselineDoc.receiptLink || "#",
             steps: stepsArr,
@@ -149,12 +120,17 @@ const TrackProducts = () => {
     );
   };
 
+  // Maps backend status variants into corresponding lower-case CSS utility tokens
+  const getPillClass = (statusStr) => {
+    if (!statusStr) return 'status-pending';
+    return `status-${statusStr.toLowerCase().replace(/\s+/g, '-')}`;
+  };
+
   return (
     <div className="track-page">
       <div className="track-hero">
         <h1>Track Your Project</h1>
         <p>Enter your tracking code to see real-time updates on your glass installation.</p>
-        
         <form onSubmit={handleTrack} className="search-box">
           <input 
             type="text" 
@@ -202,7 +178,8 @@ const TrackProducts = () => {
                 <h3 style={{ margin: '0 0 5px 0' }}>{order.name}</h3>
                 <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Project ID: {order.code} • {order.date}</p>
               </div>
-              <span className={`badge ${order.status.toLowerCase().replace(/\s+/g, '-')}`} style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>
+              {/* Contextual Status Pill Capsule */}
+              <span className={`status-pill ${getPillClass(order.status)}`}>
                 {order.status}
               </span>
             </div>
@@ -219,7 +196,7 @@ const TrackProducts = () => {
                       <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Size: {prod.dimensions}</div>
                     </div>
                     <span style={{ fontWeight: '600', color: '#333' }}>
-                      ₱{prod.lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₱ {prod.lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 ))}
@@ -228,10 +205,27 @@ const TrackProducts = () => {
 
             <div className="order-details">
               <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '5px' }}>
-                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Grand Total Price:</label> <p style={{ margin: 0, fontWeight: 'bold', color: '#28a745' }}>{order.price}</p></div>
-                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Downpayment Paid:</label> <p style={{ margin: 0, fontWeight: 'bold' }}>{order.downpayment}</p></div>
-                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Required DP (50%):</label> <p style={{ margin: 0, fontWeight: 'bold' }}>{order.requiredDownpayment}</p></div>
-                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Site Inspection:</label> <p className={order.siteInspection.toLowerCase()} style={{ margin: 0, fontWeight: 'bold' }}>{order.siteInspection}</p></div>
+                <div>
+                  <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Grand Total Price:</label>
+                  <p style={{ margin: 0, fontWeight: 'bold', color: '#28a745', fontSize: '16px' }}>{order.price}</p>
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Downpayment Paid:</label>
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>{order.downpayment}</p>
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Required DP (50%):</label>
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>{order.requiredDownpayment}</p>
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Site Inspection:</label>
+                  <div style={{ marginTop: '2px' }}>
+                    {/* Aligned Site Inspection Pill Container */}
+                    <span className={`status-pill ${getPillClass(order.status)}`}>
+                      {order.status}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

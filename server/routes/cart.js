@@ -361,99 +361,98 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
 
             const rawOrdersList = ordersResult?.payload || ordersResult || [];
 
-            // 2. Group documents by their unique 'orderId'
+            // 2. Group items cleanly by their shared 'orderId'
             const groupedMap = {};
 
             rawOrdersList.forEach(doc => {
                 const groupKey = doc.orderId || (doc._id ? doc._id.toString() : "unassigned");
 
                 if (!groupedMap[groupKey]) {
+                    // Initialize group baseline info from the primary document template
                     groupedMap[groupKey] = {
-                        ...doc,
-                        rawItemsCollector: []
+                        _id: doc._id ? doc._id.toString() : "",
+                        orderId: groupKey,
+                        status: doc.status || "Pending",
+                        createdAt: doc.createdAt || null,
+                        estimatedTotal: parseFloat(doc.estimatedTotal) || 0,
+                        downpaymentPaid: doc.downpaymentPaid === true || doc.downpaymentPaid === 1 || String(doc.downpaymentPaid).toLowerCase() === 'true',
+                        siteInspection: doc.inspectionDate ? "Done" : (doc.siteInspection || "Pending"),
+                        contractLink: doc.contractLink || "#",
+                        receiptLink: doc.receiptLink || "#",
+                        is_cancelledAllowed: (doc.is_cancelledAllowed == 1 || doc.status === "Pending") ? 1 : 0,
+                        items: []
                     };
                 }
 
-                // Capture the quantity from the root document level (with a safe fallback to 1)
                 const rootQuantity = parseInt(doc.quantity) || 1;
 
-                // Extract item and attach the correct root quantity to it
-                if (Array.isArray(doc.items)) {
-                    doc.items.forEach(item => {
-                        groupedMap[groupKey].rawItemsCollector.push({
-                            ...item,
-                            // fallback to root quantity if the nested item doesn't have its own
-                            quantity: parseInt(item.quantity) || rootQuantity 
-                        });
-                    });
-                } else if (doc.itemDetails) {
-                    groupedMap[groupKey].rawItemsCollector.push({
-                        ...doc.itemDetails,
-                        quantity: rootQuantity // inject the root quantity directly into the item payload
-                    });
+                // Extract product metrics cleanly from target structural levels
+                let targetDetails = null;
+                if (doc.itemDetails) {
+                    targetDetails = doc.itemDetails;
+                } else if (doc.items && doc.items[0]) {
+                    targetDetails = doc.items[0];
                 } else {
-                    groupedMap[groupKey].rawItemsCollector.push({
-                        ...doc,
-                        quantity: rootQuantity
+                    targetDetails = doc;
+                }
+
+                if (targetDetails && targetDetails.name) {
+                    const width = parseFloat(targetDetails.width) || 0;
+                    const height = parseFloat(targetDetails.height) || 0;
+                    const unit = (targetDetails.unit || 'in').toLowerCase().trim();
+                    const rate = parseFloat(targetDetails.ratePerSqFt || targetDetails.price || 0);
+                    
+                    // 3. Match identical square-footage algorithms from your admin panel blueprint
+                    let area = parseFloat(targetDetails.areaSqFt || targetDetails.area || 0);
+                    if (area === 0) {
+                        if (unit === 'in') {
+                            area = (width * height) / 144;
+                        } else if (unit === 'cm') {
+                            area = (width * height) / 30.48 / 30.48;
+                        } else {
+                            area = width * height;
+                        }
+                    }
+
+                    // Prioritize database stored costs, otherwise fallback to derived area rules
+                    const computedLineCost = parseFloat(targetDetails.estimatedCost || targetDetails.lineTotal || (area * rate * rootQuantity));
+
+                    groupedMap[groupKey].items.push({
+                        name: targetDetails.name,
+                        width: width,
+                        height: height,
+                        unit: unit,
+                        quantity: rootQuantity,
+                        dimensions: `${width}${unit} x ${height}${unit}`,
+                        ratePerSqFt: rate,
+                        lineTotal: computedLineCost
                     });
                 }
             });
 
-            // 4. Map grouped elements into your expected React UI structure
-            const normalizedOrders = Object.keys(groupedMap).map(orderIdKey => {
-                const groupedOrder = groupedMap[orderIdKey];
-                const itemsArray = groupedOrder.rawItemsCollector;
-
-                // Deduplicate items with matching names/dimensions while combining their quantities
-                const condensedItemsMap = {};
-                itemsArray.forEach(item => {
-                    const nameKey = item.name || "Architectural Product Placement";
-                    const width = item.width || item.dimensions?.width || '';
-                    const height = item.height || item.dimensions?.height || '';
-                    const itemUniqueId = `${nameKey}-${width}-${height}`;
-
-                    const price = parseFloat(item.price || item.estimatedCost) || 0;
-                    const  qty = parseInt(item.quantity) || 1;
-
-                    if (condensedItemsMap[itemUniqueId]) {
-                        condensedItemsMap[itemUniqueId].quantity += qty;
-                        condensedItemsMap[itemUniqueId].lineTotal = condensedItemsMap[itemUniqueId].price * condensedItemsMap[itemUniqueId].quantity;
-                    } else {
-                        const unit = item.unit || 'px';
-                        condensedItemsMap[itemUniqueId] = {
-                            name: nameKey,
-                            price: price,
-                            quantity: qty,
-                            lineTotal: price * qty,
-                            dimensions: (width && height) ? `${width}${unit} x ${height}${unit}` : (item.dimensions || "Base Dimensions"),
-                            area: item.area || 0
-                        };
-                    }
-                });
-
-                const normalizedItems = Object.values(condensedItemsMap);
-
-                // Calculate Grand Total across all merged item quantities
-                const totalCost = normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0);
-                const requiredDpAmount = totalCost * 0.5;
-                const paidDpAmount = parseFloat(groupedOrder.downpaymentPaid) || 0;
-
+            // 4. Convert structural object mappings into flat payloads for React maps
+            const normalizedOrders = Object.values(groupedMap).map(order => {
+                // If the root total array lacks aggregate sums, compute across child components
+                if (order.estimatedTotal === 0) {
+                    order.estimatedTotal = order.items.reduce((sum, entry) => sum + entry.lineTotal, 0);
+                }
+                
                 return {
-                    id: groupedOrder._id ? groupedOrder._id.toString() : "",
-                    orderId: orderIdKey,
-                    name: normalizedItems.length > 1 ? `Batch Order (${normalizedItems.length} Products)` : (normalizedItems[0]?.name || "Architectural Order"),
-                    date: groupedOrder.createdAt ? new Date(groupedOrder.createdAt).toLocaleDateString('en-US', {
+                    id: order._id,
+                    orderId: order.orderId,
+                    name: order.items.length > 1 ? `Batch Order (${order.items.length} Products)` : (order.items[0]?.name || "Architectural Product Request"),
+                    date: order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', {
                         year: 'numeric', month: 'long', day: 'numeric'
                     }) : "Date Unspecified",
-                    status: groupedOrder.status || "Pending",
-                    price: `₱ ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                    downpayment: `₱ ${paidDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                    requiredDownpayment: `₱ ${requiredDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                    siteInspection: (groupedOrder.status === "Pending Inspection" || groupedOrder.status === "Pending") ? "Pending" : "Done",
-                    contractLink: groupedOrder.contractLink || "#",
-                    receiptLink: groupedOrder.receiptLink || "#",
-                    is_cancelledAllowed: (groupedOrder?.is_cancelledAllowed == 1 || groupedOrder?.is_cancelledAllowed === "1") ? 1 : 0,
-                    items: normalizedItems // Array containing exact grouped structures and their quantities
+                    status: order.status,
+                    estimatedTotal: order.estimatedTotal,
+                    downpaymentPaid: order.downpaymentPaid ? (order.estimatedTotal * 0.5) : 0, // Maps exactly to matching DP targets
+                    requiredDownpayment: order.estimatedTotal * 0.5,
+                    siteInspection: order.siteInspection,
+                    contractLink: order.contractLink,
+                    receiptLink: order.receiptLink,
+                    is_cancelledAllowed: order.is_cancelledAllowed,
+                    items: order.items
                 };
             });
 
@@ -465,7 +464,7 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
         });
     } catch (err) {
         console.error("Critical server error executing fetch matching customer orders processing:", err);
-        return res.status(500).json({ error: err.message || err });
+        return res.status(500).json({ remarks: "failed", error: err.message || err });
     }
 });
 

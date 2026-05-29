@@ -3,46 +3,8 @@ import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
 import './MyOrders.css';
 
-// Formatter utility
-const fmtCurrency = (num) => '₱' + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-/**
- * Parses a string like "100in x 100in" or "52cm x 48cm", converts the 
- * measurements into feet, and calculates the true square footage line total.
- */
-const calcTrueLineTotal = (item) => {
-  const pricePerSqFt = parseFloat(item.price) || 0;
-  const quantity = parseInt(item.quantity) || 1;
-  
-  if (!item.dimensions) return pricePerSqFt * quantity;
-
-  // Extract numbers and units using regex (e.g., "52cm x 48cm" -> [52, "cm", 48, "cm"])
-  const matches = item.dimensions.match(/(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/g);
-  if (!matches || matches.length < 2) return pricePerSqFt * quantity;
-
-  const parseValueAndUnit = (str) => {
-    const num = parseFloat(str) || 0;
-    const unit = str.replace(/[0-9.\s]/g, '').toLowerCase();
-    return { num, unit };
-  };
-
-  const dim1 = parseValueAndUnit(matches[0]);
-  const dim2 = parseValueAndUnit(matches[1]);
-
-  // Convert unit values safely to feet
-  const convertToFeet = ({ num, unit }) => {
-    if (unit === 'ft' || unit === 'feet') return num;
-    if (unit === 'm' || unit === 'meter') return num * 3.28084;
-    if (unit === 'cm' || unit === 'centimeter') return num / 30.48;
-    return num / 12; // Default fallback to inches ('in')
-  };
-
-  const widthInFt = convertToFeet(dim1);
-  const heightInFt = convertToFeet(dim2);
-  const sqFtArea = widthInFt * heightInFt;
-
-  return sqFtArea * pricePerSqFt * quantity;
-};
+// Absolute clean local financial numbers presentation formatter
+const fmtCurrency = (num) => '₱ ' + (Number(num) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const MyOrders = () => {
   const { user } = useContext(UserContext);
@@ -110,6 +72,12 @@ const MyOrders = () => {
     );
   };
 
+  // Maps backend data keys into precise lower-case normalized tokens for style sheet lookup matches
+  const getPillClass = (statusStr) => {
+    if (!statusStr) return 'status-pending';
+    return `status-${statusStr.toLowerCase().replace(/\s+/g, '-')}`;
+  };
+
   return (
     <div className="orders-container">
       <h2>My Orders</h2>
@@ -126,42 +94,42 @@ const MyOrders = () => {
           </div>
         ) : (
           orders.map((order) => {
-            // Recalculate true sums locally using the extracted square footage logic
-            let totalOrderCost = 0;
-            const computedItems = (order.items || []).map(item => {
-              const trueLineTotal = calcTrueLineTotal(item);
-              totalOrderCost += trueLineTotal;
-              return { ...item, trueLineTotal };
-            });
-
-            const downpaymentPaid = parseFloat((order.downpayment || '').replace(/[^0-9.]/g, '')) || 0;
-            const requiredDP = totalOrderCost * 0.5;
+            const orderIdKey = order.id || order.orderId;
+            
+            // Extracts explicit values directly from your payload object structures 
+            // instead of miscalculating line subtotals manually on client runtimes.
+            const totalOrderCost = parseFloat(order.estimatedTotal) || 0;
+            const downpaymentPaid = parseFloat(order.downpaymentPaid) || 0;
+            const requiredDP = parseFloat(order.requiredDownpayment) || (totalOrderCost * 0.5);
 
             return (
-              <div className={`order-card ${expandedId === order.id ? 'expanded' : ''}`} key={order.id}>
-                <div className="order-header" onClick={() => toggleExpand(order.id)} style={{ cursor: 'pointer' }}>
+              <div className={`order-card ${expandedId === orderIdKey ? 'expanded' : ''}`} key={orderIdKey}>
+                <div className="order-header" onClick={() => toggleExpand(orderIdKey)} style={{ cursor: 'pointer' }}>
                   <div>
                     <h3>{order.name}</h3>
                     <p>ID: {order.orderId} • {order.date}</p>
                   </div>
-                  <span className={`badge ${order.status.toLowerCase().replace(/\s+/g, '-')}`}>{order.status}</span>
+                  {/* Primary Order Status Pill */}
+                  <span className={`status-pill ${getPillClass(order.status)}`}>
+                    {order.status || 'Pending'}
+                  </span>
                 </div>
 
-                {expandedId === order.id && (
+                {expandedId === orderIdKey && (
                   <div className="order-details">
                     
-                    <div className="order-items-summary" style={{ marginBottom: '15px', background: '#f9f9f9', padding: '10px', borderRadius: '6px' }}>
-                      <p style={{ fontWeight: '600', margin: '0 0 8px 0', fontSize: '14px', color: '#444' }}>Products inside this Order:</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {computedItems.map((prod, pIdx) => (
-                          <div key={pIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>
+                    <div className="order-items-summary" style={{ marginBottom: '20px', background: '#f9f9f9', padding: '15px', borderRadius: '6px' }}>
+                      <p style={{ fontWeight: '600', margin: '0 0 10px 0', fontSize: '14px', color: '#444' }}>Products inside this Tracked Request:</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {(order.items || []).map((prod, pIdx) => (
+                          <div key={pIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderBottom: '1px solid #eee', paddingBottom: '6px' }}>
                             <div>
-                              <span style={{ fontWeight: '500' }}>{prod.name}</span>
-                              <span style={{ color: '#888', marginLeft: '6px' }}>x{prod.quantity}</span>
-                              <div style={{ fontSize: '11px', color: '#666' }}>Size: {prod.dimensions}</div>
+                              <span style={{ fontWeight: '600', color: '#2c3e50' }}>{prod.name}</span>
+                              <span style={{ color: '#888', marginLeft: '6px', fontSize: '12px' }}>x{prod.quantity}</span>
+                              <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '2px' }}>Size: {prod.dimensions || `${prod.width}${prod.unit} x ${prod.height}${prod.unit}`}</div>
                             </div>
-                            <span style={{ fontWeight: '500' }}>
-                              {fmtCurrency(prod.trueLineTotal)}
+                            <span style={{ fontWeight: '600', color: '#34495e' }}>
+                              {fmtCurrency(prod.lineTotal)}
                             </span>
                           </div>
                         ))}
@@ -170,40 +138,47 @@ const MyOrders = () => {
 
                     <div className="detail-grid">
                       <div>
-                        <label>Grand Total Price:</label> 
-                        <p style={{ fontWeight: 'bold', color: '#2ecc71' }}>{fmtCurrency(totalOrderCost)}</p>
+                        <label>GRAND TOTAL PRICE:</label> 
+                        <p className="total-highlight-green" style={{ fontWeight: 'bold', fontSize: '18px', color: '#27ae60', margin: '4px 0 0 0' }}>
+                          {fmtCurrency(totalOrderCost)}
+                        </p>
                       </div>
                       <div>
-                        <label>Downpayment Paid:</label> 
-                        <p>{fmtCurrency(downpaymentPaid)}</p>
+                        <label>DOWNPAYMENT PAID:</label> 
+                        <p style={{ fontWeight: '500', margin: '4px 0 0 0' }}>{fmtCurrency(downpaymentPaid)}</p>
                       </div>
                       <div>
-                        <label>Required DP (50%):</label> 
-                        <p>{fmtCurrency(requiredDP)}</p>
+                        <label>REQUIRED DP (50%):</label> 
+                        <p style={{ fontWeight: '500', margin: '4px 0 0 0' }}>{fmtCurrency(requiredDP)}</p>
                       </div>
                       <div>
-                        <label>Site Inspection:</label> 
-                        <p className={order.siteInspection.toLowerCase()}>{order.siteInspection}</p>
+                        <label>SITE INSPECTION:</label> 
+                        <div style={{ marginTop: '4px' }}>
+                          {/* Site Inspection Status Pill instead of raw text strings */}
+                          <span className={`status-pill ${getPillClass(order.status)}`}>
+                            {order.status || 'Pending'}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="order-links" style={{ marginTop: '15px' }}>
-                      <a href={order.contractLink} className="link-btn">View Contract</a>
-                      <a href={order.receiptLink} className="link-btn">View Receipt</a>
+                    <div className="order-links" style={{ marginTop: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {order.contractLink && order.contractLink !== '#' && <a href={order.contractLink} className="link-btn" target="_blank" rel="noreferrer">View Contract</a>}
+                      {order.receiptLink && order.receiptLink !== '#' && <a href={order.receiptLink} className="link-btn" target="_blank" rel="noreferrer">View Receipt</a>}
                       {(order.status === "Pending" || order.status === "Pending Inspection" || order.is_cancelledAllowed === 1) && (
                         <button 
-                          onClick={() => handleCancelOrder(order.id)} 
-                          className="link-btn" 
-                          style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', cursor: 'pointer' }}
-                          disabled={order.status !== "Pending"}
+                          onClick={() => handleCancelOrder(orderIdKey)} 
+                          className="link-btn cancel-action-btn" 
+                          style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', cursor: 'pointer', padding: '8px 16px', borderRadius: '4px' }}
+                          disabled={order.status !== "Pending" && order.is_cancelledAllowed !== 1}
                         >
                           Cancel Request
                         </button>
                       )}
                     </div>
 
-                    <div className="upload-section" style={{ marginTop: '15px' }}>
-                      <label>Upload Proof of Payment (Optional):</label>
+                    <div className="upload-section" style={{ marginTop: '20px', borderTop: '1px dashed #ddd', paddingTop: '15px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: '600', color: '#666', display: 'block', marginBottom: '5px' }}>Upload Proof of Payment (Optional):</label>
                       <input type="file" className="file-input" multiple />
                     </div>
                   </div>

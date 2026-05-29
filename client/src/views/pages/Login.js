@@ -302,9 +302,12 @@ export default function Login() {
 }
 
 .brand-logo img {
-  max-height: 80px;
+  max-height: 160px;          /* bigger */
   width: auto;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25));
+  filter:
+    drop-shadow(0 0 12px rgba(255, 255, 255, 0.55))   /* white glow halo */
+    drop-shadow(0 4px 16px rgba(0, 0, 0, 0.40))       /* depth shadow */
+    brightness(1.15);                                  /* slight lift */
 }
 
 .brand-text .small {
@@ -855,7 +858,7 @@ export default function Login() {
           <aside className="brand-panel">
             <div className="brand-inner">
               <div className="brand-logo">
-                <img src="images/logo.png" alt="ACGC Logo" />
+                <img src="images/acgc-logo.png" alt="ACGC Logo" />
               </div>
               <div className="brand-text">
                 <div className="small">WELCOME TO</div>

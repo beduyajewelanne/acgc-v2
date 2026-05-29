@@ -2,6 +2,32 @@ import React, { useState } from 'react';
 import { CRUD } from 'services/data.services';
 import './TrackProduct.css';
 
+/**
+ * Parses a dimensions string, converts measurements to feet, 
+ * and calculates the true square footage line total.
+ */
+const calcTrueLineTotal = (width, height, unit, rate, quantity) => {
+  const w = parseFloat(width) || 0;
+  const h = parseFloat(height) || 0;
+  const pRate = parseFloat(rate) || 0;
+  const qty = parseInt(quantity) || 1;
+  const currentUnit = (unit || 'in').toLowerCase().trim();
+
+  // Convert unit values safely to feet
+  const convertToFeet = (val) => {
+    if (currentUnit === 'ft' || currentUnit === 'feet') return val;
+    if (currentUnit === 'm' || currentUnit === 'meter') return val * 3.28084;
+    if (currentUnit === 'cm' || currentUnit === 'centimeter') return val / 30.48;
+    return val / 12; // Fallback defaults to inches ('in')
+  };
+
+  const widthInFt = convertToFeet(w);
+  const heightInFt = convertToFeet(h);
+  const sqFtArea = widthInFt * heightInFt;
+
+  return sqFtArea * pRate * qty;
+};
+
 const TrackProducts = () => {
   const [trackingCode, setTrackingCode] = useState('');
   const [order, setOrder] = useState(null);
@@ -23,14 +49,10 @@ const TrackProducts = () => {
         headers: { 'Content-Type': 'application/json' }
       },
       (res) => {
-        // Safe fallbacks to extract the array list
         const rawList = res?.payload || res || [];
         
         if (Array.isArray(rawList) && rawList.length > 0) {
-          // Take administrative structural fields from the first document block
           const baselineDoc = rawList[0];
-          
-          // --- Multi-product aggregation loop block ---
           const condensedItemsMap = {};
 
           rawList.forEach(doc => {
@@ -43,18 +65,22 @@ const TrackProducts = () => {
             const unit = details.unit || 'in';
             const itemUniqueId = `${nameKey}-${width}-${height}`;
 
-            const basePrice = parseFloat(details.estimatedCost || details.price) || 0;
-            const qty = parseInt(doc.quantity) || 1; // Extract quantity from parent document layer
+            const basePrice = parseFloat(details.pricePerSqFt || details.price || details.estimatedCost) || 0;
+            const qty = parseInt(doc.quantity) || 1;
+
+            // Calculate true total by factoring in the Square Footage Area
+            const computedRowTotal = calcTrueLineTotal(width, height, unit, basePrice, qty);
 
             if (condensedItemsMap[itemUniqueId]) {
               condensedItemsMap[itemUniqueId].quantity += qty;
-              condensedItemsMap[itemUniqueId].lineTotal = condensedItemsMap[itemUniqueId].price * condensedItemsMap[itemUniqueId].quantity;
+              // Accumulate dynamically recalculating via current aggregate qty total
+              condensedItemsMap[itemUniqueId].lineTotal += computedRowTotal;
             } else {
               condensedItemsMap[itemUniqueId] = {
                 name: nameKey,
                 price: basePrice,
                 quantity: qty,
-                lineTotal: basePrice * qty,
+                lineTotal: computedRowTotal,
                 dimensions: (width && height) ? `${width}${unit} x ${height}${unit}` : "Base Configuration Dimensions",
                 area: details.areaSqFt || details.area || 0
               };
@@ -68,7 +94,7 @@ const TrackProducts = () => {
             return;
           }
 
-          // Compute accurate total balances across ALL items and correct quantities
+          // Compute matching accurate total balances across aggregated list values
           const totalCost = normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0);
           const requiredDpAmount = totalCost * 0.5;
           const paidDpAmount = parseFloat(baselineDoc.downpaymentPaid) || 0;
@@ -101,7 +127,6 @@ const TrackProducts = () => {
 
           setOrder({
             code: baselineDoc.orderId || trackingCode,
-            // Display consolidated name if it is a multi-product batch sequence
             name: normalizedItems.length > 1 ? `Batch Order (${normalizedItems.length} Products)` : normalizedItems[0].name,
             date: baselineDoc.createdAt ? new Date(baselineDoc.createdAt).toLocaleDateString('en-US', {
               year: 'numeric', month: 'long', day: 'numeric'
@@ -115,7 +140,7 @@ const TrackProducts = () => {
             receiptLink: baselineDoc.receiptLink || "#",
             steps: stepsArr,
             currentStep: matchedStepIndex,
-            items: normalizedItems // Embedded array mapping details to the render viewport
+            items: normalizedItems
           });
         } else {
           setErrorMessage("No matching project tracking code discovered record match.");
@@ -182,7 +207,7 @@ const TrackProducts = () => {
               </span>
             </div>
 
-            {/* --- Products Manifest Section (Matches MyOrders Layout) --- */}
+            {/* --- Products Manifest Section --- */}
             <div className="tracking-products-manifest" style={{ marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
               <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>Products inside this Tracked Request:</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

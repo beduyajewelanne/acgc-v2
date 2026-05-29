@@ -238,13 +238,14 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
                         unit: unitVal,
                         areaSqFt: parseFloat(areaSqFt.toFixed(4)),
                         ratePerSqFt: ratePerSqFt,
-                        estimatedCost: parseFloat(estimatedCost.toFixed(2))
+                        estimatedCost: parseFloat(estimatedCost.toFixed(2)*quantity)
                     },
                     orderId: sharedOrderId, // Shared tracking assignment across all records inside this batch
                     status: "Pending",
                     isCancelled: 0,
                     createdAt: new Date(),
-                    quantity: quantity
+                    quantity: quantity,
+                    paymentTerms: '50% downpayment, 50% upon completion'
                 };
 
                 const result = await insert_one_helper("order_requests", structuralOrderRequest);
@@ -317,7 +318,8 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
                 status: "Pending",
                 isCancelled: 0,
                 createdAt: new Date(),
-                quantity: 1
+                quantity: 1,
+                paymentTerms: '50% downpayment, 50% upon completion'
             };
 
             const result = await insert_one_helper("order_requests", newOrderRequest);
@@ -471,7 +473,7 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
 // ─── 2. CANCEL / UPDATE SPECIFIC ORDER REQUEST STATUS ─────────────────────
 cartRoutes.post("/api/cancel_order_request", async (req, res) => {
     const { token, userId, order_id } = req.body;
-
+    const db = dbo.getDb();
     if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session tokens" });
     if (!userId) return res.status(400).json({ remarks: "failed", message: "Missing security tracking identity coordinates" });
     if (!order_id) return res.status(400).json({ remarks: "failed", message: "Missing order transaction key parameter reference" });
@@ -483,7 +485,7 @@ cartRoutes.post("/api/cancel_order_request", async (req, res) => {
 
             // 1. Verify target order existence and ownership profile before executing update
             const findResult = await get_data_helper("order_requests", [
-                { $match: { _id: new ObjectId(order_id), user_id: new ObjectId(userId) } }
+                { $match: { orderId: order_id } }
             ]);
             const existingOrderList = findResult?.payload || findResult || [];
 
@@ -505,10 +507,20 @@ cartRoutes.post("/api/cancel_order_request", async (req, res) => {
             }
 
             // 3. Instead of deleting, update the document status to "Cancelled"
-            const updateResult = await update_one_helper(
-                "order_requests", 
-                { _id: new ObjectId(order_id) }, 
-                { $set: { status: "Cancelled", isCancelled: 1, updatedAt: new Date() } }
+            // const updateResult = await update_many_helper(
+            //     "order_requests", 
+            //     { orderId: order_id }, 
+            //     { $set: { status: "Cancelled", isCancelled: 1, updatedAt: new Date() } }
+            // );
+            const updateResult = await db.collection("order_requests").updateMany(
+                { orderId: order_id },
+                { 
+                    $set: { 
+                        status: "Cancelled", 
+                        isCancelled: 1, 
+                        updatedAt: new Date() 
+                    } 
+                }
             );
 
             if (updateResult.remarks === "success" || updateResult.modifiedCount > 0 || updateResult.matchedCount > 0) {
@@ -571,91 +583,57 @@ cartRoutes.post("/api/get_order_requests", async (req, res) => {
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "Unauthorized" });
 
-            // Pipeline strategy groups separate split database entries with the same orderId cleanly
             const pipeline = [
                 {
                     $group: {
                         _id: "$orderId",
-                        // Retains base document indicators safely from the first record in the group
-                        dbId: { $first: "$_id" },
-                        user_id: { $first: "$user_id" },
-                        clientName: { $first: "$clientName" },
-                        clientPhone: { $first: "$clientPhone" },
-                        clientEmail: { $first: "$clientEmail" },
-                        installationAddress: { $first: "$installationAddress" },
-                        clientNotes: { $first: "$clientNotes" },
-                        status: { $first: "$status" },
-                        isCancelled: { $first: "$isCancelled" },
-                        createdAt: { $first: "$createdAt" },
-                        inspectionDate: { $first: "$inspectionDate" },
-                        estimatedInstallationDate: { $first: "$estimatedInstallationDate" },
-                        paymentTerms: { $first: "$paymentTerms" },
-                        downpaymentPaid: { $first: "$downpaymentPaid" },
-                        paymentDate: { $first: "$paymentDate" },
-                        customerHasAccount: { $first: "$customerHasAccount" },
-                        customerEmail: { $first: "$customerEmail" },
-                        // Appends custom admin measurement array inputs if they exist
-                        manualMeasurements: { $first: "$measurements" },
-                        manualEstimatedTotal: { $first: "$estimatedTotal" },
-                        // Collects all item details into an array across all matching shared records
-                        bundledItems: {
+                        // Capture base document fields from the first occurrence
+                        baseDoc: { $first: "$$ROOT" },
+                        // Aggregate all items associated with this orderId
+                        measurements: {
                             $push: {
                                 id: "$_id",
                                 product: "$itemDetails.name",
                                 width: "$itemDetails.width",
                                 height: "$itemDetails.height",
-                                qty: { $ifNull: ["$itemDetails.quantity", 1] },
-                                pricePerSqFt: "$itemDetails.ratePerSqFt"
+                                qty: { $ifNull: ["$quantity", "$itemDetails.quantity", 1] },
+                                pricePerSqFt: "$itemDetails.ratePerSqFt",
+                                unit: "$itemDetails.unit",
                             }
-                        }
+                        },
+                        // Sum up costs across all grouped documents
+                        totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" }
                     }
                 },
-                { $sort: { createdAt: -1 } }
+                { $sort: { "baseDoc.createdAt": -1 } }
             ];
 
             const result = await get_data_helper("order_requests", pipeline);
             const rawPayload = result?.payload || result || [];
 
             const normalizedPayload = rawPayload.map(group => {
-                // If explicit measurements exist via manual dashboard creates, use them. Otherwise, fallback to rolled up bundledItems.
-                let measurements = group.manualMeasurements || [];
-                if (measurements.length === 0 && group.bundledItems && group.bundledItems.length > 0) {
-                    measurements = group.bundledItems.filter(item => item.product);
-                }
-                
-                // Fallback safeguards to standard array maps
-                if (measurements.length === 0) {
-                    measurements = [{ id: Date.now(), product: '', width: '', height: '', qty: 1, pricePerSqFt: '' }];
-                }
-
-                // Compute real-time totals safely across all items
-                const calculatedTotal = measurements.reduce((sum, r) => {
-                    const sqFt = ((parseFloat(r.width) || 0) * (parseFloat(r.height) || 0)) / 929.03;
-                    return sum + (sqFt * (parseFloat(r.pricePerSqFt) || 0) * (parseInt(r.qty) || 1));
-                }, 0);
-
+                const b = group.baseDoc;
                 return {
-                    _id: group.dbId ? group.dbId.toString() : "",
-                    id: group._id || "", 
-                    orderId: group._id || "",
-                    user_id: group.user_id,
-                    clientName: group.clientName || "Unknown Client",
-                    clientNumber: group.clientPhone || "",
-                    clientAddress: group.installationAddress || "",
-                    siteAddress: group.installationAddress || "",
-                    notes: group.clientNotes || "",
-                    status: group.status || "Pending",
-                    isCancelled: group.isCancelled || 0,
-                    dateCreated: group.createdAt ? new Date(group.createdAt).toISOString().split('T')[0] : "",
-                    inspectionDate: group.inspectionDate || (group.createdAt ? new Date(group.createdAt).toISOString().split('T')[0] : ""),
-                    estimatedInstallationDate: group.estimatedInstallationDate || "",
-                    paymentTerms: group.paymentTerms || '50% downpayment, 50% upon completion',
-                    downpaymentPaid: group.downpaymentPaid || false,
-                    paymentDate: group.paymentDate || "",
-                    customerHasAccount: group.customerHasAccount || false,
-                    customerEmail: group.customerEmail || "",
-                    measurements: measurements,
-                    estimatedTotal: group.manualEstimatedTotal || parseFloat(calculatedTotal.toFixed(2))
+                    id: group._id, // orderId acts as the unique identifier
+                    clientName: b.clientName || "Unknown Client",
+                    clientAddress: b.installationAddress || "",
+                    clientNumber: b.clientPhone || "",
+                    siteAddress: b.installationAddress || "",
+                    dateCreated: b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : "",
+                    inspectionDate: b.inspectionDate || "",
+                    estimatedInstallationDate: b.estimatedInstallationDate || "",
+                    status: b.status || "Pending",
+                    estimatedTotal: b.estimatedTotal || group.totalEstimatedCost || 0,
+                    downpaymentPaid: b.downpaymentPaid || false,
+                    paymentTerms: b.paymentTerms || '50% downpayment, 50% upon completion',
+                    paymentDate: b.paymentDate || "",
+                    notes: b.clientNotes || "",
+                    measurements: group.measurements,
+                    contractSentToCustomer: b.contractSentToCustomer || false,
+                    customerHasAccount: b.customerHasAccount || false,
+                    customerEmail: b.clientEmail || "",
+                    customerHasAccount: b.customerHasAccount == true ? true : b.user_id ? true : false ,
+                    manualOverride: parseFloat(b.manualOverride) || "",
                 };
             });
 
@@ -669,7 +647,11 @@ cartRoutes.post("/api/get_order_requests", async (req, res) => {
  
 // ─── 4. ADMIN WORKSPACE: CREATE NEW ORDER REQUEST RECORD ──────────────────
 cartRoutes.post("/api/create_order_request", async (req, res) => {
-    const { token, _id, clientName, clientNumber, siteAddress, inspectionDate, estimatedInstallationDate, status, notes, paymentTerms, downpaymentPaid, paymentDate, customerHasAccount, customerEmail, measurements, estimatedTotal } = req.body;
+    const { 
+        token, _id, clientName, clientNumber, siteAddress, inspectionDate, 
+        estimatedInstallationDate, status, notes, paymentTerms, downpaymentPaid, 
+        paymentDate, customerHasAccount, customerEmail, measurements, manualOverride, estimatedTotal 
+    } = req.body;
 
     if (!token) return res.status(401).json({ remarks: "Unauthorized" });
 
@@ -677,35 +659,81 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
         checkAuth(token, _id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "Unauthorized" });
 
-            const newRecord = {
-                user_id: customerHasAccount ? null : new ObjectId(), // Can be linked dynamically later if required
-                clientName: clientName || "",
-                clientEmail: customerEmail || "",
-                clientPhone: clientNumber || "",
-                installationAddress: siteAddress || "",
-                clientNotes: notes || "",
-                orderId: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                status: status || "Pending",
-                isCancelled: status === "Canceled" ? 1 : 0,
-                createdAt: new Date(),
-                // Extra operational fields used by the Site Inspection context
-                inspectionDate: inspectionDate || "",
-                estimatedInstallationDate: estimatedInstallationDate || "",
-                paymentTerms: paymentTerms || "",
-                downpaymentPaid: downpaymentPaid || false,
-                paymentDate: paymentDate || "",
-                customerHasAccount: customerHasAccount || false,
-                customerEmail: customerEmail || "",
-                measurements: measurements || [],
-                estimatedTotal: parseFloat(estimatedTotal) || 0
-            };
+            const db = await dbo.getDb();
+            let matchedUserId = null;
+            let matchedUser = null
 
-            const result = await insert_one_helper("order_requests", newRecord);
-            if (result.remarks === "success" || result.insertedId) {
+            // Find user_id from users collection using client email if has account is true
+            if (customerHasAccount && customerEmail) {
+                const userDoc = await db.collection("users").findOne({ email: customerEmail.trim() });
+                if (userDoc) matchedUserId = userDoc._id; matchedUser = userDoc
+            }
+
+            const sharedOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const isCancelledValue = status === "Canceled" || status === "Cancelled" ? 1 : 0;
+
+            // Map each row in measurements to an individual document to align with aggregation queries
+            const documentBatch = (measurements || []).map(row => {
+                const widthVal = parseFloat(row.width) || 0;
+                const heightVal = parseFloat(row.height) || 0;
+                const qtyVal = parseInt(row.qty) || 1;
+                const rateVal = parseFloat(row.pricePerSqFt) || 0;
+                const unitVal = row.unit || "cm"; // Default fallback match
+                
+                // Dynamic conversion to Square Feet
+                let areaSqFt = 0;
+                if (unitVal === "cm") {
+                    areaSqFt = (widthVal * heightVal) / 929.03;
+                } else if (unitVal === "inch") {
+                    areaSqFt = (widthVal * heightVal) / 144;
+                } else if (unitVal === "ft") {
+                    areaSqFt = widthVal * heightVal;
+                }
+                
+                const estimatedCost = areaSqFt > 0 ? (areaSqFt * rateVal * qtyVal) : (rateVal * qtyVal);
+
+                return {
+                    user_id: matchedUserId ? new ObjectId(matchedUserId) : null,
+                    clientName: clientName || "",
+                    clientEmail: customerEmail || "",
+                    clientPhone: clientNumber || "",
+                    installationAddress: siteAddress || "",
+                    clientNotes: notes || "",
+                    orderId: sharedOrderId, // (or targetOrderId for updates)
+                    status: status || "Pending",
+                    isCancelled: isCancelledValue,
+                    createdAt: new Date(),
+                    inspectionDate: inspectionDate || "",
+                    estimatedInstallationDate: estimatedInstallationDate || "",
+                    paymentTerms: paymentTerms || "",
+                    downpaymentPaid: downpaymentPaid === true || downpaymentPaid === "true",
+                    paymentDate: paymentDate || "",
+                    customerHasAccount: !!matchedUserId,
+                    manualOverride: manualOverride !== undefined && manualOverride !== null ? parseFloat(manualOverride) : "",
+                    estimatedTotal: parseFloat(estimatedTotal) || 0,
+                    quantity: qtyVal,
+                    itemDetails: {
+                        name: row.product || "",
+                        width: widthVal,
+                        height: heightVal,
+                        unit: unitVal, // Stores the exact selected unit choice safely
+                        areaSqFt: parseFloat(areaSqFt.toFixed(4)),
+                        ratePerSqFt: rateVal,
+                        estimatedCost: parseFloat(estimatedCost.toFixed(2))
+                    }
+                };
+            });
+
+            if (documentBatch.length === 0) {
+                return res.status(400).json({ remarks: "failed", message: "Cannot create an inspection without measurements rows." });
+            }
+
+            const result = await db.collection("order_requests").insertMany(documentBatch);
+            if (result.acknowledged) {
                 await actionLog(_id, "Created Site Inspection Order", `Manually added order tracking for ${clientName}`);
                 return res.status(200).json({ remarks: "success", message: "Inspection context created successfully" });
             } else {
-                return res.status(500).json({ remarks: "failed", message: "Database rejected properties insert." });
+                return res.status(500).json({ remarks: "failed", message: "Database rejected property inserts." });
             }
         });
     } catch (err) {
@@ -716,38 +744,98 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
 
 // ─── 5. ADMIN WORKSPACE: UPDATE EXISTING ORDER REQUEST RECORD ──────────────
 cartRoutes.post("/api/update_order_request", async (req, res) => {
-    const { token, user_id, ...fields } = req.body;
+    const { 
+        token, user_id, id, orderId, clientName, clientNumber, siteAddress, inspectionDate, 
+        estimatedInstallationDate, status, notes, paymentTerms, downpaymentPaid, 
+        paymentDate, customerHasAccount, customerEmail, measurements, manualOverride, estimatedTotal 
+    } = req.body;
 
     if (!token) return res.status(401).json({ remarks: "Unauthorized" });
     
-    const orderId = fields.orderId || fields.id;
-    if (!orderId) return res.status(400).json({ remarks: "failed", message: "Missing target orderId reference identifier" });
+    const targetOrderId = orderId || id;
+    if (!targetOrderId) return res.status(400).json({ remarks: "failed", message: "Missing target orderId reference identifier" });
 
     try {
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "Unauthorized" });
 
-            const securePayload = { ...fields };
-            delete securePayload._id;
-            delete securePayload.id;
-            delete securePayload.token;
+            const db = await dbo.getDb();
+            let matchedUserId = null;
 
-            if (securePayload.status === "Canceled") {
-                securePayload.isCancelled = 1;
+            // Re-verify/find user link by email update options
+            if (customerHasAccount && customerEmail) {
+                const userDoc = await db.collection("users").findOne({ email: customerEmail.trim() });
+                if (userDoc) matchedUserId = userDoc._id;
             }
 
-            // Perform an update query spanning all matching records sharing this shared orderId
-            const db = await dbo.getDb();
-            const updateResult = await db.collection("order_requests").updateMany(
-                { orderId: orderId },
-                { $set: { ...securePayload, updatedAt: new Date() } }
-            );
+            const isCancelledValue = status === "Canceled" || status === "Cancelled" ? 1 : 0;
 
-            if (updateResult.matchedCount > 0) {
-                await actionLog(user_id, "Updated Grouped Order Request", `Modified fields for batch tracking orderId: ${orderId}`);
+            // 1. Clear out the previous grouped documents under this orderId to prevent layout row fragmentation
+            await db.collection("order_requests").deleteMany({ orderId: targetOrderId });
+
+            // 2. Re-insert the updated measurements array into individual documents maintaining schema alignment
+            const documentBatch = (measurements || []).map(row => {
+                const widthVal = parseFloat(row.width) || 0;
+                const heightVal = parseFloat(row.height) || 0;
+                const qtyVal = parseInt(row.qty) || 1;
+                const rateVal = parseFloat(row.pricePerSqFt) || 0;
+                const unitVal = row.unit || "cm"; // Default fallback match
+                
+                // Dynamic conversion to Square Feet
+                let areaSqFt = 0;
+                if (unitVal === "cm") {
+                    areaSqFt = (widthVal * heightVal) / 929.03;
+                } else if (unitVal === "inch") {
+                    areaSqFt = (widthVal * heightVal) / 144;
+                } else if (unitVal === "ft") {
+                    areaSqFt = widthVal * heightVal;
+                }
+                
+                const estimatedCost = areaSqFt > 0 ? (areaSqFt * rateVal * qtyVal) : (rateVal * qtyVal);
+
+                return {
+                    user_id: matchedUserId ? new ObjectId(matchedUserId) : null,
+                    clientName: clientName || "",
+                    clientEmail: customerEmail || "",
+                    clientPhone: clientNumber || "",
+                    installationAddress: siteAddress || "",
+                    clientNotes: notes || "",
+                    orderId: targetOrderId,
+                    status: status || "Pending",
+                    isCancelled: isCancelledValue,
+                    createdAt: new Date(),
+                    inspectionDate: inspectionDate || "",
+                    estimatedInstallationDate: estimatedInstallationDate || "",
+                    paymentTerms: paymentTerms || "",
+                    downpaymentPaid: downpaymentPaid === true || downpaymentPaid === "true",
+                    paymentDate: paymentDate || "",
+                    customerHasAccount: !!matchedUserId,
+                    manualOverride: manualOverride !== undefined && manualOverride !== null ? parseFloat(manualOverride) : "",
+                    estimatedTotal: parseFloat(estimatedTotal) || 0,
+                    quantity: qtyVal,
+                    itemDetails: {
+                        name: row.product || "",
+                        width: widthVal,
+                        height: heightVal,
+                        unit: unitVal, // Stores the exact selected unit choice safely
+                        areaSqFt: parseFloat(areaSqFt.toFixed(4)),
+                        ratePerSqFt: rateVal,
+                        estimatedCost: parseFloat(estimatedCost.toFixed(2))
+                    }
+                };
+            });
+
+            if (documentBatch.length === 0) {
+                return res.status(400).json({ remarks: "failed", message: "Cannot save an updated inspection with zero measurement entries." });
+            }
+
+            const result = await db.collection("order_requests").insertMany(documentBatch);
+
+            if (result.acknowledged) {
+                await actionLog(user_id, "Updated Grouped Order Request", `Modified fields and reconstructed batch entries for orderId: ${targetOrderId}`);
                 return res.status(200).json({ remarks: "success", message: "Grouped inspection records updated successfully" });
             } else {
-                return res.status(500).json({ remarks: "failed", message: "No documents matched the tracking orderId specification context." });
+                return res.status(500).json({ remarks: "failed", message: "Database update engine failed to process transaction profiles." });
             }
         });
     } catch (err) {

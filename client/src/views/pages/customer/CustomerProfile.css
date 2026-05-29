@@ -1,118 +1,149 @@
-/* CustomerProfile.css */
+/* ============================================================
+   CustomerProfile.css — ACGC Glass & Aluminum Services
+   ============================================================ */
 
+:root {
+  --primary-red: #8b1e22;
+  --dark-red:    #6d1111;
+  --light-red:   #f4e8e8;
+  --white:       #ffffff;
+  --off-white:   #f7f7f7;
+  --light-gray:  #eaeaea;
+  --mid-gray:    #b8bcc2;
+  --slate:       #5a5a5a;
+  --text-dark:   #333333;
+  --border:      #e5e7eb;
+  --shadow-sm:   0 2px 8px rgba(0,0,0,0.07);
+  --shadow-md:   0 6px 24px rgba(0,0,0,0.11);
+  --radius:      12px;
+  --transition:  0.25s ease;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Container ── */
 .cp-container {
+  font-family: 'Segoe UI', system-ui, sans-serif;
   max-width: 860px;
   margin: 40px auto;
-  padding: 0 20px;
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  padding: 0 24px 60px;
+  color: var(--text-dark);
 }
 
 /* ── Profile Card ── */
 .cp-profile-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 20px 24px;
-  background: #fff;
-  border: 1px solid #eeece8;
-  border-radius: 14px;
-  margin-bottom: 16px;
+  gap: 18px;
+  margin-bottom: 20px;
 }
 
 .cp-avatar {
-  width: 52px;
-  height: 52px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  background: #faece7;
-  color: #993c1d;
+  background: var(--primary-red);
+  color: var(--white);
+  font-size: 1.3rem;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 17px;
   flex-shrink: 0;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
 }
 
 .cp-user-meta {
   flex: 1;
+  min-width: 0;
 }
 
 .cp-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 3px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cp-email {
-  font-size: 13px;
-  color: #888;
-  margin: 0;
+  font-size: 0.9rem;
+  color: var(--slate);
 }
 
 .cp-edit-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #993c1d;
-  background: transparent;
-  border: 1px solid #f0997b;
+  padding: 9px 18px;
+  border: 1.5px solid var(--border);
   border-radius: 8px;
-  padding: 7px 14px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  background: var(--white);
+  color: var(--slate);
+  font-size: 0.88rem;
+  font-weight: 600;
   font-family: inherit;
-  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition);
 }
 
 .cp-edit-btn:hover {
-  background: #faece7;
-  border-color: #d85a30;
+  border-color: var(--primary-red);
+  color: var(--primary-red);
+  background: var(--light-red);
 }
 
 /* ── Nav Grid ── */
 .cp-nav-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 28px;
 }
 
 .cp-nav-item {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 16px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 18px 20px;
-  background: #fff;
-  border: 1px solid #eeece8;
-  border-radius: 14px;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition);
 }
 
 .cp-nav-item:hover {
-  border-color: #d85a30;
-  background: #fffaf8;
-  transform: translateY(-1px);
+  border-color: var(--primary-red);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .cp-nav-icon {
-  color: #993c1d;
+  color: var(--primary-red);
   margin-bottom: 4px;
 }
 
 .cp-nav-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1a1a1a;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-dark);
 }
 
 .cp-nav-sub {
-  font-size: 12px;
-  color: #aaa;
+  font-size: 0.8rem;
+  color: var(--slate);
 }
 
 /* ── Section Header ── */
@@ -120,30 +151,26 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .cp-section-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-dark);
 }
 
 .cp-view-all {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 0.88rem;
   font-weight: 600;
-  color: #993c1d;
-  cursor: pointer;
-  transition: opacity 0.15s;
+  color: var(--primary-red);
+  transition: opacity var(--transition);
 }
 
-.cp-view-all:hover {
-  opacity: 0.75;
-}
+.cp-view-all:hover { opacity: 0.7; }
 
 /* ── Order List ── */
 .cp-order-list {
@@ -153,53 +180,59 @@
 }
 
 .cp-order-item {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px;
-  background: #fff;
-  border: 1px solid #eeece8;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition);
 }
 
 .cp-order-item:hover {
-  border-color: #d85a30;
-  background: #fffaf8;
+  border-color: var(--light-red);
+  box-shadow: var(--shadow-md);
+  transform: translateX(2px);
 }
 
 .cp-order-left {
   display: flex;
   align-items: center;
   gap: 14px;
+  flex: 1;
+  min-width: 0;
 }
 
 .cp-order-icon-wrap {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  background: #faece7;
-  color: #993c1d;
+  border-radius: 8px;
+  background: var(--light-red);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--primary-red);
   flex-shrink: 0;
 }
 
+.cp-order-info { min-width: 0; }
+
 .cp-order-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 3px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cp-order-meta {
-  font-size: 12px;
-  color: #aaa;
-  margin: 0;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+  color: var(--slate);
 }
 
 .cp-order-right {
@@ -209,52 +242,34 @@
   flex-shrink: 0;
 }
 
-/* ── Badges ── */
+/* ── Status Badges ── */
 .cp-badge {
-  font-size: 11px;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 6px;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-.cp-badge--pending {
-  background: #faeeda;
-  color: #854f0b;
-}
+.cp-badge--pending          { background: #fef9c3; color: #854d0e; }
+.cp-badge--confirmed        { background: #dbeafe; color: #1e40af; }
+.cp-badge--in-progress      { background: #e0e7ff; color: #4338ca; }
+.cp-badge--in-fabrication   { background: #fde68a; color: #92400e; }
+.cp-badge--completed        { background: #dcfce7; color: #166534; }
+.cp-badge--cancelled        { background: var(--light-red); color: var(--dark-red); }
 
-.cp-badge--completed {
-  background: #eaf3de;
-  color: #3b6d11;
-}
-
-.cp-badge--cancelled {
-  background: #fcebeb;
-  color: #a32d2d;
-}
-
-.cp-chevron {
-  color: #ccc;
-}
+.cp-chevron { color: var(--mid-gray); }
 
 /* ── Responsive ── */
-@media (max-width: 580px) {
-  .cp-nav-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
+@media (max-width: 600px) {
+  .cp-nav-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .cp-nav-item  { padding: 14px 10px; }
+  .cp-profile-card { flex-wrap: wrap; }
+  .cp-edit-btn  { width: 100%; justify-content: center; }
+}
 
-  .cp-nav-item {
-    padding: 14px 12px;
-  }
-
-  .cp-profile-card {
-    flex-wrap: wrap;
-  }
-
-  .cp-edit-btn {
-    width: 100%;
-    justify-content: center;
-  }
+@media (max-width: 420px) {
+  .cp-nav-grid { grid-template-columns: 1fr; }
 }

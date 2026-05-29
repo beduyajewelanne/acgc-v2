@@ -1,184 +1,103 @@
 /* ============================================================
-   Footer.css
-   Glass & Aluminum Services — Maroon & White Theme
-   Matches CustomerDashboard.css design system
+   Footer.css — ACGC Glass & Aluminum Services
+   Fixed: solid red bg (matches CTA), bigger fonts, clear separation
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
-/* ── Footer Base ────────────────────────────────────────────── */
 .main-footer {
-  background: #2A2826;
-  background-image:
-    radial-gradient(ellipse 70% 60% at 10% 80%, rgba(107, 13, 26, 0.35) 0%, transparent 65%),
-    repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 40px,
-      rgba(255, 255, 255, 0.015) 40px,
-      rgba(255, 255, 255, 0.015) 41px
-    );
-  color: #D9D7D4;
-  font-family: 'DM Sans', sans-serif;
-  border-top: 3px solid #6B0D1A;
-  position: relative;
-  overflow: hidden;
+  background-color: #8b1e22;   /* same primary red as CTA — no dark bleed */
+  color: #ffffff;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  padding: 64px 48px 36px;
+  border-top: 3px solid rgba(255,255,255,0.12); /* crisp visual separator from CTA */
 }
 
-/* decorative circle accent — top right */
-.main-footer::before {
-  content: '';
-  position: absolute;
-  top: -100px;
-  right: -100px;
-  width: 340px;
-  height: 340px;
-  border: 50px solid rgba(107, 13, 26, 0.15);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-/* ── Footer Content Grid ────────────────────────────────────── */
+/* ── Grid ── */
 .footer-content {
   display: grid;
-  grid-template-columns: 2fr 1.2fr 1.2fr;
-  gap: 3rem;
+  grid-template-columns: 2fr 1.3fr 1.3fr;
+  gap: 56px;
   max-width: 1200px;
-  margin: 0 auto;
-  padding: 3.5rem 4rem 2.5rem;
-  position: relative;
-  z-index: 1;
+  margin: 0 auto 48px;
 }
 
-/* ── Column Headings ────────────────────────────────────────── */
+/* ── Column headings ── */
 .footer-content h3 {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #FFFFFF;
-  margin-bottom: 1rem;
-  padding-bottom: 0.6rem;
-  border-bottom: 1.5px solid rgba(107, 13, 26, 0.6);
-  position: relative;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffffff;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.25);
 }
 
-/* small maroon pip before each heading */
-.footer-content h3::before {
-  content: '';
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background: #A82535;
-  border-radius: 50%;
-  margin-right: 10px;
-  vertical-align: middle;
-  position: relative;
-  top: -1px;
+/* Brand column */
+.footer-content div:first-child h3 {
+  font-size: 1.2rem;
+  letter-spacing: 0.1em;
 }
 
-/* ── Body Text ──────────────────────────────────────────────── */
+/* ── Body text ── */
 .footer-content p {
-  font-size: 0.88rem;
-  font-weight: 300;
-  color: #A8A6A2;
-  line-height: 1.75;
-  margin-bottom: 0.4rem;
+  font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.8;
+  margin-bottom: 8px;
+  font-weight: 400;
 }
 
-/* company tagline — slightly brighter */
-.footer-content div:first-child p {
-  color: #B4B2A9;
-  max-width: 320px;
-  margin-top: 0.25rem;
-}
-
-/* ── Contact items ──────────────────────────────────────────── */
-.footer-content div:nth-child(2) p {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #B4B2A9;
-  transition: color 0.2s ease;
-}
-
-.footer-content div:nth-child(2) p:hover {
-  color: #EAB8C0;
-}
-
-/* ── Quick Links List ───────────────────────────────────────── */
+/* ── Quick links list ── */
 .footer-content ul {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+}
+
+.footer-content ul li {
+  margin-bottom: 14px;
 }
 
 .footer-content ul li a {
-  font-size: 0.88rem;
-  font-weight: 400;
-  color: #A8A6A2;
+  color: rgba(255, 255, 255, 0.82);
   text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  font-size: 1.05rem;
+  font-weight: 400;
   transition: color 0.2s ease, padding-left 0.2s ease;
-  position: relative;
-}
-
-/* arrow indicator on hover */
-.footer-content ul li a::before {
-  content: '›';
-  font-size: 1.1rem;
-  color: #6B0D1A;
-  line-height: 1;
-  transition: color 0.2s ease, transform 0.2s ease;
+  display: inline-block;
 }
 
 .footer-content ul li a:hover {
-  color: #EAB8C0;
-  padding-left: 4px;
+  color: #ffffff;
+  padding-left: 5px;
 }
 
-.footer-content ul li a:hover::before {
-  color: #C4506A;
-  transform: translateX(2px);
-}
-
-/* ── Footer Bottom Bar ──────────────────────────────────────── */
-.main-footer::after {
-  content: '© ' attr(data-year) ' ACGC Glass & Aluminum Services. All rights reserved.';
-  display: block;
+/* ── Copyright bar ── */
+.footer-bottom {
   text-align: center;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.78rem;
-  color: #5E5C58;
-  padding: 1.1rem 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  letter-spacing: 0.02em;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.5);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255,255,255,0.15);
 }
 
-/* ── Responsive ─────────────────────────────────────────────── */
+/* ── Responsive ── */
 @media (max-width: 900px) {
   .footer-content {
     grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-    padding: 3rem 2.5rem 2rem;
+    gap: 36px;
   }
-
   .footer-content div:first-child {
     grid-column: 1 / -1;
   }
 }
 
-@media (max-width: 600px) {
-  .footer-content {
-    grid-template-columns: 1fr;
-    padding: 2.5rem 1.5rem 1.5rem;
-  }
-
-  .footer-content div:first-child {
-    grid-column: auto;
-  }
+@media (max-width: 560px) {
+  .main-footer    { padding: 44px 24px 28px; }
+  .footer-content { grid-template-columns: 1fr; gap: 32px; }
+  .footer-content div:first-child { grid-column: auto; }
 }

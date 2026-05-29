@@ -1,67 +1,156 @@
-.contracts-container { 
-  max-width: 900px; 
-  margin: 40px auto; 
-  padding: 20px; 
-  color: #333;
+/* ============================================================
+   Contracts.css — ACGC Glass & Aluminum Services
+   ============================================================ */
+
+:root {
+  --primary-red: #8b1e22;
+  --dark-red:    #6d1111;
+  --light-red:   #f4e8e8;
+  --white:       #ffffff;
+  --off-white:   #f7f7f7;
+  --light-gray:  #eaeaea;
+  --mid-gray:    #b8bcc2;
+  --slate:       #5a5a5a;
+  --text-dark:   #333333;
+  --border:      #e5e7eb;
+  --shadow-sm:   0 2px 8px rgba(0,0,0,0.07);
+  --shadow-md:   0 6px 24px rgba(0,0,0,0.11);
+  --radius:      12px;
+  --transition:  0.25s ease;
 }
 
-.contract-card { 
-  background: #ffffff; 
-  padding: 30px; 
-  border: 1px solid #e8e6e3; /* Soft border */
-  border-radius: 16px; 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-  box-shadow: 0 4px 12px rgba(0,0,0,0.03); /* Subtle shadow */
-  transition: transform 0.2s ease;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Container ── */
+.contracts-container {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 0 24px 60px;
+  color: var(--text-dark);
 }
 
-.contract-main h3 { margin: 0 0 8px; font-size: 1.25rem; color: #1a1a1a; }
-.contract-main p { margin: 0; font-size: 0.9rem; color: #777; }
-
-.contract-actions { display: flex; gap: 12px; }
-
-/* Elegant Buttons */
-.btn { 
-  padding: 8px 16px; 
-  border-radius: 6px; 
-  border: 1px solid #ddd; 
-  cursor: pointer; 
-  font-weight: 600; 
-  font-size: 0.8rem;
-  transition: all 0.2s;
-  background: #fff;
-}
-
-.btn-view { background: #f9f9f9; color: #444; }
-.btn-view:hover { background: #f8f8f8; }
-
-.btn-approve { 
-  background: #2e7d32; /* Deep forest green */
-  color: white; 
-  border: none; 
-}
-.btn-approve:hover { background: #1b5e20; }
-
-.btn-decline { 
-  background: #c62828; /* Deep brick red */
-  color: white; 
-  border: none; 
-}
-.btn-decline:hover { background: #b71c1c; }
-/* Sophisticated Badges */
-.status-badge { 
-  display: inline-block;
-  margin-top: 15px;
-  padding: 5px 14px; 
-  border-radius: 20px; 
-  font-size: 0.75rem; 
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.contracts-container h2 {
+  font-size: 1.9rem;
   font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--light-gray);
 }
 
-.status-badge.pending-approval { background: #fff8e1; color: #856404; border: 1px solid #ffeeba; }
-.status-badge.approved { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-.status-badge.declined { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+/* ── Contract Card ── */
+.contract-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  transition: box-shadow var(--transition);
+  flex-wrap: wrap;
+}
+
+.contract-card:hover { box-shadow: var(--shadow-md); }
+
+.contract-main h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 6px;
+}
+
+.contract-main p {
+  font-size: 0.88rem;
+  color: var(--slate);
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+/* ── Status Badge ── */
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.status-badge.pending-approval {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.status-badge.approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.declined {
+  background: var(--light-red);
+  color: var(--dark-red);
+}
+
+/* ── Actions ── */
+.contract-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: all var(--transition);
+}
+
+.btn-view {
+  background: var(--off-white);
+  color: var(--text-dark);
+  border: 1.5px solid var(--border);
+}
+
+.btn-view:hover {
+  background: var(--light-gray);
+}
+
+.btn-approve {
+  background: #16a34a;
+  color: var(--white);
+}
+
+.btn-approve:hover { background: #15803d; }
+
+.btn-decline {
+  background: var(--primary-red);
+  color: var(--white);
+}
+
+.btn-decline:hover { background: var(--dark-red); }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .contract-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .contract-actions {
+    width: 100%;
+  }
+
+  .btn {
+    flex: 1;
+    text-align: center;
+  }
+}

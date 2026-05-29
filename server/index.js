@@ -27,6 +27,12 @@ try {
 
   const cartRoutes = require("./routes/cart");
   app.use(cartRoutes);
+
+  const contractRoutes = require("./routes/contracts");
+  app.use(contractRoutes);
+
+  const receiptRoutes = require("./routes/receipts");
+  app.use(receiptRoutes);
 } catch (err) {
   console.error("Error setting up routes:", err.message);
 }

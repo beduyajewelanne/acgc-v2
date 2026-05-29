@@ -184,4 +184,60 @@ userRoutes.post("/api/get_global_client_template", async (req, res) => {
   }
 });
 
+userRoutes.post("/api/update_user_profile", async (req, res) => {
+    const { token, _id, firstName, lastName, email, phone, address, province, city, barangay, zipCode, password } = req.body;
+    
+    if (!token) return res.status(400).json({ error: "Token is required" });
+    if (!_id) return res.status(400).json({ error: "User ID is required" });
+
+    try {
+        // Enforce state session authenticity using your existing validation module hook
+        checkAuth(token, _id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            const db = dbo.getDb();
+            
+            // Build the standard update payload tracking structural geography elements
+            const updateFields = {
+                firstName: firstName?.trim(),
+                lastName: lastName?.trim(),
+                email: email?.trim()?.toLowerCase(),
+                phone: phone?.trim(),
+                address: address?.trim(),
+                province: province?.trim(),
+                city: city?.trim(),
+                barangay: barangay?.trim(),
+                zipCode: zipCode?.trim()
+            };
+
+            // Optional Security Check: If a user specifies a password string, hash it before committing
+            if (password && password.trim() !== "") {
+                // Utilizing your helper function 'hashPass' provided in your require destructuring top-level line
+                updateFields.password = hashPass(password.trim());
+            }
+
+            // Perform targeted document updates inside the users database collection
+            const updateResult = await db.collection("users").updateOne(
+                { _id: new ObjectId(_id) },
+                { $set: updateFields }
+            );
+
+            if (updateResult.matchedCount === 0) {
+                return res.status(404).json({ remarks: "failed", message: "User record not found" });
+            }
+
+            // Fire audit logging if necessary using your framework helper module
+            await actionLog(_id, "Update Profile Details", "Users");
+
+            return res.status(200).json({ 
+                remarks: "success", 
+                message: "Profile updated successfully"
+            });
+        });
+    } catch (err) {
+        console.error("Profile settings writing failure:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = userRoutes;

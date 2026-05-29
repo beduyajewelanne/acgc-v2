@@ -421,3 +421,44 @@
     width: 100%;
   }
 }
+
+/* Ensure dropdown lists match normal styling standards */
+.epm-select {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #ffffff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.epm-select:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* 4-column address grid row setup */
+.epm-grid-4col {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+/* Specific error tags underneath fields */
+.epm-field-error {
+  color: #ef4444;
+  font-size: 11px;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Responsive adjustments for tight screen heights */
+@media (max-width: 768px) {
+  .epm-grid-4col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

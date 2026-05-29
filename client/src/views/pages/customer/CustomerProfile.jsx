@@ -1,36 +1,160 @@
-import React, { useState } from 'react';
+import React, { useContext, useState, useEffect, useCallback } from 'react';
 import './CustomerProfile.css';
 import EditProfileModal from './EditProfileModal';
-import { useNavigate } from 'react-router-dom'; // Keep only one instance
+import { useNavigate } from 'react-router-dom';
+import { UserContext } from 'App';
+import { CRUD } from 'services/data.services';
 
 const CustomerProfile = () => {
-  const navigate = useNavigate(); // Added navigation hook
+  const { user, setUser: setGlobalUser } = useContext(UserContext); 
+  const navigate = useNavigate();
+  
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [user, setUser] = useState({
-    name: 'Jewel Anne Beduya',
-    email: 'beduyajewelanne@gmail.com',
-    phone: '',
-  });
+  const [selectedUser, setUser] = useState(user || {});
+  
+  // Dashboard Metrics & Playloads State
+  const [orders, setOrders] = useState([]);
+  const [contracts, setContracts] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // Helper session hooks
+  const sessionToken = localStorage.getItem("userToken") || "";
+  const currentUserId = user?._id || user?.id;
+
+  // Gather initials cleanly for customer profile avatar bubble
   const getInitials = (name) => {
+    if (!name) return '';
     const parts = name.trim().split(' ');
     const first = parts[0]?.[0] || '';
     const last = parts[parts.length - 1]?.[0] || '';
     return (first + (parts.length > 1 ? last : '')).toUpperCase();
   };
 
-  const handleSave = (updatedUser) => {
-    setUser(updatedUser);
+  // Main Centralized Dashboard Synchronization Thread
+  const fetchDashboardData = useCallback(async () => {
+    if (!sessionToken || !currentUserId) {
+      setLoading(false);
+      return;
+    }
+
+    const requestPayload = { token: sessionToken, _id: currentUserId };
+
+    try {
+      // 1. Fire concurrent asynchronous network request batches to backends
+      const [ordersRes, contractsRes, receiptsRes] = await Promise.all([
+        fetch('/api/get_my_orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestPayload)
+        }).then(res => res.json()).catch(() => ({ payload: [] })),
+
+        fetch('/api/get_user_contracts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestPayload)
+        }).then(res => res.json()).catch(() => ({ payload: [] })),
+
+        fetch('/api/get_user_receipts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestPayload)
+        }).then(res => res.json()).catch(() => ({ payload: [] }))
+      ]);
+
+      // 2. Synchronize states with the returning payload sets
+      if (ordersRes.remarks === "success" || ordersRes.payload) {
+        setOrders(ordersRes.payload || []);
+      }
+      if (contractsRes.remarks === "success" || contractsRes.payload) {
+        setContracts(contractsRes.payload || []);
+      }
+      if (receiptsRes.remarks === "success" || receiptsRes.payload) {
+        setReceipts(receiptsRes.payload || []);
+      }
+
+    } catch (error) {
+      console.error("Error reading sync details from database dashboard clusters:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionToken, currentUserId]);
+
+  // Initial trigger on initialization mount layout render
+  useEffect(() => {
+    if (user) {
+      setUser(user);
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  // Handle saving the user profile changes to the database
+  const handleSave = async (updatedUser) => {
+    console.log("burat")
+    if (!sessionToken || !currentUserId) return;
+
+    try {
+      const api_url = window.base_api + "update_user_profile";
+      const requestOptions = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: sessionToken,
+          _id: currentUserId,
+          firstName: updatedUser.name.split(' ')[0] || '',
+          lastName: updatedUser.name.split(' ').slice(1).join(' ') || '',
+          email: updatedUser.email,
+          phone: updatedUser.phone,
+          address: updatedUser.address,
+          province: updatedUser.province,
+          city: updatedUser.city,
+          barangay: updatedUser.barangay,
+          zipCode: updatedUser.zipCode,
+          password: updatedUser.password
+        })
+      }
+      CRUD(api_url, requestOptions, async (res) => {
+        if (res.remarks === "success") {
+        // Synchronize interface states immediately 
+        setUser(updatedUser);
+        if (setGlobalUser) setGlobalUser(updatedUser);
+
+        // Re-fetch all transactional lists to ensure full profile consistency
+          await fetchDashboardData();
+        } else {
+          console.error("Profile modification rejected by database:", res.message);
+      }
+      });
+    } catch (error) {
+      console.error("Network communication exception encountered:", error);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="cp-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+        <p style={{ color: '#666', fontSize: '14px' }}>Loading account profile records...</p>
+      </div>
+    );
+  }
+
+  // Derived calculations based on server states
+  const activeOrdersCount = orders.filter(o => o.status?.toLowerCase() !== 'completed' && o.status?.toLowerCase() !== 'cancelled').length;
+  const activeContractsCount = contracts.filter(c => c.status?.toLowerCase() !== 'expired' && c.status?.toLowerCase() !== 'terminated').length;
 
   return (
     <div className="cp-container">
 
+      {/* Profile Summary Infrastructure */}
       <div className="cp-profile-card">
-        <div className="cp-avatar">{getInitials(user.name)}</div>
+        <div className="cp-avatar">
+          {getInitials(selectedUser.firstName ? `${selectedUser.firstName} ${selectedUser.lastName}` : selectedUser.name)}
+        </div>
         <div className="cp-user-meta">
-          <h3 className="cp-name">{user.name}</h3>
-          <p className="cp-email">{user.email}</p>
+          <h3 className="cp-name">
+            {selectedUser.firstName ? `${selectedUser.firstName} ${selectedUser.lastName}` : (selectedUser.name || 'Client Account')}
+          </h3>
+          <p className="cp-email">{selectedUser.email || 'No email provided'}</p>
         </div>
         <button className="cp-edit-btn" onClick={() => setIsEditOpen(true)}>
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -41,6 +165,7 @@ const CustomerProfile = () => {
         </button>
       </div>
 
+      {/* Interactive Navigation Count Matrices */}
       <div className="cp-nav-grid">
         <div className="cp-nav-item" onClick={() => navigate('/orders')}>
           <svg className="cp-nav-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -49,7 +174,7 @@ const CustomerProfile = () => {
             <line x1="12" y1="22.08" x2="12" y2="12"/>
           </svg>
           <span className="cp-nav-label">My orders</span>
-          <span className="cp-nav-sub">5 active</span>
+          <span className="cp-nav-sub">{activeOrdersCount} active</span>
         </div>
 
         <div className="cp-nav-item" onClick={() => navigate('/contracts')}>
@@ -61,7 +186,7 @@ const CustomerProfile = () => {
             <polyline points="10 9 9 9 8 9"/>
           </svg>
           <span className="cp-nav-label">Contracts</span>
-          <span className="cp-nav-sub">3 active</span>
+          <span className="cp-nav-sub">{activeContractsCount} active</span>
         </div>
 
         <div className="cp-nav-item" onClick={() => navigate('/receipts')}>
@@ -70,54 +195,66 @@ const CustomerProfile = () => {
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
           </svg>
           <span className="cp-nav-label">Receipts</span>
-          <span className="cp-nav-sub">3 documents</span>
+          <span className="cp-nav-sub">{receipts.length} documents</span>
         </div>
       </div>
 
       <div className="cp-section-header">
         <h3 className="cp-section-title">Recent orders</h3>
-        <span 
-            className="cp-view-all" 
-            onClick={() => navigate('/orders')} 
-            style={{ cursor: 'pointer' }}
-        >
-            View all
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <span className="cp-view-all" onClick={() => navigate('/orders')} style={{ cursor: 'pointer' }}>
+          View all
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"/>
             <polyline points="12 5 19 12 12 19"/>
-            </svg>
+          </svg>
         </span>
       </div>
 
+      {/* Dynamic Orders Scraper Layout */}
       <div className="cp-order-list">
-        <div className="cp-order-item">
-          <div className="cp-order-left">
-            <div className="cp-order-icon-wrap">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                <line x1="12" y1="22.08" x2="12" y2="12"/>
-              </svg>
+        {orders.length > 0 ? (
+          orders.slice(0, 3).map((order, index) => (
+            <div key={order._id || index} className="cp-order-item" onClick={() => navigate(`/orders`)} style={{ cursor: 'pointer' }}>
+              <div className="cp-order-left">
+                <div className="cp-order-icon-wrap">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                  </svg>
+                </div>
+                <div className="cp-order-info">
+                  <h4 className="cp-order-name">{order.productName || order.item_name || 'Aluminum Window Frame Profile'}</h4>
+                  <p className="cp-order-meta">
+                    {order.orderNumber || order.tracking_id || 'ACGC-MOTQ0BX6'} &nbsp;·&nbsp; {order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : 'Recent'}
+                  </p>
+                </div>
+              </div>
+              <div className="cp-order-right">
+                <span className={`cp-badge cp-badge--${(order.status || 'pending').toLowerCase()}`}>
+                  {order.status || 'Pending'}
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cp-chevron">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </div>
             </div>
-            <div className="cp-order-info">
-              <h4 className="cp-order-name">Aluminum Window Frame Profile</h4>
-              <p className="cp-order-meta">ACGC-MOTQ0BX6 &nbsp;·&nbsp; May 6, 2026</p>
-            </div>
+          ))
+        ) : (
+          <div style={{ padding: '24px', textAlign: 'center', color: '#888', background: '#fcfcfc', borderRadius: '8px', border: '1px dashed #eee' }}>
+            No recent transaction orders found.
           </div>
-          <div className="cp-order-right">
-            <span className="cp-badge cp-badge--pending">Pending</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cp-chevron">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Edit Profile Modal */}
+      {/* Edit Profile Modal Injection Frame */}
       <EditProfileModal
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
-        user={user}
+        user={{
+          ...selectedUser,
+          name: selectedUser.name || `${selectedUser.firstName || ''} ${selectedUser.lastName || ''}`.trim()
+        }}
         onSave={handleSave}
       />
 

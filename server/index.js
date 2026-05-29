@@ -33,6 +33,9 @@ try {
 
   const receiptRoutes = require("./routes/receipts");
   app.use(receiptRoutes);
+
+  const backupRoutes = require("./routes/backupRoutes");
+  app.use(backupRoutes);
 } catch (err) {
   console.error("Error setting up routes:", err.message);
 }

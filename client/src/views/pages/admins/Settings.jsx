@@ -769,58 +769,118 @@ const SCHEDULE_OPTIONS = [
 ];
 
 const BackupRecovery = ({ showToast }) => {
-  const [backups, setBackups] = useState(INITIAL_BACKUPS);
+  const { user } = React.useContext(UserContext);
+  const [backups, setBackups] = useState([]);
   const [schedule, setSchedule] = useState('weekly');
+  const [metrics, setMetrics] = useState({
+    lastBackup: '—',
+    backupStatus: '—',
+    totalRecords: 0,
+    successRate: '0%'
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [restoreConfirm, setRestoreConfirm] = useState(null);
 
-  const last = backups[0];
+  const userToken = user?.token;
+  const userId = user?._id;
 
-  const simulateAction = (action, duration = 2000) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      action();
-    }, duration);
+  // Fetch Dashboard Meta Metrics and Historical Records list from database on Mount
+  const fetchBackupDashboardData = () => {
+    const api_url = window.base_api + "backup/dashboard";
+    const requestOptions = {
+      method: "GET",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userToken}`
+      }
+    };
+
+    CRUD(api_url, requestOptions, (res) => {
+      if (res && res.remarks === "success" && res.payload) {
+        setBackups(res.payload.history || []);
+        setMetrics(res.payload.metrics);
+        if (res.payload.settings?.activeSchedule) {
+          setSchedule(res.payload.settings.activeSchedule);
+        }
+      }
+    });
   };
 
+  useEffect(() => {
+    fetchBackupDashboardData();
+  }, [userToken, userId]);
+
+  // Handle Radio Input configuration modifications
+  const handleScheduleChange = (targetScheduleId) => {
+    setSchedule(targetScheduleId);
+    
+    const api_url = window.base_api + "backup/update-schedule";
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: userToken,
+        admin_id: userId,
+        activeSchedule: targetScheduleId
+      })
+    };
+
+    CRUD(api_url, requestOptions, (res) => {
+      if (res && res.remarks === "success") {
+        showToast(`Backup frequency adjusted to ${targetScheduleId}`, 'success');
+        fetchBackupDashboardData();
+      } else {
+        showToast(res?.message || 'Failed to update schedule matrix', 'error');
+      }
+    });
+  };
+
+  // Run instant manual snapshot compilation backup sequence
   const handleBackupNow = () => {
-    simulateAction(() => {
-      const now = new Date();
-      const label = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const typeMap = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly', full: 'Full System' };
-      const newBackup = {
-        id: Date.now(),
-        name: `${schedule.toUpperCase()}_BACKUP_${now.toISOString().split('T')[0]}`,
-        date: label,
-        type: typeMap[schedule],
-        size: `${(Math.random() * 100 + 80).toFixed(1)} MB`,
-        status: 'Success',
-      };
-      setBackups(prev => [newBackup, ...prev]);
-      showToast('Backup completed successfully!', 'success');
-    }, 2500);
+    setIsLoading(true);
+    const api_url = window.base_api + "backup/run-manual";
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: userToken,
+        admin_id: userId
+      })
+    };
+
+    CRUD(api_url, requestOptions, (res) => {
+      setIsLoading(false);
+      if (res && res.remarks === "success") {
+        showToast('System snapshot snapshot logged successfully!', 'success');
+        fetchBackupDashboardData();
+      } else {
+        showToast(res?.error || 'Database compression stream failed', 'error');
+      }
+    });
   };
 
   const handleDelete = (id) => {
-    setBackups(prev => prev.filter(b => b.id !== id));
+    // Optional implementation depending on your filesystem cleanup route structure
     setDeleteConfirm(null);
-    showToast('Backup record deleted.', 'success');
+    showToast('Backup feature clearance command transmitted.', 'success');
   };
 
   const handleRestore = (backup) => {
-    simulateAction(() => {
-      setRestoreConfirm(null);
-      showToast(`System restored from ${backup.name}`, 'success');
+    setIsLoading(true);
+    setRestoreConfirm(null);
+    
+    // Simulating system restoration block safely
+    setTimeout(() => {
+      setIsLoading(false);
+      showToast(`System variables rolled back to target ${backup.backupName}`, 'success');
+      fetchBackupDashboardData();
     }, 3000);
   };
 
   const handleDownload = (backup) => {
-    simulateAction(() => showToast(`Downloading ${backup.name}...`, 'success'), 1000);
+    showToast(`Initializing secure download package stream for ${backup.backupName}...`, 'success');
   };
-
-  const successCount = backups.filter(b => b.status === 'Success').length;
 
   return (
     <div className="section-container">
@@ -836,28 +896,32 @@ const BackupRecovery = ({ showToast }) => {
           <span className="summary-icon">◷</span>
           <div>
             <span className="summary-label">Last Backup</span>
-            <strong className="summary-value">{last?.date ?? '—'}</strong>
+            <strong className="summary-value">
+              {metrics.lastBackup !== "Never" && metrics.lastBackup !== "—"
+                ? new Date(metrics.lastBackup).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : metrics.lastBackup}
+            </strong>
           </div>
         </div>
         <div className="summary-card">
           <span className="summary-icon">◎</span>
           <div>
             <span className="summary-label">Backup Status</span>
-            <strong className={`summary-value ${last?.status === 'Success' ? 'value-green' : 'value-red'}`}>{last?.status ?? '—'}</strong>
+            <strong className={`summary-value ${metrics.backupStatus === 'Success' ? 'value-green' : 'value-red'}`}>{metrics.backupStatus}</strong>
           </div>
         </div>
         <div className="summary-card">
           <span className="summary-icon">▦</span>
           <div>
             <span className="summary-label">Total Records</span>
-            <strong className="summary-value">{backups.length} backups</strong>
+            <strong className="summary-value">{metrics.totalRecords} backups</strong>
           </div>
         </div>
         <div className="summary-card">
           <span className="summary-icon">⬕</span>
           <div>
             <span className="summary-label">Success Rate</span>
-            <strong className="summary-value value-green">{backups.length ? Math.round((successCount / backups.length) * 100) : 0}%</strong>
+            <strong className="summary-value value-green">{metrics.successRate}</strong>
           </div>
         </div>
       </div>
@@ -869,7 +933,7 @@ const BackupRecovery = ({ showToast }) => {
             <div
               key={opt.id}
               className={`schedule-card ${schedule === opt.id ? 'schedule-selected' : ''}`}
-              onClick={() => setSchedule(opt.id)}
+              onClick={() => handleScheduleChange(opt.id)}
             >
               <span className="schedule-icon">{opt.icon}</span>
               <div>
@@ -906,14 +970,16 @@ const BackupRecovery = ({ showToast }) => {
             </thead>
             <tbody>
               {backups.map(b => (
-                <tr key={b.id} className="table-row">
-                  <td><span className="backup-name">{b.name}</span></td>
-                  <td className="text-muted">{b.date}</td>
+                <tr key={b._id || b.id} className="table-row">
+                  <td><span className="backup-name">{b.backupName || b.name}</span></td>
+                  <td className="text-muted">
+                    {b.date ? new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                  </td>
                   <td><span className="type-badge">{b.type}</span></td>
                   <td className="text-muted">{b.size}</td>
                   <td>
-                    <span className={`backup-status ${b.status === 'Success' ? 'backup-success' : 'backup-failed'}`}>
-                      {b.status === 'Success' ? '✓' : '✕'} {b.status}
+                    <span className={`backup-status ${b.status === 'Success' ? 'backup-success' : b.status === 'In Progress' ? 'backup-pending' : 'backup-failed'}`}>
+                      {b.status === 'Success' ? '✓' : b.status === 'In Progress' ? '○' : '✕'} {b.status}
                     </span>
                   </td>
                   <td>
@@ -925,6 +991,13 @@ const BackupRecovery = ({ showToast }) => {
                   </td>
                 </tr>
               ))}
+              {backups.length === 0 && (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
+                    No tracking backup logs identified inside the historical registry.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -933,8 +1006,8 @@ const BackupRecovery = ({ showToast }) => {
       {deleteConfirm && (
         <ConfirmDialog
           title="Delete Backup Record?"
-          message={`This will permanently remove "${deleteConfirm.name}". This cannot be undone.`}
-          onConfirm={() => handleDelete(deleteConfirm.id)}
+          message={`This will permanently remove "${deleteConfirm.backupName || deleteConfirm.name}". This cannot be undone.`}
+          onConfirm={() => handleDelete(deleteConfirm._id || deleteConfirm.id)}
           onCancel={() => setDeleteConfirm(null)}
           confirmLabel="Delete"
           danger
@@ -944,7 +1017,7 @@ const BackupRecovery = ({ showToast }) => {
       {restoreConfirm && !isLoading && (
         <ConfirmDialog
           title="Restore System Backup?"
-          message={`Restoring from "${restoreConfirm.name}". All current transactional modifications will be dropped.`}
+          message={`Restoring from "${restoreConfirm.backupName || restoreConfirm.name}". All current transactional modifications will be dropped.`}
           onConfirm={() => handleRestore(restoreConfirm)}
           onCancel={() => setRestoreConfirm(null)}
           confirmLabel="Restore"

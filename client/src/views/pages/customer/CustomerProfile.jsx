@@ -12,15 +12,11 @@ const CustomerProfile = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedUser, setUser] = useState(user || {});
   
-  // Dashboard Metrics & Playloads State
+  // Dashboard Metrics & Payloads State
   const [orders, setOrders] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Helper session hooks
-  const sessionToken = localStorage.getItem("userToken") || "";
-  const currentUserId = user?._id || user?.id;
 
   // Gather initials cleanly for customer profile avatar bubble
   const getInitials = (name) => {
@@ -31,67 +27,86 @@ const CustomerProfile = () => {
     return (first + (parts.length > 1 ? last : '')).toUpperCase();
   };
 
-  // Main Centralized Dashboard Synchronization Thread
-  const fetchDashboardData = useCallback(async () => {
-    if (!sessionToken || !currentUserId) {
-      setLoading(false);
+  // 1. Wrap functions in useCallback to keep stable references
+  const getUserDashboard = useCallback((currentUser) => {
+    const token = currentUser?.token;
+    const user_id = currentUser?._id;
+    if (!token || !user_id) {
+      console.error("User authentication token or ID is missing. Cannot fetch dashboard.");
+      localStorage.removeItem('userData');
       return;
     }
 
-    const requestPayload = { token: sessionToken, _id: currentUserId };
+    try {
+      const api_url = window.base_api + "get_user_dashboard";
+      const requestOptions = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token, _id: user_id })
+      };
+      CRUD(api_url, requestOptions, async (res) => {
+        if (res.remarks === "success") {
+          setOrders(res.payload.orders || []);
+          setContracts(res.payload.contracts || []);
+          setReceipts(res.payload.receipts || []);
+        }
+      });
+    } catch (err) {
+      console.log("Network communication exception encountered:", err);
+    }
+  }, []);
+
+  const getSpecificUser = useCallback((currentUser) => {
+    const token = currentUser?.token;
+    const user_id = currentUser?._id;
+    if (!token || !user_id) {
+      console.error("User authentication token or ID is missing. Cannot fetch profile.");
+      localStorage.removeItem('userData');
+      return;
+    }
 
     try {
-      // 1. Fire concurrent asynchronous network request batches to backends
-      const [ordersRes, contractsRes, receiptsRes] = await Promise.all([
-        fetch('/api/get_my_orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestPayload)
-        }).then(res => res.json()).catch(() => ({ payload: [] })),
-
-        fetch('/api/get_user_contracts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestPayload)
-        }).then(res => res.json()).catch(() => ({ payload: [] })),
-
-        fetch('/api/get_user_receipts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestPayload)
-        }).then(res => res.json()).catch(() => ({ payload: [] }))
-      ]);
-
-      // 2. Synchronize states with the returning payload sets
-      if (ordersRes.remarks === "success" || ordersRes.payload) {
-        setOrders(ordersRes.payload || []);
-      }
-      if (contractsRes.remarks === "success" || contractsRes.payload) {
-        setContracts(contractsRes.payload || []);
-      }
-      if (receiptsRes.remarks === "success" || receiptsRes.payload) {
-        setReceipts(receiptsRes.payload || []);
-      }
-
+      const api_url = window.base_api + "get_user_profile";
+      const requestOptions = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token, _id: user_id })
+      };
+      CRUD(api_url, requestOptions, async (res) => {
+        if (res.remarks === "success") {
+          setUser(res.payload);
+          setGlobalUser(res.payload); // This updates context safely now
+          setLoading(false);
+          getUserDashboard(currentUser);
+        } else {
+          console.error("Profile fetch rejected by database:", res.message);
+          setLoading(false);
+        }
+      });
     } catch (error) {
-      console.error("Error reading sync details from database dashboard clusters:", error);
-    } finally {
+      console.error("Network communication exception encountered:", error);
       setLoading(false);
     }
-  }, [sessionToken, currentUserId]);
+  }, [setGlobalUser, getUserDashboard]);
 
-  // Initial trigger on initialization mount layout render
+  // 2. Track user?._id instead of the entire user object to prevent object-reference rerenders
+  const userId = user?._id;
   useEffect(() => {
-    if (user) {
-      setUser(user);
-      fetchDashboardData();
+    if (userId) {
+      getSpecificUser(user);
     }
-  }, [user]);
+  }, [userId, getSpecificUser]); // Safe dependency tracking
 
   // Handle saving the user profile changes to the database
   const handleSave = async (updatedUser) => {
-    console.log("burat")
-    if (!sessionToken || !currentUserId) return;
+    const token = user?.token;
+    const user_id = user?._id;
+
+    if (!token || !user_id) {
+      console.error("User authentication token or ID is missing. Cannot update profile.");
+      localStorage.removeItem('userData');
+      return;
+    }
 
     try {
       const api_url = window.base_api + "update_user_profile";
@@ -99,8 +114,8 @@ const CustomerProfile = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token: sessionToken,
-          _id: currentUserId,
+          token: token,
+          _id: user_id,
           firstName: updatedUser.name.split(' ')[0] || '',
           lastName: updatedUser.name.split(' ').slice(1).join(' ') || '',
           email: updatedUser.email,
@@ -112,18 +127,16 @@ const CustomerProfile = () => {
           zipCode: updatedUser.zipCode,
           password: updatedUser.password
         })
-      }
+      };
       CRUD(api_url, requestOptions, async (res) => {
         if (res.remarks === "success") {
-        // Synchronize interface states immediately 
-        setUser(updatedUser);
-        if (setGlobalUser) setGlobalUser(updatedUser);
-
-        // Re-fetch all transactional lists to ensure full profile consistency
-          await fetchDashboardData();
+          delete updatedUser.password;
+          const mergedUser = { ...user, ...updatedUser };
+          setUser(mergedUser); // Keep local UI state updated instantly
+          setGlobalUser(mergedUser);
         } else {
           console.error("Profile modification rejected by database:", res.message);
-      }
+        }
       });
     } catch (error) {
       console.error("Network communication exception encountered:", error);
@@ -224,9 +237,9 @@ const CustomerProfile = () => {
                   </svg>
                 </div>
                 <div className="cp-order-info">
-                  <h4 className="cp-order-name">{order.productName || order.item_name || 'Aluminum Window Frame Profile'}</h4>
+                  <h4 className="cp-order-name">{order.itemDetails.name || order.item_name || 'Aluminum Window Frame Profile'}</h4>
                   <p className="cp-order-meta">
-                    {order.orderNumber || order.tracking_id || 'ACGC-MOTQ0BX6'} &nbsp;·&nbsp; {order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : 'Recent'}
+                    {order.orderId || order.tracking_id || 'ACGC-MOTQ0BX6'} &nbsp;·&nbsp; {order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : 'Recent'}
                   </p>
                 </div>
               </div>

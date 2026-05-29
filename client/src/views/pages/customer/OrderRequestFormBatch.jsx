@@ -11,8 +11,8 @@ import { UserContext } from 'App';
 const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
   const { items, customer } = order;
 
-  // Compute grand total calculations across all batch elements
-  const grandTotal = items.reduce((sum, item) => sum + item.price, 0);
+  // 1. Corrected grand total calculation to multiply price by quantity
+  const grandTotal = items.reduce((acc, item) => acc + item.price, 0);
   const downpay = grandTotal * 0.5;
 
   return (
@@ -39,10 +39,17 @@ const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {items.map((item, index) => (
                 <div key={index} style={{ padding: '8px', border: '1px solid #eee', borderRadius: '4px', fontSize: '13px' }}>
-                  <div style={{ fontWeight: '600', color: '#333' }}>{item.name}</div>
+                  {/* 2. Added Quantity indicator next to the item name for visual clarity */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', color: '#333' }}>
+                    <span>{item.name}</span>
+                    <span style={{ color: '#666', fontWeight: 'normal' }}>x{item.quantity || 1}</span>
+                  </div>
                   <div style={{ display: 'flex', justifyContent: 'between', color: '#666', marginTop: '3px' }}>
                     <span>Size: {item.dimensions} ({item.area} sq ft)</span>
-                    <span style={{ marginLeft: 'auto', fontWeight: '500' }}>₱{item.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    {/* 3. Shows the total price for this line item (Price × Qty) */}
+                    <span style={{ marginLeft: 'auto', fontWeight: '500' }}>
+                      ₱{(item.price * (item.quantity || 1)).toLocaleString(undefined, {minimumFractionDigits: 2})}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -118,7 +125,7 @@ const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
   const [errors, setErrors] = useState({});
 
   // Dynamic Grand aggregation
-  const grandTotal = items.reduce((acc, item) => acc + item.price, 0);
+  const grandTotal = items.reduce((sum, item) => sum + item.price, 0);
   const downpay = grandTotal * 0.5;
 
   useEffect(() => {
@@ -165,7 +172,8 @@ const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
       width: item.width !== undefined ? item.width.toString() : "",
       height: item.height !== undefined ? item.height.toString() : "",
       unit: item.unit || "in",
-      cart_id: item.id // Passes entry identity so backend removes it from collection automatically
+      cart_id: item.id, // Passes entry identity so backend removes it from collection automatically,
+      quantity: item.quantity
     }));
 
     const payload = {

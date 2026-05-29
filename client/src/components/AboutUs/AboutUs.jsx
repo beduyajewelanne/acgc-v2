@@ -45,9 +45,6 @@ const AboutUs = () => {
             <p><strong>Phone:</strong> +63 912 345 6789</p>
             <p><strong>Address:</strong> Maligaya 1, Kataasan, Dinalupihan, Bataan</p>
             <p><strong>Business Hours:</strong> Mon–Sat: 8:00 AM – 6:00 PM</p>
-            <button className="contact-btn" onClick={() => navigate('/contact')}>
-              Inquire Now
-            </button>
           </div>
         </section>
       </div>

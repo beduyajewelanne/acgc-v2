@@ -200,3 +200,48 @@
   .order-header { flex-direction: column; }
   .detail-grid  { grid-template-columns: 1fr 1fr; }
 }
+
+/* Base Pill Container Layout */
+.status-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  text-align: center;
+}
+
+/* System Workflow Variances */
+.status-pending, 
+.status-needs-to-be-called {
+  background-color: #fef9e7;
+  color: #f39c12;
+  border: 1px solid #fdebd0;
+}
+
+.status-scheduled,
+.status-done {
+  background-color: #e8f8f5;
+  color: #117a65;
+  border: 1px solid #d1f2eb;
+}
+
+.status-pending-payment {
+  background-color: #ebd6ff;
+  color: #8e44ad;
+  border: 1px solid #e1bfe7;
+}
+
+.status-completed {
+  background-color: #eaf2f8;
+  color: #2980b9;
+  border: 1px solid #d4e6f1;
+}
+
+.status-cancelled {
+  background-color: #fdedd8;
+  color: #c0392b;
+  border: 1px solid #fadbd8;
+}

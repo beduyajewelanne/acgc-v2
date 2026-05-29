@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useContext, useCallback } from 'rea
 import './SiteInspection.css';
 import { UserContext } from 'App';
 import { CRUD, isEmpty } from 'services/data.services';
-
+import html2pdf from 'html2pdf.js';
 
 const PAYMENT_TERMS_OPTIONS = [
   '50% downpayment, 50% upon completion',
@@ -99,11 +99,68 @@ function StatusBadge({ status }) {
 }
 
 function MeasurementTable({ rows, setRows, editable = true }) {
+  const { user } = useContext(UserContext);
+  const [products, setProducts] = useState([]);
+
+  // Fetch active products from the DB on component mount
+  useEffect(() => {
+    if (!user || !user.token) return;
+
+    const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/get_products';
+    const payload = {
+      token: user.token,
+      _id: user._id,
+      archive: 0 // Fetch only active, non-archived products
+    };
+
+    const requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    };
+
+    CRUD(apiUri, requestOptions, (res) => {
+      if (res && res.remarks === 'success' && Array.isArray(res.payload)) {
+        setProducts(res.payload);
+      }
+    });
+  }, [user]);
+
+  // Append a fresh custom or blank row tracking frame
   const addRow = () =>
-    setRows(prev => [...prev, { id: Date.now(), product: '', width: '', height: '', qty: 1, pricePerSqFt: '', unit: 'cm' }]);
+    setRows(prev => [
+      ...prev, 
+      { id: Date.now(), product: '', width: '', height: '', qty: 1, pricePerSqFt: '', unit: 'in' }
+    ]);
+
   const removeRow = (id) => setRows(prev => prev.filter(r => r.id !== id));
+
   const update = (id, field, value) =>
     setRows(prev => prev.map(r => (r.id === id ? { ...r, [field]: value } : r)));
+
+  // Overwrites custom entry dimensions dynamically when a base product item is chosen
+  const handleProductSelection = (id, selectedName) => {
+    const matchingProduct = products.find(p => p.name === selectedName);
+    
+    if (matchingProduct) {
+      setRows(prev => prev.map(r => {
+        if (r.id === id) {
+          return {
+            ...r,
+            product: matchingProduct.name,
+            width: matchingProduct.width || '',
+            height: matchingProduct.height || '',
+            unit: matchingProduct.unit || 'in',
+            pricePerSqFt: matchingProduct.pricePerSqFt || ''
+          };
+        }
+        return r;
+      }));
+    } else {
+      // Allows falling back to a custom product option if needed
+      update(id, 'product', selectedName);
+    }
+  };
 
   return (
     <div className="meas-wrapper">
@@ -124,44 +181,113 @@ function MeasurementTable({ rows, setRows, editable = true }) {
           <tbody>
             {rows.map(row => (
               <tr key={row.id}>
-                <td>
-                  {editable
-                    ? <input className="meas-input" value={row.product} onChange={e => update(row.id, 'product', e.target.value)} placeholder="e.g. Sliding Door" />
-                    : <span>{row.product}</span>}
-                </td>
-                <td>
-                  {editable
-                    ? <input className="meas-input num" type="number" value={row.width} onChange={e => update(row.id, 'width', e.target.value)} placeholder="0" />
-                    : <span>{row.width}</span>}
-                </td>
-                <td>
-                  {editable
-                    ? <input className="meas-input num" type="number" value={row.height} onChange={e => update(row.id, 'height', e.target.value)} placeholder="0" />
-                    : <span>{row.height}</span>}
-                </td>
-                {/* Dynamic Unit Dropdown / Display Selection Column */}
+                {/* Product Dropdown Selection with Override Support */}
                 <td>
                   {editable ? (
-                    <select className="meas-input" style={{ minWidth: '70px' }} value={row.unit || 'cm'} onChange={e => update(row.id, 'unit', e.target.value)}>
-                      <option value="cm">cm</option>
-                      <option value="inch">inch</option>
-                      <option value="ft">ft</option>
+                    <select 
+                      className="meas-input" 
+                      value={row.product} 
+                      onChange={e => handleProductSelection(row.id, e.target.value)}
+                    >
+                      <option value="">-- Select Active Product --</option>
+                      {products.map(p => (
+                        <option key={p._id?.$oid || p._id} value={p.name}>
+                          {p.name} {p.variant ? `(${p.variant})` : ''}
+                        </option>
+                      ))}
+                      {/* Preserves rendering if custom items already exist in data rows */}
+                      {row.product && !products.some(p => p.name === row.product) && (
+                        <option value={row.product}>{row.product} (Custom Entry)</option>
+                      )}
                     </select>
                   ) : (
-                    <span className="paid-chip" style={{ background: '#e2e8f0', color: '#4a5568' }}>{row.unit || 'cm'}</span>
+                    <span>{row.product}</span>
                   )}
                 </td>
+
+                {/* Overridable Width Field */}
                 <td>
-                  {editable
-                    ? <input className="meas-input num" type="number" min="1" value={row.qty} onChange={e => update(row.id, 'qty', e.target.value)} />
-                    : <span>{row.qty}</span>}
+                  {editable ? (
+                    <input 
+                      className="meas-input num" 
+                      type="number" 
+                      value={row.width} 
+                      onChange={e => update(row.id, 'width', e.target.value)} 
+                      placeholder="0" 
+                    />
+                  ) : (
+                    <span>{row.width}</span>
+                  )}
                 </td>
+
+                {/* Overridable Height Field */}
                 <td>
-                  {editable
-                    ? <input className="meas-input num" type="number" value={row.pricePerSqFt} onChange={e => update(row.id, 'pricePerSqFt', e.target.value)} placeholder="0" />
-                    : <span>{row.pricePerSqFt}</span>}
+                  {editable ? (
+                    <input 
+                      className="meas-input num" 
+                      type="number" 
+                      value={row.height} 
+                      onChange={e => update(row.id, 'height', e.target.value)} 
+                      placeholder="0" 
+                    />
+                  ) : (
+                    <span>{row.height}</span>
+                  )}
                 </td>
+
+                {/* Overridable Measuring Unit Dropdown Column */}
+                <td>
+                  {/* {editable ? (
+                    <select 
+                      className="meas-input" 
+                      style={{ minWidth: '75px' }} 
+                      value={row.unit || 'in'} 
+                      onChange={e => update(row.id, 'unit', e.target.value)}
+                    >
+                      <option value="in">in</option>
+                      <option value="cm">cm</option>
+                      <option value="ft">ft</option>
+                      <option value="m">m</option>
+                    </select>
+                  ) : ( */}
+                    <span className="paid-chip" style={{ background: '#e2e8f0', color: '#4a5568' }}>
+                      {row.unit || 'in'}
+                    </span>
+                  {/* )} */}
+                </td>
+
+                {/* Quantity Factor Tracker */}
+                <td>
+                  {editable ? (
+                    <input 
+                      className="meas-input num" 
+                      type="number" 
+                      min="1" 
+                      value={row.qty} 
+                      onChange={e => update(row.id, 'qty', e.target.value)} 
+                    />
+                  ) : (
+                    <span>{row.qty}</span>
+                  )}
+                </td>
+
+                {/* Overridable Rate Parameter Per Square Foot */}
+                <td>
+                  {/* {editable ? (
+                    <input 
+                      className="meas-input num" 
+                      type="number" 
+                      value={row.pricePerSqFt} 
+                      onChange={e => update(row.id, 'pricePerSqFt', e.target.value)} 
+                      placeholder="0" 
+                    />
+                  ) : ( */}
+                    <span>{row.pricePerSqFt}</span>
+                  {/* )} */}
+                </td>
+
                 <td className="meas-total">{fmtCurrency(calcRowTotal(row))}</td>
+                
                 {editable && (
                   <td>
                     <button className="meas-del" onClick={() => removeRow(row.id)} title="Remove row">×</button>
@@ -184,12 +310,49 @@ function MeasurementTable({ rows, setRows, editable = true }) {
 }
 
 // ─── Contract Modal ──────────────────────────────────────────────────────────
-function ContractModal({ inspection, onClose, onSend, onDownload }) {
-  const grand = inspection.estimatedTotal || calcGrandTotal(inspection.measurements);
+function ContractModal({ inspection, onClose, onSend }) {
+  const contractPaperRef = useRef(null);
+
+  const grand = inspection.manualOverride && inspection.manualOverride !== ""
+    ? parseFloat(inspection.manualOverride)
+    : (inspection.estimatedTotal || calcGrandTotal(inspection.measurements));
   const dp = grand * 0.5;
   const contractDate = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(inspection.contractSentToCustomer || false);
+
+  const handleDownloadPDF = () => {
+    const element = contractPaperRef.current;
+    if (!element) return;
+
+    // Configuration settings tailored to force single-page compilation
+    const options = {
+      margin:       [0.3, 0.3, 0.3, 0.3], // Tightened page padding boundaries
+      filename:     `Contract_SI-${String(inspection.id).padStart(4, '0')}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false,
+        letterRendering: true,
+        // Explicitly sets canvas window bounds to a standardized document ratio
+        windowWidth: 816, 
+        windowHeight: 1056 
+      },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+      // Smart page-break rules: avoids slicing rows, prefers single viewport constraint
+      pagebreak:    { mode: ['avoid-all', 'css'] } 
+    };
+
+    const exporter = window.html2pdf ? window.html2pdf : html2pdf;
+    
+    if (exporter) {
+      exporter().set(options).from(element).save();
+    } else {
+      alert("PDF download engine is loading. Please try again.");
+    }
+  };
 
   const handleSend = () => {
     setSending(true);
@@ -203,7 +366,7 @@ function ContractModal({ inspection, onClose, onSend, onDownload }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="contract-modal-box" onClick={e => e.stopPropagation()}>
-        {/* Modal Header */}
+        {/* Modal Header Actions */}
         <div className="modal-topbar">
           <div>
             <h2 className="modal-title">📄 Service Contract</h2>
@@ -219,187 +382,160 @@ function ContractModal({ inspection, onClose, onSend, onDownload }) {
                 {sent ? '✅ Sent to Customer' : sending ? '⏳ Sending...' : '📨 Send to Customer'}
               </button>
             )}
-            <button className="contract-dl-btn" onClick={onDownload}>
+            <button className="contract-dl-btn" onClick={handleDownloadPDF}>
               ⬇️ Download PDF
             </button>
             <button className="modal-close" onClick={onClose}>×</button>
           </div>
         </div>
 
-        {/* Send Info Banner */}
-        {inspection.customerHasAccount ? (
-          <div className="contract-info-banner contract-info-banner--blue">
-            <span>👤</span>
-            <span>Customer has an account · <strong>{inspection.customerEmail}</strong> · You can send the contract directly to them.</span>
-          </div>
-        ) : (
-          <div className="contract-info-banner contract-info-banner--amber">
-            <span>📧</span>
-            <span>Customer has no account. Download the contract and send it manually via email or print.</span>
-          </div>
-        )}
+        {/* ... Info Banners ... */}
 
-        {/* Dummy Customer Agreement Banner */}
-        {inspection.contractStatus === 'agreed' && (
-          <div className="contract-info-banner contract-info-banner--green">
-            <span>✅</span>
-            <span>
-              Customer has <strong>agreed</strong> to this contract on <strong>{fmtDate(inspection.contractAgreedDate)}</strong>.
-              {inspection.warrantyStartDate && (
-                <> · 90-day warranty: <strong>{fmtDate(inspection.warrantyStartDate)}</strong> – <strong>{fmtDate(inspection.warrantyEndDate)}</strong></>
-              )}
-            </span>
-          </div>
-        )}
-
-        {/* Scrollable Contract Body */}
+        {/* Scrollable Contract Body Wrapper */}
         <div className="contract-modal-body">
-          <div className="contract-paper-inner">
+          {/* 
+            Notice the CSS additions below:
+            - page-break-inside: avoid handles rendering boundaries.
+            - Slightly reduced font scaling and dense line heights prevent unwanted overflows.
+          */}
+          <div 
+            className="contract-paper-inner" 
+            ref={contractPaperRef} 
+            style={{ 
+              background: '#ffffff', 
+              padding: '24px',
+              fontSize: '13px', 
+              lineHeight: '1.4',
+              pageBreakInside: 'avoid'
+            }}
+          >
             {/* Header */}
-            <div className="contract-header">
+            <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
               <div className="contract-logo">
                 <div className="contract-logo-icon">◆</div>
                 <div>
-                  <div className="contract-biz">GlassAlum Pro</div>
-                  <div className="contract-tagline">Glass &amp; Aluminum Specialists</div>
+                  <div className="contract-biz" style={{ fontSize: '16px', fontWeight: 'bold' }}>ACGC Glass & Aluminum Services</div>
+                  <div className="contract-tagline" style={{ fontSize: '11px' }}>Glass &amp; Aluminum Specialists</div>
                 </div>
               </div>
-              <div className="contract-meta">
-                <div className="contract-title">SERVICE CONTRACT</div>
-                <div className="contract-num">Contract No: SI-{String(inspection.id).padStart(4, '0')}</div>
-                <div className="contract-date">Date: {contractDate}</div>
+              <div className="contract-meta" style={{ textAlign: 'right' }}>
+                <div className="contract-title" style={{ fontSize: '16px', fontWeight: 'bold', color: '#2b6cb0' }}>SERVICE CONTRACT</div>
+                <div className="contract-num" style={{ fontSize: '12px' }}>Contract No: SI-{String(inspection.id).padStart(4, '0')}</div>
+                <div className="contract-date" style={{ fontSize: '12px' }}>Date: {contractDate}</div>
               </div>
             </div>
 
-            <div className="contract-divider" />
+            <div className="contract-divider" style={{ margin: '10px 0' }} />
 
-            <div className="contract-parties">
+            <div className="contract-parties" style={{ marginBottom: '15px' }}>
               <div>
-                <div className="contract-label">SERVICE PROVIDER</div>
-                <div className="contract-value">GlassAlum Pro Inc.</div>
+                <div className="contract-label" style={{ fontSize: '10px', color: '#718096' }}>SERVICE PROVIDER</div>
+                <div className="contract-value" style={{ fontWeight: 'bold' }}>GlassAlum Pro Inc.</div>
                 <div className="contract-sub">Olongapo City, Zambales</div>
               </div>
               <div>
-                <div className="contract-label">CLIENT</div>
-                <div className="contract-value">{inspection.clientName}</div>
+                <div className="contract-label" style={{ fontSize: '10px', color: '#718096' }}>CLIENT</div>
+                <div className="contract-value" style={{ fontWeight: 'bold' }}>{inspection.clientName}</div>
                 <div className="contract-sub">{inspection.clientAddress}</div>
               </div>
             </div>
 
-            <div className="contract-section-title">SCOPE OF WORK</div>
-            <div className="contract-site-info">
-              <span><b>Site Address:</b> {inspection.siteAddress}</span>
-              <span><b>Inspection Date:</b> {inspection.inspectionDate}</span>
+            <div className="contract-section-title" style={{ fontSize: '12px', fontWeight: 'bold', borderBottom: '1px solid #edf2f7', paddingBottom: '2px', marginBottom: '6px' }}>SCOPE OF WORK</div>
+            <div className="contract-site-info" style={{ marginBottom: '10px', fontSize: '12px' }}>
+              <span><b>Site Address:</b> {inspection.siteAddress}</span> | <span><b>Inspection Date:</b> {inspection.inspectionDate}</span>
               {inspection.estimatedInstallationDate && (
-                <span><b>Est. Installation Date:</b> {inspection.estimatedInstallationDate}</span>
+                <> | <span><b>Est. Installation Date:</b> {inspection.estimatedInstallationDate}</span></>
               )}
             </div>
 
-            <table className="contract-table">
+            <table className="contract-table" style={{ width: '100%', marginBottom: '15px', fontSize: '12px' }}>
               <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Product / Description</th>
-                  <th>W×H (cm)</th>
-                  <th>Qty</th>
-                  <th>Rate/sqft</th>
-                  <th>Amount</th>
+                <tr style={{ background: '#f7fafc' }}>
+                  <th style={{ padding: '6px' }}>#</th>
+                  <th style={{ padding: '6px', textAlign: 'left' }}>Product / Description</th>
+                  <th style={{ padding: '6px' }}>W×H (Unit)</th>
+                  <th style={{ padding: '6px' }}>Qty</th>
+                  <th style={{ padding: '6px' }}>Rate/sqft</th>
+                  <th style={{ padding: '6px', textAlign: 'right' }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {inspection.measurements.map((r, i) => (
-                  <tr key={r.id}>
-                    <td>{i + 1}</td>
-                    <td>{r.product}</td>
-                    <td>{r.width}×{r.height}</td>
-                    <td>{r.qty}</td>
-                    <td>{fmtCurrency(r.pricePerSqFt)}</td>
-                    <td>{fmtCurrency(calcRowTotal(r))}</td>
+                  <tr key={r.id} style={{ borderBottom: '1px solid #edf2f7' }}>
+                    <td style={{ padding: '6px', textAlign: 'center' }}>{i + 1}</td>
+                    <td style={{ padding: '6px' }}>{r.product}</td>
+                    <td style={{ padding: '6px', textAlign: 'center' }}>{r.width}×{r.height} <small style={{ color: '#666' }}>({r.unit || 'in'})</small></td>
+                    <td style={{ padding: '6px', textAlign: 'center' }}>{r.qty}</td>
+                    <td style={{ padding: '6px', textAlign: 'center' }}>{fmtCurrency(r.pricePerSqFt)}</td>
+                    <td style={{ padding: '6px', textAlign: 'right' }}>{fmtCurrency(calcRowTotal(r))}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr>
-                  <td colSpan="5" className="contract-total-label">TOTAL CONTRACT AMOUNT</td>
-                  <td className="contract-total-val">{fmtCurrency(grand)}</td>
+                <tr style={{ fontWeight: 'bold', background: '#f7fafc' }}>
+                  <td colSpan="5" style={{ padding: '8px', textAlign: 'right' }}>TOTAL CONTRACT AMOUNT</td>
+                  <td style={{ padding: '8px', textAlign: 'right', color: '#2b6cb0' }}>{fmtCurrency(grand)}</td>
                 </tr>
               </tfoot>
             </table>
 
-            <div className="contract-payment-box">
-              <div className="contract-section-title">PAYMENT TERMS</div>
-              <p>{inspection.paymentTerms}</p>
-              <div className="contract-payment-row">
+            <div className="contract-payment-box" style={{ background: '#f8fafc', padding: '10px', borderRadius: '4px', marginBottom: '12px' }}>
+              <div className="contract-section-title" style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>PAYMENT TERMS</div>
+              <p style={{ margin: '0 0 6px 0', fontSize: '12px' }}>{inspection.paymentTerms}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
                 <span>50% Downpayment Required:</span>
                 <strong>{fmtCurrency(dp)}</strong>
               </div>
-              <div className="contract-payment-row">
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                 <span>Balance Upon Completion:</span>
                 <strong>{fmtCurrency(grand - dp)}</strong>
               </div>
-              {inspection.paymentDate && (
-                <div className="contract-payment-row">
-                  <span>Agreed Payment Date:</span>
-                  <strong>{inspection.paymentDate}</strong>
-                </div>
-              )}
             </div>
 
             {/* Warranty Section */}
-            <div className="contract-section-title">WARRANTY</div>
-            <div className="contract-warranty-box">
-              <div className="warranty-icon">🛡️</div>
+            <div className="contract-section-title" style={{ fontSize: '12px', fontWeight: 'bold', borderBottom: '1px solid #edf2f7', paddingBottom: '2px', marginBottom: '4px' }}>WARRANTY</div>
+            <div className="contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '12px', fontSize: '11px' }}>
+              <div style={{ fontSize: '16px' }}>🛡️</div>
               <div>
-                <div className="warranty-title">90-Day Warranty</div>
-                <div className="warranty-desc">
-                  GlassAlum Pro Inc. provides a <strong>90-day warranty</strong> on all installed products and workmanship.
-                  The warranty period begins on the <strong>date of installation completion</strong>.
-                  {inspection.warrantyStartDate ? (
-                    <span className="warranty-dates">
-                      {' '}Warranty Period: <strong>{fmtDate(inspection.warrantyStartDate)}</strong> to <strong>{fmtDate(inspection.warrantyEndDate)}</strong>.
-                    </span>
-                  ) : (
-                    <span className="warranty-dates"> Warranty dates will be recorded upon installation completion.</span>
-                  )}
-                </div>
+                <strong>90-Day Warranty:</strong> GlassAlum Pro Inc. provides a 90-day warranty on all installed products and workmanship starting from installation completion.
+              </div>
+            </div>
+
+            <div className="contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '12px', fontSize: '11px', backgroundColor: '#f0c400', padding: '10px', borderRadius: '4px' }}>
+              <div style={{ fontSize: '16px' }}>⚠️</div>
+              <div>
+                <strong>WARNING:</strong> 50% Down Payment is Required to start the project based on the store policy.
               </div>
             </div>
 
             {inspection.notes && (
-              <>
-                <div className="contract-section-title">NOTES &amp; SPECIAL INSTRUCTIONS</div>
-                <p className="contract-notes">{inspection.notes}</p>
-              </>
+              <div style={{ marginBottom: '12px' }}>
+                <div className="contract-section-title" style={{ fontSize: '12px', fontWeight: 'bold', borderBottom: '1px solid #edf2f7', paddingBottom: '2px', marginBottom: '4px' }}>NOTES &amp; SPECIAL INSTRUCTIONS</div>
+                <p style={{ margin: '0', fontSize: '11px', color: '#4a5568' }}>{inspection.notes}</p>
+              </div>
             )}
 
-            {/* Signature — Admin only (no admin signature line needed since they generate it) */}
-            <div className="contract-section-title">CLIENT ACKNOWLEDGMENT</div>
-            <div className="contract-signatures contract-signatures--single">
-              <div className="contract-sig">
-                <div className="contract-sig-line" />
-                <div>Client Signature &amp; Printed Name</div>
-                <div className="contract-sub">{inspection.clientName}</div>
-                <div className="contract-sub">Date: _______________</div>
-              </div>
-              <div className="contract-sig-note">
-                <div className="contract-sig-note-icon">✍️</div>
-                <div className="contract-sig-note-text">
-                  <strong>Admin Note:</strong> This contract is officially issued by GlassAlum Pro Inc. Administration. The admin signature is implicit upon generation and distribution of this document.
+            {/* Signature Block */}
+            <div className="contract-section-title" style={{ fontSize: '12px', fontWeight: 'bold', borderBottom: '1px solid #edf2f7', paddingBottom: '2px', marginBottom: '10px' }}>CLIENT ACKNOWLEDGMENT</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '15px' }}>
+              <div style={{ width: '45%' }}>
+                <div style={{ borderTop: '1px solid #4a5568', marginTop: '30px', paddingTop: '4px', fontSize: '11px', textAlign: 'center' }}>
+                  Client Signature &amp; Printed Name
                 </div>
+                <div style={{ fontSize: '10px', textAlign: 'center', color: '#718096', marginTop: '2px' }}>{inspection.clientName}</div>
               </div>
-            </div>
-
-            <div className="contract-footer">
-              <p>This document serves as the official service contract between the client and GlassAlum Pro Inc. By signing, the client agrees to all terms stated herein.</p>
+              <div style={{ width: '50%', background: '#f7fafc', padding: '8px', borderRadius: '4px', fontSize: '10px', color: '#718096', lineHeight: '1.3' }}>
+                <strong>Admin Note:</strong> This contract is officially issued by GlassAlum Pro Inc. Administration. Signature is implicit upon automated generation.
+              </div>
             </div>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="modal-footer">
+        {/* <div className="modal-footer">
           <button className="btn-ghost" onClick={onClose}>Close</button>
           <button className="contract-print-btn" onClick={() => window.print()}>🖨️ Print</button>
-          <button className="contract-dl-btn-lg" onClick={onDownload}>⬇️ Download</button>
+          <button className="contract-dl-btn-lg" onClick={handleDownloadPDF}>⬇️ Download</button>
           {inspection.customerHasAccount && (
             <button
               className={`btn-primary ${sent ? 'btn-primary--sent' : ''}`}
@@ -409,7 +545,7 @@ function ContractModal({ inspection, onClose, onSend, onDownload }) {
               {sent ? '✅ Sent' : sending ? 'Sending…' : '📨 Send to Customer'}
             </button>
           )}
-        </div>
+        </div> */}
       </div>
     </div>
   );
@@ -591,6 +727,7 @@ function InspectionFormModal({ initial, onClose, onSave }) {
     if (!form.clientNumber?.trim()) e.clientNumber = 'Required';
     if (!form.siteAddress.trim()) e.siteAddress = 'Required';
     if (!form.inspectionDate) e.inspectionDate = 'Required';
+    if (form.paymentTerms === 'Custom arrangement' && !form.paymentDate) e.paymentDate = 'Required';
     return e;
   };
 
@@ -763,8 +900,9 @@ function InspectionFormModal({ initial, onClose, onSave }) {
 
             {!form.downpaymentPaid && needsPaymentDate && (
               <div className="form-field mt-12 fade-in">
-                <label>Agreed Payment Date</label>
+                <label>Agreed Payment Date<span className="req">*</span></label>
                 <input type="date" className="fi" value={form.paymentDate} min={today} onChange={e => set('paymentDate', e.target.value)} />
+                {errors.paymentDate && <span className="err-msg">{errors.paymentDate}</span>}
                 <span className="field-hint">Client agreed to pay downpayment on this date.</span>
               </div>
             )}

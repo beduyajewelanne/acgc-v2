@@ -23,20 +23,57 @@ const TrackProducts = () => {
         headers: { 'Content-Type': 'application/json' }
       },
       (res) => {
+        // Safe fallbacks to extract the array list
         const rawList = res?.payload || res || [];
         
         if (Array.isArray(rawList) && rawList.length > 0) {
-          const dbOrder = rawList[0];
-          const details = dbOrder.itemDetails || {};
-          const cost = parseFloat(details.estimatedCost) || 0;
-          const requiredDpAmount = cost * 0.5;
-          const paidDpAmount = parseFloat(dbOrder.downpaymentPaid) || 0;
+          // Take administrative structural fields from the first document block
+          const baselineDoc = rawList[0];
+          
+          // --- Multi-product aggregation loop block ---
+          const condensedItemsMap = {};
 
-          const dimensionString = (details.width && details.height) 
-            ? `${details.width}${details.unit} x ${details.height}${details.unit}` 
-            : "Base Configuration Dimensions";
+          rawList.forEach(doc => {
+            if (!doc.itemDetails) return;
+            const details = doc.itemDetails;
+            
+            const nameKey = details.name || "Architectural Product Placement";
+            const width = details.width || '';
+            const height = details.height || '';
+            const unit = details.unit || 'in';
+            const itemUniqueId = `${nameKey}-${width}-${height}`;
 
-          const trackingStatus = dbOrder.status || "Pending";
+            const basePrice = parseFloat(details.estimatedCost || details.price) || 0;
+            const qty = parseInt(doc.quantity) || 1; // Extract quantity from parent document layer
+
+            if (condensedItemsMap[itemUniqueId]) {
+              condensedItemsMap[itemUniqueId].quantity += qty;
+              condensedItemsMap[itemUniqueId].lineTotal = condensedItemsMap[itemUniqueId].price * condensedItemsMap[itemUniqueId].quantity;
+            } else {
+              condensedItemsMap[itemUniqueId] = {
+                name: nameKey,
+                price: basePrice,
+                quantity: qty,
+                lineTotal: basePrice * qty,
+                dimensions: (width && height) ? `${width}${unit} x ${height}${unit}` : "Base Configuration Dimensions",
+                area: details.areaSqFt || details.area || 0
+              };
+            }
+          });
+
+          const normalizedItems = Object.values(condensedItemsMap);
+
+          if (normalizedItems.length === 0) {
+            setErrorMessage("No valid product properties mapped within tracking context data rows.");
+            return;
+          }
+
+          // Compute accurate total balances across ALL items and correct quantities
+          const totalCost = normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0);
+          const requiredDpAmount = totalCost * 0.5;
+          const paidDpAmount = parseFloat(baselineDoc.downpaymentPaid) || 0;
+
+          const trackingStatus = baselineDoc.status || "Pending";
           
           const stepsArr = [
             "Pending Inspection", 
@@ -63,21 +100,22 @@ const TrackProducts = () => {
           }
 
           setOrder({
-            code: dbOrder.orderId || trackingCode,
-            name: details.name || "Architectural Product Placement",
-            date: dbOrder.createdAt ? new Date(dbOrder.createdAt).toLocaleDateString('en-US', {
+            code: baselineDoc.orderId || trackingCode,
+            // Display consolidated name if it is a multi-product batch sequence
+            name: normalizedItems.length > 1 ? `Batch Order (${normalizedItems.length} Products)` : normalizedItems[0].name,
+            date: baselineDoc.createdAt ? new Date(baselineDoc.createdAt).toLocaleDateString('en-US', {
               year: 'numeric', month: 'long', day: 'numeric'
             }) : "Date Unspecified",
             status: trackingStatus,
-            price: `₱ ${cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            price: `₱ ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             downpayment: `₱ ${paidDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             requiredDownpayment: `₱ ${requiredDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             siteInspection: (trackingStatus === "Pending Inspection" || trackingStatus === "Pending") ? "Pending" : "Done",
-            measurements: dimensionString,
-            contractLink: dbOrder.contractLink || "#",
-            receiptLink: dbOrder.receiptLink || "#",
+            contractLink: baselineDoc.contractLink || "#",
+            receiptLink: baselineDoc.receiptLink || "#",
             steps: stepsArr,
-            currentStep: matchedStepIndex
+            currentStep: matchedStepIndex,
+            items: normalizedItems // Embedded array mapping details to the render viewport
           });
         } else {
           setErrorMessage("No matching project tracking code discovered record match.");
@@ -144,19 +182,32 @@ const TrackProducts = () => {
               </span>
             </div>
 
-            <div className="order-details">
-              <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px' }}>
-                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Total Price:</label> <p style={{ margin: 0, fontWeight: 'bold' }}>{order.price}</p></div>
-                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Downpayment Paid:</label> <p style={{ margin: 0, fontWeight: 'bold' }}>{order.downpayment}</p></div>
-                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Required DP:</label> <p style={{ margin: 0, fontWeight: 'bold' }}>{order.requiredDownpayment}</p></div>
-                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Site Inspection:</label> <p className={order.siteInspection.toLowerCase()} style={{ margin: 0, fontWeight: 'bold' }}>{order.siteInspection}</p></div>
-                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Measurements:</label> <p style={{ margin: 0, fontWeight: 'bold' }}>{order.measurements}</p></div>
+            {/* --- Products Manifest Section (Matches MyOrders Layout) --- */}
+            <div className="tracking-products-manifest" style={{ marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+              <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>Products inside this Tracked Request:</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {order.items && order.items.map((prod, pIdx) => (
+                  <div key={pIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', background: '#f9f9f9', padding: '8px 12px', borderRadius: '6px' }}>
+                    <div>
+                      <span style={{ fontWeight: '600', color: '#333' }}>{prod.name}</span>
+                      <span style={{ color: '#888', marginLeft: '6px', fontWeight: '500' }}>x{prod.quantity}</span>
+                      <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Size: {prod.dimensions}</div>
+                    </div>
+                    <span style={{ fontWeight: '600', color: '#333' }}>
+                      ₱{prod.lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                ))}
               </div>
+            </div>
 
-              {/* <div className="order-links" style={{ display: 'flex', gap: '10px' }}>
-                <a href={order.contractLink} className="link-btn" style={{ padding: '8px 16px', border: '1px solid #ccc', borderRadius: '4px', textDecoration: 'none', color: '#333', fontSize: '14px' }}>View Contract</a>
-                <a href={order.receiptLink} className="link-btn" style={{ padding: '8px 16px', border: '1px solid #ccc', borderRadius: '4px', textDecoration: 'none', color: '#333', fontSize: '14px' }}>View Receipt</a>
-              </div> */}
+            <div className="order-details">
+              <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '5px' }}>
+                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Grand Total Price:</label> <p style={{ margin: 0, fontWeight: 'bold', color: '#28a745' }}>{order.price}</p></div>
+                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Downpayment Paid:</label> <p style={{ margin: 0, fontWeight: 'bold' }}>{order.downpayment}</p></div>
+                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Required DP (50%):</label> <p style={{ margin: 0, fontWeight: 'bold' }}>{order.requiredDownpayment}</p></div>
+                <div><label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Site Inspection:</label> <p className={order.siteInspection.toLowerCase()} style={{ margin: 0, fontWeight: 'bold' }}>{order.siteInspection}</p></div>
+              </div>
             </div>
           </div>
         </div>

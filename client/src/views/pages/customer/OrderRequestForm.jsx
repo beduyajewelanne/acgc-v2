@@ -217,7 +217,8 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
         width: measurements?.width || "",
         height: measurements?.height || "",
         unit: measurements?.unit || "ft"
-      }
+      },
+      quantity: 1
     };
 
     try {

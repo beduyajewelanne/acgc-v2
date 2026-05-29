@@ -96,18 +96,38 @@ const MyOrders = () => {
 
               {expandedId === order.id && (
                 <div className="order-details">
-                  <div className="detail-grid">
-                    <div><label>Total Price:</label> <p>{order.price}</p></div>
-                    <div><label>Downpayment Paid:</label> <p>{order.downpayment}</p></div>
-                    <div><label>Required DP:</label> <p>{order.requiredDownpayment}</p></div>
-                    <div><label>Site Inspection:</label> <p className={order.siteInspection.toLowerCase()}>{order.siteInspection}</p></div>
-                    <div><label>Measurements:</label> <p>{order.measurements}</p></div>
+                  
+                  {/* --- NEW SECTION: Displaying multiple items inside this order --- */}
+                  <div className="order-items-summary" style={{ marginBottom: '15px', background: '#f9f9f9', padding: '10px', borderRadius: '6px' }}>
+                    <p style={{ fontWeight: '600', margin: '0 0 8px 0', fontSize: '14px', color: '#444' }}>Products inside this Order:</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {order.items && order.items.map((prod, pIdx) => (
+                        <div key={pIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>
+                          <div>
+                            <span style={{ fontWeight: '500' }}>{prod.name}</span>
+                            <span style={{ color: '#888', marginLeft: '6px' }}>x{prod.quantity}</span>
+                            <div style={{ fontSize: '11px', color: '#666' }}>Size: {prod.dimensions}</div>
+                          </div>
+                          {/* Correctly displays total cost for this line item (Price x Quantity) */}
+                          <span style={{ fontWeight: '500' }}>
+                            ₱{prod.lineTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="order-links">
+                  <div className="detail-grid">
+                    <div><label>Grand Total Price:</label> <p style={{ fontWeight: 'bold', color: '#2ecc71' }}>{order.price}</p></div>
+                    <div><label>Downpayment Paid:</label> <p>{order.downpayment}</p></div>
+                    <div><label>Required DP (50%):</label> <p>{order.requiredDownpayment}</p></div>
+                    <div><label>Site Inspection:</label> <p className={order.siteInspection.toLowerCase()}>{order.siteInspection}</p></div>
+                  </div>
+
+                  <div className="order-links" style={{ marginTop: '15px' }}>
                     <a href={order.contractLink} className="link-btn">View Contract</a>
                     <a href={order.receiptLink} className="link-btn">View Receipt</a>
-                    {(order.status === "Pending" || order.status === "Pending Inspection" || order.is_cancelledAllowed === 1 || order.is_cancelledAllowed === "1") && (
+                    {(order.status === "Pending" || order.status === "Pending Inspection" || order.is_cancelledAllowed === 1) && (
                       <button 
                         onClick={() => handleCancelOrder(order.id)} 
                         className="link-btn" 
@@ -119,7 +139,7 @@ const MyOrders = () => {
                     )}
                   </div>
 
-                  <div className="upload-section">
+                  <div className="upload-section" style={{ marginTop: '15px' }}>
                     <label>Upload Proof of Payment (Optional):</label>
                     <input type="file" className="file-input" multiple />
                   </div>

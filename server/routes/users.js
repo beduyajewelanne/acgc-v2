@@ -18,7 +18,7 @@ userRoutes.post("/api/get_settings_users", async (req, res) => {
 
             // Fetch users from collection
             const usersResult = await get_data_helper("users", [
-                { $match: { archive: { $ne: 1 }, role: { $ne: "admin" } } }
+                { $match: { archive: { $ne: 1 } } }
             ]);
             const usersList = usersResult.payload || [];
 

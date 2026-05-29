@@ -184,6 +184,61 @@ userRoutes.post("/api/get_global_client_template", async (req, res) => {
   }
 });
 
+
+userRoutes.post ("/api/get_user_profile", async (req, res) => {
+    const { token, _id } = req.body;
+    if (!token) return res.status(400).json({ error: "Token is required" });
+
+    try {
+        checkAuth(token, _id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            const db_connect = dbo.getDb();
+            const result = await db_connect.collection("users").findOne({ _id: new ObjectId(_id) });
+            delete result.password;
+            if (result) {
+                return res.status(200).json({ remarks: "success", message: "Data fetched successfully", payload: result });
+            } else {
+                return res.status(200).json({ remarks: "failed", message: "No data found", payload: null });
+            }
+        });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+userRoutes.post("/api/get_user_dashboard", async (req, res) => {
+    const { token, _id } = req.body;
+    if (!token) return res.status(400).json({ error: "Token is required" });
+
+    checkAuth(token, _id, async (isValid) => {
+        if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+        try {
+            const db_connect = dbo.getDb();
+            const userObjectId = new ObjectId(_id);
+
+            // FIX: Added .toArray() to fully resolve cursors into plain data arrays
+            const orders = await db_connect.collection("order_requests").find({ user_id: userObjectId }).toArray();
+            const receipts = await db_connect.collection("receipts").find({ user_id: userObjectId }).toArray();
+            const contracts = await db_connect.collection("contracts").find({ user_id: userObjectId }).toArray();
+
+            // Arrays are always truthy, so we check if records were parsed successfully 
+            return res.status(200).json({ 
+                remarks: "success", 
+                message: "Data fetched successfully", 
+                payload: { 
+                    orders: orders, 
+                    receipts: receipts, 
+                    contracts: contracts 
+                } 
+            });
+        } catch (err) {
+            return res.status(500).json({ error: err.message });
+        }
+    });
+});
+
 userRoutes.post("/api/update_user_profile", async (req, res) => {
     const { token, _id, firstName, lastName, email, phone, address, province, city, barangay, zipCode, password } = req.body;
     
@@ -213,7 +268,7 @@ userRoutes.post("/api/update_user_profile", async (req, res) => {
             // Optional Security Check: If a user specifies a password string, hash it before committing
             if (password && password.trim() !== "") {
                 // Utilizing your helper function 'hashPass' provided in your require destructuring top-level line
-                updateFields.password = hashPass(password.trim());
+                updateFields.password = await hashPass(password.trim());
             }
 
             // Perform targeted document updates inside the users database collection

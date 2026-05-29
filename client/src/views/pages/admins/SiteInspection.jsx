@@ -17,28 +17,32 @@ const STATUS_OPTIONS = ['Needs to be Called', 'Scheduled', 'Completed', 'Pending
 const today = new Date().toISOString().split('T')[0];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-function calcRowTotal(row) {
-  const width = parseFloat(row.width) || 0;
-  const height = parseFloat(row.height) || 0;
-  const price = parseFloat(row.pricePerSqFt) || 0;
-  const qty = parseInt(row.qty) || 0;
-  const unit = row.unit || 'cm';
+const calcRowTotal = (row) => {
+  const w = parseFloat(row.width) || 0;
+  const h = parseFloat(row.height) || 0;
+  const rate = parseFloat(row.pricePerSqFt) || 0;
+  const qty = parseInt(row.qty) || 1;
 
-  let sqFt = 0;
-  if (unit === 'cm') {
-    sqFt = (width * height) / 929.03; // cm² to sqft
-  } else if (unit === 'inch') {
-    sqFt = (width * height) / 144;    // in² to sqft
-  } else if (unit === 'ft') {
-    sqFt = width * height;            // Already in sqft
-  }
+  if (w === 0 || h === 0 || rate === 0) return 0;
 
-  return sqFt * price * qty;
-}
+  // Convert given dimensions systematically to Feet (sq.ft tracking)
+  const toFeet = (val, unit) => {
+    const u = String(unit).toLowerCase().trim();
+    if (u === 'ft' || u === 'feet') return val;
+    if (u === 'm' || u === 'meter') return val * 3.28084;
+    if (u === 'in' || u === 'inch') return val / 12; // Handles both 'in' and 'inch'
+    if (u === 'cm') return val / 30.48;
+    return val;
+  };
 
-function calcGrandTotal(rows) {
-  return (rows || []).reduce((sum, r) => sum + calcRowTotal(r), 0);
-}
+  const calculatedArea = toFeet(w, row.unit) * toFeet(h, row.unit);
+  return calculatedArea * rate * qty;
+};
+
+const calcGrandTotal = (rows) => {
+  if (!Array.isArray(rows)) return 0;
+  return rows.reduce((sum, row) => sum + calcRowTotal(row), 0);
+};
 
 function fmtCurrency(n) {
   return '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

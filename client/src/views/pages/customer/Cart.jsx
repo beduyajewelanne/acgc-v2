@@ -9,7 +9,7 @@ const Cart = () => {
   const { user } = useContext(UserContext);
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]); // Now tracks item.id instead of product_id
   
   // View states: 'cart' or 'checkout'
   const [view, setView] = useState('cart');
@@ -77,14 +77,20 @@ const Cart = () => {
   }, [user]);
 
   // 2. Clear item array using backend delete
-  const handleRemove = (productIdsArray) => {
-    if (!user || !user.token || productIdsArray.length === 0) return;
+  const handleRemove = (cartItemIdsArray) => {
+    if (!user || !user.token || cartItemIdsArray.length === 0) return;
+
+    // Map your custom UI cart 'id' values back to whatever identifier your API expects (e.g., _id or product_id)
+    const targetItems = cartItems.filter(item => cartItemIdsArray.includes(item.id));
+    
+    // Adjust payload representation based on how your backend structure accepts bulk/single deletions
+    const backendIds = targetItems.map(item => item.product_id); 
 
     const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/remove_from_cart';
     const payload = {
       token: user.token,
       _id: user._id,
-      product_id: productIdsArray.length === 1 ? productIdsArray[0] : productIdsArray
+      product_id: backendIds.length === 1 ? backendIds[0] : backendIds
     };
 
     const requestOptions = {
@@ -102,12 +108,12 @@ const Cart = () => {
     });
   };
 
-  // Checkbox Toggles
-  const handleSelectToggle = (productId) => {
+  // Checkbox Toggles shifted to item.id
+  const handleSelectToggle = (id) => {
     setSelectedIds(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId) 
-        : [...prev, productId]
+      prev.includes(id) 
+        ? prev.filter(itemIds => itemIds !== id) 
+        : [...prev, id]
     );
   };
 
@@ -115,13 +121,13 @@ const Cart = () => {
     if (selectedIds.length === cartItems.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(cartItems.map(item => item.product_id));
+      setSelectedIds(cartItems.map(item => item.id));
     }
   };
 
   // 3. Checkout selected batch
   const handleCheckoutSelected = () => {
-    const itemsToCheckout = cartItems.filter(item => selectedIds.includes(item.product_id));
+    const itemsToCheckout = cartItems.filter(item => selectedIds.includes(item.id));
     if (itemsToCheckout.length === 0) return;
     setCheckoutItems(itemsToCheckout);
     setView('checkout');
@@ -134,20 +140,19 @@ const Cart = () => {
     setView('checkout');
   };
 
-  // Calculations are dynamic based on item selections
-  const selectedItems = cartItems.filter(item => selectedIds.includes(item.product_id));
+  // Calculations filtered by structural unique entry id
+  const selectedItems = cartItems.filter(item => selectedIds.includes(item.id));
   const subtotal = selectedIds.length > 0 
     ? selectedItems.reduce((acc, item) => acc + item.price, 0)
     : cartItems.reduce((acc, item) => acc + item.price, 0);
 
-  // If view is switched to checkout, render the Batch Order Form component
   if (view === 'checkout') {
     return (
       <OrderRequestFormBatch
         items={checkoutItems}
         onBack={() => {
           setView('cart');
-          fetchCartItems(); // Refresh live items state
+          fetchCartItems(); 
         }}
         onClose={() => {
           setView('cart');
@@ -195,8 +200,8 @@ const Cart = () => {
                   <div className="item-info" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <input 
                       type="checkbox"
-                      checked={selectedIds.includes(item.product_id)}
-                      onChange={() => handleSelectToggle(item.product_id)}
+                      checked={selectedIds.includes(item.id)}
+                      onChange={() => handleSelectToggle(item.id)}
                       style={{ cursor: 'pointer', width: '16px', height: '16px', flexShrink: 0 }}
                     />
                     
@@ -218,7 +223,7 @@ const Cart = () => {
                   </div>
                   <div className="price-section">
                     <span className="price-text">₱{item.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                    <button className="remove-btn" onClick={() => handleRemove([item.product_id])}>🗑️</button>
+                    <button className="remove-btn" onClick={() => handleRemove([item.id])}>🗑️</button>
                   </div>
                 </div>
                 <button 

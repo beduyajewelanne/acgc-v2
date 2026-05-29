@@ -6,8 +6,6 @@ import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
 import './BrowseProduct.css';
 
-const CATEGORIES = ['All Products', 'Glass', 'Aluminum', 'Interior', 'Windows', 'Facade', 'Doors'];
-
 const CartToast = ({ product, message, onDismiss }) => (
   <div className="cart-toast">
     <CheckCircle2 size={18} className="toast-icon" />
@@ -29,6 +27,22 @@ const ProductCard = ({ product, onView, onAddToCart }) => (
         ₱{product.price.toLocaleString()}
         <span className="card-unit"> / sq ft</span>
       </p>
+      {product.width > 0 && product.height > 0 && (() => {
+        const toFeet = (val, unit) => {
+          if (unit === 'ft') return val;
+          if (unit === 'm')  return val * 3.28084;
+          if (unit === 'in') return val / 12;
+          if (unit === 'cm') return val / 30.48;
+          return val;
+        };
+        const area = toFeet(product.width, product.unit) * toFeet(product.height, product.unit);
+        const computed = area * product.price;
+        return (
+          <p className="card-computed-price">
+            ₱{computed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+        );
+      })()}
     </div>
     <div className="card-actions">
       <button className="btn-view" onClick={() => onView(product)}>
@@ -56,6 +70,8 @@ const BrowseProducts = () => {
   const [cart, setCart] = useState([]);
   const [toast, setToast] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
 
   const fetchCartItems = () => {
     if (!user || !user.token) return;
@@ -109,19 +125,20 @@ const BrowseProducts = () => {
     fetchCartItems();
   }, [user]);
 
+  const uniqueTypes = useMemo(() => [...new Set(products.map(p => p.type).filter(Boolean))], [products]);
+  const uniqueCategories = useMemo(() => [...new Set(products.map(p => p.category).filter(Boolean))], [products]);
+
   const filtered = useMemo(() => {
     return products.filter((p) => {
-      const matchCat =
-        activeCategory === 'All Products' ||
-        p.type === activeCategory ||
-        p.category === activeCategory;
+      const matchType = !filterType || p.type === filterType;
+      const matchCategory = !filterCategory || p.category === filterCategory;
       const matchSearch =
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.type.toLowerCase().includes(search.toLowerCase()) ||
         p.category.toLowerCase().includes(search.toLowerCase());
-      return matchCat && matchSearch;
+      return matchType && matchCategory && matchSearch;
     });
-  }, [search, activeCategory, products]);
+  }, [search, filterType, filterCategory, products]);
 
   const handleView = (product, intent = 'view') => {
     if (intent === 'order' && (!user || !user.token)) {
@@ -202,18 +219,29 @@ const BrowseProducts = () => {
             </button>
           )}
         </div>
-        <div className="filter-wrap">
-          <SlidersHorizontal size={15} className="filter-icon" />
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              className={`filter-btn ${activeCategory === cat ? 'active' : ''}`}
-              onClick={() => setActiveCategory(cat)}
+          <div className="filter-wrap">
+            <SlidersHorizontal size={15} className="filter-icon" />
+            <select
+              className="filter-select"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
             >
-              {cat}
-            </button>
-          ))}
-        </div>
+              <option value="">All Types</option>
+              {uniqueTypes.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <select
+              className="filter-select"
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+            >
+              <option value="">All Categories</option>
+              {uniqueCategories.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
       </div>
 
       <div className="results-row">

@@ -129,6 +129,8 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
     if (e.target === overlayRef.current) onClose();
   };
 
+  
+
   useEffect(() => {
     console.log(permissions)
   }, [permissions])
@@ -165,6 +167,8 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
       />
     );
   }
+
+
 
   return (
     <div className="modal-overlay" ref={overlayRef} onClick={handleOverlayClick}>
@@ -239,11 +243,13 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
             <hr className="detail-divider" />
 
             {/* Price Estimator */}
+            
+
               {permissions?.modules?.[ "Client" ]?.["Estimate Pricing"] == 1 && (
               <PriceEstimator
                 product={product}
                 measurements={measurements}
-                onMeasurementsChange={setMeasurements}
+                onMeasurementsChange={setMeasurements} 
               />
               )}
 

@@ -100,7 +100,7 @@ userRoutes.post("/api/update_global_customer_permissions", async (req, res) => {
     
     // Normalize fetching target client roles
     const users = await db.collection("users").find({ role: { $in: ["client", "customer"] } }).project({ _id: 1 }).toArray();
-    const user_ids = users.map(u => u._id.toString()); 
+    const user_ids = users.map(u => u._id);
     
     if (user_ids.length === 0) {
         return res.json({ remarks: "success", message: "No customer users found to update" });

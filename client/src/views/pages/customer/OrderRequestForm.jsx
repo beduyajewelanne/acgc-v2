@@ -25,7 +25,10 @@ const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
   const wFt = hasMeas ? toFeet(measurements.width, measurements.unit) : 0;
   const hFt = hasMeas ? toFeet(measurements.height, measurements.unit) : 0;
   const area = wFt * hFt;
-  const total = hasMeas ? area * product.price : product.price;
+  const adminWFt = toFeet(product.width || 0, product.unit || 'in');
+  const adminHFt = toFeet(product.height || 0, product.unit || 'in');
+  const adminArea = adminWFt * adminHFt;
+  const total = hasMeas ? area * product.price : (adminArea > 0 ? adminArea * product.price : product.price);
   const downpay = total * 0.5;
 
   return (
@@ -153,8 +156,11 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
   const wFt = hasMeas ? toFeet(measurements.width, measurements.unit) : 0;
   const hFt = hasMeas ? toFeet(measurements.height, measurements.unit) : 0;
   const area = wFt * hFt;
-  const total = hasMeas ? area * product.price : product.price;
-  const downpay = total * 0.5;
+  const adminWFt = toFeet(product.width || 0, product.unit || 'in');
+  const adminHFt = toFeet(product.height || 0, product.unit || 'in');
+  const adminArea = adminWFt * adminHFt;
+  const total = hasMeas ? area * product.price : (adminArea > 0 ? adminArea * product.price : product.price);
+    const downpay = total * 0.5;
 
   const [customer, setCustomer] = useState({ fullName: '', email: '', phone: '', address: '' });
   const [clientNotes, setClientNotes] = useState('');

@@ -210,6 +210,20 @@ body {
   color: var(--white);
   box-shadow: 0 2px 8px rgba(123,28,46,0.25);
 }
+.filter-select {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  background: #fff;
+  color: #333;
+  outline: none;
+}
+
+.filter-select:focus {
+  border-color: #8B0000;
+}
 
 /* ── Results Row ──────────────────────────────────────────────────────────── */
 .results-row {
@@ -338,6 +352,17 @@ body {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+.card-dimensions {
+  font-size: 12px;
+  color: #777;
+  margin-top: 2px;
+}
+.card-computed-price {
+  font-size: 15px;
+  font-weight: 700;
+  color: #8B0000;
+  margin-top: 4px;
 }
 
 .btn-view {

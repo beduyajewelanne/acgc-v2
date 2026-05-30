@@ -1367,4 +1367,104 @@ cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFil
   }
 });
 
+cartRoutes.post("/api/get_progress_monitor", async (req, res) => {
+    const { token, user_id } = req.body;
+    if (!token || !user_id) return res.status(400).json({ remarks: "failed", message: "Missing tracking credentials or response parameters." }); 
+
+    try {
+        // Wrap inside checkAuth logic block securely
+        checkAuth(token, user_id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Unauthorized transaction attempt." });
+
+            const query = [
+                {
+                    $match: {
+                        contractApproved: 1,
+                    }
+                },
+                {
+                    $addFields:{
+                        progressStatus: { 
+                            $ifNull: ["$progressStatus", "Pending"] 
+                        },
+                        stages: {
+                            $ifNull: ["$stages", []]
+                        }
+                    }
+                }
+            ];
+
+        const result = await get_data_helper("order_requests", query);
+
+        return res.status(200).json({
+            remarks: "success",
+            message: "Project tracking tracking context documents fetched successfully",
+            payload: result.payload
+        });
+
+        });
+    } catch (error) {
+        console.error("Critical outer pipeline crash in get_progress_monitor:", error);
+        return res.status(500).json({ remarks: "error", message: "Internal server error executing file operations." });
+    }
+});
+
+cartRoutes.post("/api/upload_proof_file", upload.single("proofFile"), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ remarks: "failed", message: "No binary file payload received." });
+        }
+
+        // Return a structural reference pointing to the new file metadata
+        return res.status(200).json({
+            remarks: "success",
+            proof: {
+                id: "p" + Date.now() + Math.floor(Math.random() * 100),
+                fileName: req.file.filename,
+                originalName: req.file.originalname,
+                uploadedAt: new Date().toISOString()
+            }
+        });
+    } catch (err) {
+        console.error("Proof file tracking intercept failure:", err);
+        return res.status(500).json({ error: "File system allocation failure." });
+    }
+});
+
+cartRoutes.post("/api/update_order_request_progress", async (req, res) => {
+    const { token, user_id, _id, stages, progressStatus, estimatedInstallationDate } = req.body;
+
+    if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized credentials" });
+    if (!_id) return res.status(400).json({ remarks: "failed", message: "Missing target document tracking reference _id" });
+
+    try {
+        checkAuth(token, user_id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security framework validation failed" });
+
+            const db = await dbo.getDb();
+            
+            const updateFields = {
+                stages: stages || [],
+                progressStatus: progressStatus || "Pending",
+                estimatedInstallationDate: estimatedInstallationDate || ""
+            };
+
+            const result = await db.collection("order_requests").updateOne(
+                { _id: new ObjectId(_id) },
+                { $set: updateFields }
+            );
+
+            if (result.acknowledged) {
+                await actionLog(user_id, "Update Project Progress", `Modified workflow layout tracking details for Document: ${_id}`);
+                return res.status(200).json({ remarks: "success", message: "Order records synchronized successfully." });
+            } else {
+                return res.status(500).json({ remarks: "failed", message: "Database rejected properties modification mapping." });
+            }
+        });
+    } catch (err) {
+        console.error("Critical error inside update_order_request_progress:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = cartRoutes;

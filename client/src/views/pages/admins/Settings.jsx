@@ -7,11 +7,11 @@ import { CRUD } from '../../../services/data.services';
 const ALL_MODULES = [
   { id: 'Dashboard', label: 'Dashboard', icon: '▦', actions: ['View'] },
   { id: 'Products', label: 'Product Management', icon: '⬡', actions: ['View', 'Add', 'Edit', 'Delete'] },
-  { id: 'Site Inspection', label: 'Site Inspection', icon: '◈', actions: ['View', 'Add', 'View Details', 'Edit'] },
+  { id: 'Site Inspection', label: 'Site Inspection', icon: '◈', actions: ['View', 'Add', 'View Details', 'Edit', 'Cancel', 'Generate Contract', 'Send Email', 'Download Contract', 'Manual Approve'] },
   { id: 'Progress Monitor', label: 'Progress Monitoring', icon: '◎', actions: ['View', 'View Details', 'Edit'] },
-  { id: 'Transactions', label: 'Transactions', icon: '⬕', actions: ['View', 'View Details', 'Edit'] },
+  { id: 'Transactions', label: 'Transactions', icon: '⬕', actions: ['View', 'View Details', 'Edit', 'View Contract', 'Download Contract', 'Send Email'] },
   { id: 'Settings', label: 'Settings', icon: '⚙', actions: ['View'] },
-  { id: 'Profile', label: 'Profile', icon: '👤', actions: ['View'] },
+  { id: 'Profile', label: 'Profile', icon: '👤', actions: ['View', 'Edit'] },
 ];
 
 const BASE_TEMPLATE = {
@@ -313,8 +313,16 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
   const handleUpgrade = () => {
     // Setup fallback view permissions when upgrading a client to base operational staff
     const staffBaseModules = {};
-    ALL_MODULES.forEach(m => {
-      staffBaseModules[m.id] = { View: 1, Add: 0, Edit: 0, Delete: 0, "View Details": 1 };
+    ALL_MODULES.forEach(module => {
+      staffBaseModules[module.id] = {};
+
+      module.actions.forEach(action => {
+        staffBaseModules[module.id][action] =
+          module.id !== "Site Inspection" &&
+          (action === "View" || action === "View Details")
+            ? 1
+            : 0;
+      });
     });
 
     const upgradePayload = {

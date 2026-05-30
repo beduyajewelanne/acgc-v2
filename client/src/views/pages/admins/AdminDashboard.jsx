@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './AdminDashboard.css';
+import {CRUD} from 'services/data.services'
+import {UserContext} from "App"
 
 const PROJECTS = [
   { id: 'proj-1', name: 'Sunrise Condo Shower Enclosures', client: 'Patricia Go', status: 'In Progress', startDate: 'Jan 10, 2025', endDate: 'Jun 30, 2025', value: '₱49,000', description: 'Full shower enclosure installation for Sunrise Condo units 3A–8F.' },
@@ -29,11 +31,45 @@ const statusColor = (s) => {
 };
 
 export default function AdminDashboard() {
+  const {user} = useContext(UserContext)
   const navigate = useNavigate();
   const [highlightSection, setHighlightSection] = useState(null); // 'projects' | 'warranties'
   const [modal, setModal] = useState(null); // { type, data }
   const projectsRef = useRef(null);
   const warrantiesRef = useRef(null);
+
+  const [transactions, setTransactions] = useState([])
+  const [projects, setProjects] = useState([])
+  const [warranties, setWarranties] = useState([])
+
+  useEffect(() => {
+    if (user.token){
+      fetchDashboardData()
+    }
+  },[user])
+
+  function fetchDashboardData() {
+    const token = user.token;
+    const user_id = user._id
+
+    if(!token) return;
+
+    const api_url = window.base_api + "dashboard_data";
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, user_id })
+    };
+
+    CRUD(api_url, requestOptions, (res) => {
+      if (res && res.remarks === "success") {
+        console.log("Dashboard data successfully fetched:", res);
+        setTransactions(res.payload.transactions)
+        setProjects(res.payload.projects)
+        setWarranties(res.payload.warranty)
+      }
+    })
+    }
 
   const scrollTo = (ref, section) => {
     setHighlightSection(section);
@@ -70,7 +106,7 @@ export default function AdminDashboard() {
           <div className="kpi-icon"><i className="ti ti-briefcase" aria-hidden="true"></i></div>
           <div className="kpi-body">
             <span className="kpi-label">Active Projects</span>
-            <span className="kpi-value">{PROJECTS.length}</span>
+            <span className="kpi-value">{projects.length}</span>
           </div>
           <i className="ti ti-arrow-right kpi-arrow" aria-hidden="true"></i>
         </button>
@@ -79,7 +115,7 @@ export default function AdminDashboard() {
           <div className="kpi-icon"><i className="ti ti-shield-check" aria-hidden="true"></i></div>
           <div className="kpi-body">
             <span className="kpi-label">Active Warranties</span>
-            <span className="kpi-value">{WARRANTIES.length}</span>
+            <span className="kpi-value">{warranties.length}</span>
           </div>
           <i className="ti ti-arrow-right kpi-arrow" aria-hidden="true"></i>
         </button>
@@ -88,7 +124,7 @@ export default function AdminDashboard() {
           <div className="kpi-icon"><i className="ti ti-clipboard-list" aria-hidden="true"></i></div>
           <div className="kpi-body">
             <span className="kpi-label">Pending Inspections</span>
-            <span className="kpi-value">2</span>
+            <span className="kpi-value">{transactions.length}</span>
           </div>
           <i className="ti ti-arrow-right kpi-arrow" aria-hidden="true"></i>
         </button>
@@ -112,20 +148,24 @@ export default function AdminDashboard() {
               <tr>
                 <th>Project</th>
                 <th>Client</th>
-                <th>Type</th>
+                {/* <th>Type</th> */}
                 <th>Date</th>
                 <th className="text-right">Amount</th>
                 <th className="text-right">Status</th>
               </tr>
             </thead>
             <tbody>
-              {TRANSACTIONS.map(txn => (
-                <tr key={txn.id} className="adm-table-row" onClick={() => navigate('/admin/site-inspection', { state: { modalId: txn.id, view: 'recent-orders' } })}>
-                  <td className="td-primary">{txn.name}</td>
-                  <td className="td-muted">{txn.client}</td>
-                  <td><span className="type-chip">{txn.type}</span></td>
-                  <td className="td-muted">{txn.date}</td>
-                  <td className="text-right td-amount">{txn.amount}</td>
+              {transactions.slice(0, 5).map(txn => (
+                <tr key={txn._id} className="adm-table-row" onClick={() => navigate('/admin/site-inspections', { state: { inspection: txn, type: 'view' } })}>
+                  <td className="td-primary">
+                    {txn.measurements && txn.measurements.length > 0
+                      ? txn.measurements.map(item => item.product).join(", ")
+                      : "—"}
+                  </td>
+                  <td className="td-muted">{txn.clientName}</td>
+                  {/* <td><span className="type-chip">{txn.status == "Pending" ? "To Call" : txn.status}</span></td> */}
+                  <td className="td-muted">{txn.dateCreated}</td>
+                  <td className="text-right td-amount">{txn.estimatedTotal.toFixed(2)}</td>
                   <td className="text-right"><span className={`badge ${statusColor(txn.status)}`}>{txn.status}</span></td>
                 </tr>
               ))}
@@ -142,7 +182,7 @@ export default function AdminDashboard() {
           <div className="adm-section-header">
             <div>
               <h2 className="adm-section-title">Active Projects</h2>
-              <p className="adm-section-desc">{PROJECTS.length} projects currently in progress</p>
+              <p className="adm-section-desc">{projects.length} projects currently in progress</p>
             </div>
             <button className="adm-viewall-btn" onClick={() => navigate('/admin/monitor')}>
               View all <i className="ti ti-arrow-right" aria-hidden="true"></i>
@@ -150,14 +190,14 @@ export default function AdminDashboard() {
           </div>
 
           <div className="adm-list">
-            {PROJECTS.map((proj, i) => (
-              <button key={proj.id} className="adm-list-item" style={{ animationDelay: `${i * 60}ms` }} onClick={() => openModal('project', proj)}>
-                <div className="list-avatar list-avatar-blue">{proj.client.charAt(0)}</div>
+            {projects.slice(0,5).map((proj, i) => (
+              <button key={proj._id} className="adm-list-item" style={{ animationDelay: `${i * 60}ms` }} onClick={() => navigate('/admin/monitor', { state: { project: proj } })}>
+                <div className="list-avatar list-avatar-blue">{proj.clientName.charAt(0)}</div>
                 <div className="list-body">
-                  <span className="list-name">{proj.name}</span>
-                  <span className="list-sub">{proj.client} · {proj.startDate} – {proj.endDate}</span>
+                  <span className="list-name">{proj.itemDetails.name}</span>
+                  <span className="list-sub">{proj.client} · {proj.contractUpdatedAt} – {proj.estimatedInstallationDate}</span>
                 </div>
-                <span className="badge badge-progress">In Progress</span>
+                <span className="badge badge-progress">{proj.progressStatus}</span>
               </button>
             ))}
           </div>
@@ -168,7 +208,7 @@ export default function AdminDashboard() {
           <div className="adm-section-header">
             <div>
               <h2 className="adm-section-title">Active Warranties</h2>
-              <p className="adm-section-desc">{WARRANTIES.length} warranties currently active</p>
+              <p className="adm-section-desc">{warranties.length} warranties currently active</p>
             </div>
             <button className="adm-viewall-btn" onClick={() => navigate('/admin/transactions', { state: { view: 'warranties' } })}>
               View all <i className="ti ti-arrow-right" aria-hidden="true"></i>
@@ -176,14 +216,26 @@ export default function AdminDashboard() {
           </div>
 
           <div className="adm-list">
-            {WARRANTIES.map((war, i) => (
-              <button key={war.id} className="adm-list-item" style={{ animationDelay: `${i * 60}ms` }} onClick={() => openModal('warranty', war)}>
-                <div className="list-avatar list-avatar-green">{war.client.charAt(0)}</div>
+            {warranties.slice(0,5).map((war, i) => (
+              <button key={war.id} className="adm-list-item" style={{ animationDelay: `${i * 60}ms` }} onClick={() => navigate('/admin/transactions', { state: { tx: war } })}>
+                <div className="list-avatar list-avatar-green">{war.clientName.charAt(0)}</div>
                 <div className="list-body">
-                  <span className="list-name">{war.name}</span>
-                  <span className="list-sub">{war.client}</span>
+                  <td className="td-primary">
+                    {war.measurements && war.measurements.length > 0
+                      ? war.measurements.map(item => item.product).join(", ")
+                      : "—"}
+                  </td>
+                  <span className="list-sub">{war.clientName}</span>
                 </div>
-                <span className="warranty-expiry">Expires {war.expires}</span>
+                <span className="warranty-expiry">
+                  Expires {
+                    new Date(
+                      new Date(war.estimatedInstallationDate).setDate(
+                        new Date(war.estimatedInstallationDate).getDate() + 90
+                      )
+                    ).toLocaleDateString()
+                  }
+                </span>
               </button>
             ))}
           </div>

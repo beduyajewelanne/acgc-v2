@@ -2,6 +2,7 @@ import React, { useState, useMemo, useContext, useEffect } from 'react';
 import './Transactions.css';
 import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
+import {useLocation} from 'react-router-dom'
 
 const fmt = (n) => `₱${Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
 const fmtDate = (d) =>
@@ -496,18 +497,49 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
             <InfoRow label="Inspection Date" value={fmtDate(tx.inspectionDate)} />
           </InfoSection>
 
-          {(tx.category === 'Warranty' || tx.warrantyEnd) && (
+          {(tx.category === 'Warranty' || tx.estimatedInstallationDate) && (
             <InfoSection title="Warranty Information">
-              <InfoRow label="Warranty Start" value={fmtDate(tx.warrantyStart || tx.estimatedInstallationDate)} />
-              <InfoRow label="Warranty End" value={fmtDate(tx.warrantyEnd)} />
+              <InfoRow
+                label="Warranty Start"
+                value={fmtDate(tx.warrantyStart || tx.estimatedInstallationDate)}
+              />
+
+              <InfoRow
+                label="Warranty End"
+                value={fmtDate(
+                  new Date(
+                    new Date(tx.warrantyStart || tx.estimatedInstallationDate)
+                      .setDate(new Date(tx.warrantyStart || tx.estimatedInstallationDate).getDate() + 90)
+                  )
+                )}
+              />
+
               <div className="warranty-days-row">
                 <span className="info-label">Remaining Warranty Days</span>
-                {warrantyDays === null ? (
-                  <span className="info-value">—</span>
-                ) : warrantyExpired ? (
-                  <span className="warranty-expired">Expired ({Math.abs(warrantyDays)} days ago)</span>
+
+                {tx.estimatedInstallationDate ? (
+                  (() => {
+                    const days = Math.ceil(
+                      (
+                        new Date(
+                          new Date(tx.warrantyStart || tx.estimatedInstallationDate)
+                            .setDate(new Date(tx.warrantyStart || tx.estimatedInstallationDate).getDate() + 90)
+                        ) - new Date()
+                      ) / (1000 * 60 * 60 * 24)
+                    );
+
+                    return days < 0 ? (
+                      <span className="warranty-expired">
+                        Expired ({Math.abs(days)} days ago)
+                      </span>
+                    ) : (
+                      <span className="warranty-active">
+                        {days} days remaining
+                      </span>
+                    );
+                  })()
                 ) : (
-                  <span className="warranty-active">{warrantyDays} days remaining</span>
+                  <span className="info-value">—</span>
                 )}
               </div>
             </InfoSection>
@@ -692,6 +724,7 @@ const EditModal = ({ tx, onClose, onSave }) => {
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 const Transactions = () => {
+  const location = useLocation()
   const { user, permissions } = useContext(UserContext); 
   const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
   const [filter, setFilter] = useState('All');
@@ -705,6 +738,12 @@ const Transactions = () => {
       fetchTransactions(user);  
     }
   }, [user]);
+
+  useEffect(() => {
+    if(location.state){
+      setViewTx(location.state.tx)
+    }
+  },[location])
 
   function fetchTransactions(user){
     const token = user.token;

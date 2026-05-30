@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useContext, useEffect } from 'react';
 import './ProgressMonitor.css';
-
+import { CRUD, isEmpty } from 'services/data.services'
+import {UserContext} from "App"
 // ─── Static Dummy Data ────────────────────────────────────────────────────────
 const INITIAL_PROJECTS = [
   {
@@ -155,15 +156,39 @@ const ProofUpload = ({ proofs, onAdd, onRemove }) => {
   const inputRef = useRef();
   const [dragging, setDragging] = useState(false);
 
-  const handleFiles = (files) => {
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) =>
-        onAdd({ id: Date.now() + Math.random(), url: e.target.result, name: file.name });
-      reader.readAsDataURL(file);
-    });
+  // --- Updated: Functional Upload Core Handler ---
+  const handleFiles = async (files) => {
+    // Process each selected/dropped file individually 
+    for (const file of Array.from(files)) {
+      // Build standard multipart/form-data payload stream wrapper
+      const formData = new FormData();
+      formData.append("proofFile", file);
+
+      try {
+        const response = await fetch(window.base_api + "upload_proof_file", {
+          method: "POST",
+          body: formData, // Browser handles configuration headers automatically
+        });
+
+        const data = await response.json();
+        
+        if (data.remarks === "success") {
+          // Pass the persistent network reference details to your modal state layer
+          onAdd({
+            id: data.proof.id,
+            url: `/uploads/${data.proof.fileName}`, // Dynamic web route access path matching server storage
+            name: data.proof.originalName
+          });
+        } else {
+          console.error("Server upload verification rejected file processing:", data.message);
+        }
+      } catch (err) {
+        console.error("Network infrastructure error uploading media asset file stream:", err);
+      }
+    }
   };
 
+  // --- UI Structure Remains Identical ---
   return (
     <div className="pm-proof-wrap">
       <div
@@ -194,7 +219,8 @@ const ProofUpload = ({ proofs, onAdd, onRemove }) => {
         <div className="pm-proof-grid">
           {proofs.map((p) => (
             <div key={p.id} className="pm-proof-thumb">
-              <img src={p.url} alt={p.name} className="pm-proof-img" />
+              {/* Renders server URL pathway pointer instead of an unstable local runtime string blob */}
+              <img src={window.base_api.replace('/api/', '') + p.url} alt={p.name} className="pm-proof-img" />
               <button className="pm-proof-remove" onClick={() => onRemove(p.id)}>✕</button>
             </div>
           ))}
@@ -215,8 +241,8 @@ const ViewModal = ({ project, onClose }) => {
         <div className="pm-modal-header">
           <div>
             <p className="pm-modal-eyebrow pm-eyebrow-blue">Project Details</p>
-            <h2 className="pm-modal-title">{project.client}</h2>
-            <p className="pm-modal-subtitle">{project.product}</p>
+            <h2 className="pm-modal-title">{project?.clientName}</h2>
+            <p className="pm-modal-subtitle">{project?.itemDetails?.name}</p>
           </div>
           <button onClick={onClose} className="pm-close-btn">
             <svg className="pm-icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -228,8 +254,8 @@ const ViewModal = ({ project, onClose }) => {
         <div className="pm-modal-body">
           <div className="pm-info-grid">
             {[
-              { label: 'Site Inspection',   value: fmt(project.siteInspection) },
-              { label: 'Est. Installation', value: fmt(project.estimatedInstall) },
+              { label: 'Site Inspection',   value: fmt(project.inspectionDate) },
+              { label: 'Est. Installation', value: fmt(project.estimatedInstallationDate) },
             ].map(({ label, value }) => (
               <div key={label} className="pm-info-cell">
                 <p className="pm-info-label">{label}</p>
@@ -238,7 +264,7 @@ const ViewModal = ({ project, onClose }) => {
             ))}
             <div className="pm-info-cell">
               <p className="pm-info-label">Current Status</p>
-              <div className="pm-info-value"><StatusBadge status={project.status} /></div>
+              <div className="pm-info-value"><StatusBadge status={project.projectStatus} /></div>
             </div>
             <div className="pm-info-cell">
               <p className="pm-info-label">Completion</p>
@@ -288,7 +314,7 @@ const ViewModal = ({ project, onClose }) => {
                     {stage.proofs.length > 0 && (
                       <div className="pm-proof-row">
                         {stage.proofs.map((p) => (
-                          <img key={p.id} src={p.url} alt={p.name} className="pm-proof-thumb-sm" />
+                          <img key={p.id} src={window.base_api.replace('/api/', '') + p.url} alt={p.name} className="pm-proof-thumb-sm" />
                         ))}
                       </div>
                     )}
@@ -311,8 +337,8 @@ const EditModal = ({ project, onClose, onSave }) => {
   const [stages, setStages] = useState(
     project.stages.map((s) => ({ ...s, proofs: [...(s.proofs || [])] }))
   );
-  const [status, setStatus]     = useState(project.status);
-  const [estDate, setEstDate]   = useState(project.estimatedInstall);
+  const [status, setStatus]     = useState(project.progressStatus);
+  const [estDate, setEstDate]   = useState(project.estimatedInstallationDate);
   const [newStageName, setNewStageName] = useState('');
   const [insertAfterIdx, setInsertAfterIdx] = useState(-1); // -1 = beginning
   const [saving, setSaving]     = useState(false);
@@ -404,7 +430,7 @@ const EditModal = ({ project, onClose, onSave }) => {
   const handleSave = () => {
     setSaving(true);
     setTimeout(() => {
-      onSave({ ...project, stages, status, estimatedInstall: estDate });
+      onSave({ ...project, stages, progressStatus: status, estimatedInstall: estDate });
       setSaving(false);
       onClose();
     }, 600);
@@ -583,14 +609,20 @@ const EditModal = ({ project, onClose, onSave }) => {
           <div className="pm-section">
             <label className="pm-section-label">Add New Stage</label>
             <div className="pm-add-stage-col">
-              <input
-                type="text"
-                placeholder="e.g. Quality Inspection"
+              <select
                 value={newStageName}
                 onChange={(e) => setNewStageName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addStage()}
-                className="pm-text-input"
-              />
+                className="pm-text-input" // Keeps your styling intact
+              >
+                <option value="" disabled>-- Select a Preset Stage --</option>
+                
+                {/* Dynamically loop through your STATUS_CONFIG keys to render options */}
+                {Object.keys(STATUS_CONFIG).map((stage) => (
+                  <option key={stage} value={stage}>
+                    {stage}
+                  </option>
+                ))}
+              </select>
               {/* Position selector */}
               <div className="pm-insert-row">
                 <label className="pm-insert-label">Insert after:</label>
@@ -660,20 +692,75 @@ const EditModal = ({ project, onClose, onSave }) => {
 
 // ─── ProgressMonitor (Main Page) ──────────────────────────────────────────────
 const ProgressMonitor = () => {
+  const { user, permissions } = useContext(UserContext);
   const [projects, setProjects]         = useState(INITIAL_PROJECTS);
   const [viewProject, setViewProject]   = useState(null);
   const [editProject, setEditProject]   = useState(null);
   const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
 
-  const handleSave = (updated) =>
-    setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+  useEffect(() => {
+    if (!isEmpty(user.token)){
+      fetchProjects(user)
+    }
+    console.log(permissions)
+  }, [user])
 
+  function fetchProjects(user){
+    var token = user.token
+    var userId = user._id
+
+    if (!token) return;
+    var api_url = window.base_api + 'get_progress_monitor'
+    var requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: token,
+        user_id: userId
+      })
+    }
+    CRUD(api_url, requestOptions, (res) => {
+      if (res && res.remarks === "success") {
+        setProjects(res.payload)
+      } else {
+        setProjects([])
+      }
+    })
+  }
+
+  const handleSave = async (updatedProjectPayload) => {
+    const token = user.token;
+    const user_id = user._id;
+
+    const api_url = window.base_api + 'update_order_request_progress';
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: token,
+        user_id: user_id,
+        _id: updatedProjectPayload._id,
+        stages: updatedProjectPayload.stages,
+        progressStatus: updatedProjectPayload.progressStatus,
+        estimatedInstallationDate: updatedProjectPayload.estimatedInstall
+      })
+    }
+    CRUD(api_url, requestOptions, (res) => {
+      // console.log("Transaction result:", res);
+      if (res.remarks == "success") {
+        fetchProjects(user); 
+      } else {
+        console.error("Transaction rejected:", res.message);
+      }
+    })
+
+  };
   const filtered = projects.filter((p) => {
     const matchesSearch =
-      p.client.toLowerCase().includes(search.toLowerCase()) ||
-      p.product.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || p.status === filterStatus;
+      p?.clientName?.toLowerCase()?.includes(search?.toLowerCase()) ||
+      p?.itemDetails?.name?.toLowerCase()?.includes(search?.toLowerCase());
+    const matchesStatus = filterStatus === 'All' || p.progressStatus === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -692,10 +779,10 @@ const ProgressMonitor = () => {
               {projects.length} Projects
             </span>
             <span className="pm-badge pm-badge-green">
-              {projects.filter((p) => p.status === 'Completed').length} Completed
+              {projects.filter((p) => p.progressStatus === 'Completed').length} Completed
             </span>
             <span className="pm-badge pm-badge-red">
-              {projects.filter((p) => p.status === 'Delayed').length} Delayed
+              {projects.filter((p) => p.progressStatus === 'Delayed').length} Delayed
             </span>
           </div>
         </div>
@@ -753,20 +840,20 @@ const ProgressMonitor = () => {
                 filtered.map((p) => (
                   <tr key={p.id} className="pm-tr">
                     <td className="pm-td">
-                      <p className="pm-td-primary">{p.client}</p>
+                      <p className="pm-td-primary">{p.clientName}</p>
                     </td>
-                    <td className="pm-td pm-td-secondary">{p.product}</td>
-                    <td className="pm-td pm-td-secondary">{fmt(p.siteInspection)}</td>
-                    <td className="pm-td pm-td-secondary">{fmt(p.estimatedInstall)}</td>
+                    <td className="pm-td pm-td-secondary">{p?.itemDetails?.name}</td>
+                    <td className="pm-td pm-td-secondary">{fmt(p?.inspectionDate)}</td>
+                    <td className="pm-td pm-td-secondary">{fmt(p.estimatedInstallationDate)}</td>
                     <td className="pm-td pm-td-progress">
                       <ProgressBar pct={calcProgress(p.stages)} />
                     </td>
                     <td className="pm-td">
-                      <StatusBadge status={p.status} />
+                      <StatusBadge status={p.progressStatus} />
                     </td>
                     <td className="pm-td">
                       <div className="pm-actions">
-                        <button onClick={() => setViewProject(p)} title="View" className="pm-action-btn pm-view">
+                        <button onClick={() => setViewProject(p)} title="View" className="pm-action-btn pm-view" hidden={permissions?.modules?.['Progress Monitor']?.["View Details"] != 1}>
                           <svg className="pm-icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -774,7 +861,7 @@ const ProgressMonitor = () => {
                               d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </button>
-                        <button onClick={() => setEditProject(p)} title="Edit" className="pm-action-btn pm-edit">
+                        <button onClick={() => setEditProject(p)} title="Edit" className="pm-action-btn pm-edit" hidden={permissions?.modules?.['Progress Monitor']?.["Edit"] != 1}>
                           <svg className="pm-icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -798,15 +885,15 @@ const ProgressMonitor = () => {
               <div key={p.id} className="pm-card">
                 <div className="pm-card-header">
                   <div>
-                    <p className="pm-td-primary">{p.client}</p>
-                    <p className="pm-card-sub">{p.product}</p>
+                    <p className="pm-td-primary">{p?.clientName}</p>
+                    <p className="pm-card-sub">{p?.itemDetails?.name}</p>
                   </div>
-                  <StatusBadge status={p.status} />
+                  <StatusBadge status={p?.progressStatus} />
                 </div>
                 <ProgressBar pct={calcProgress(p.stages)} />
                 <div className="pm-card-dates">
-                  <div><span className="pm-card-date-label">Inspection:</span> {fmt(p.siteInspection)}</div>
-                  <div><span className="pm-card-date-label">Install:</span> {fmt(p.estimatedInstall)}</div>
+                  <div><span className="pm-card-date-label">Inspection:</span> {fmt(p.inspectionDate)}</div>
+                  <div><span className="pm-card-date-label">Install:</span> {fmt(p?.estimatedInstallationDate)}</div>
                 </div>
                 <div className="pm-card-actions">
                   <button onClick={() => setViewProject(p)} className="pm-card-btn pm-card-view">View Details</button>

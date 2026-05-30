@@ -20,7 +20,7 @@ const toFeet = (value, unit) => {
 /* ─── Order Summary Modal ────────────────────────────────────────────────── */
 const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
   const { product, measurements, customer } = order;
-
+  console.log(measurements)
   const hasMeas = measurements && parseFloat(measurements.width) > 0 && parseFloat(measurements.height) > 0;
   const wFt = hasMeas ? toFeet(measurements.width, measurements.unit) : 0;
   const hFt = hasMeas ? toFeet(measurements.height, measurements.unit) : 0;
@@ -206,7 +206,6 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
   const handleProceed = async () => {
     const token = user?.token;
     const userId = user?._id;
-    console.log(product)
     const payload = {
       token,
       userId,
@@ -214,9 +213,12 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
       customer,
       clientNotes,
       measurements: {
-        width: measurements?.width || "",
-        height: measurements?.height || "",
-        unit: measurements?.unit || "ft"
+        // width: measurements?.width || "",
+        // height: measurements?.height || "",
+        // unit: measurements?.unit 1|| "ft"
+        width:  measurements?.width != '' ? measurements?.width : product.width,
+        height: measurements?.height != '' ? measurements?.height : product.height,
+        unit: measurements?.height != '' && measurements?.width != '' ? measurements?.unit : product.unit
       },
       quantity: 1
     };

@@ -458,7 +458,7 @@ function ContractModal({ inspection, onClose, onSend, permissions }) {
               </div>
               <div className="contract-meta" style={{ textAlign: 'right' }}>
                 <div className="contract-title" style={{ fontSize: '16px', fontWeight: 'bold', color: '#2b6cb0' }}>SERVICE CONTRACT</div>
-                <div className="contract-num" style={{ fontSize: '12px' }}>Contract No: SI-{String(inspection.id).padStart(4, '0')}</div>
+                <div className="contract-num" style={{ fontSize: '12px' }}>Contract No: CTR-{String(inspection.id).padStart(4, '0')}</div>
                 <div className="contract-date" style={{ fontSize: '12px' }}>Date: {contractDate}</div>
               </div>
             </div>
@@ -633,7 +633,7 @@ function ViewModal({ inspection, onClose, onGenerateContract, permissions }) {
             <p className="modal-subtitle">SI-{String(inspection.id).padStart(4, '0')} · Created {inspection.dateCreated}</p>
           </div>
           <div className="modal-topbar-actions">
-            <button className="gen-contract-btn" onClick={onGenerateContract} hidden={permissions?.modules?.["Site Inspection"]?.["Generate Contract"] !== 1}>📄 Generate Contract</button>
+            <button className="gen-contract-btn" onClick={onGenerateContract} hidden={(permissions?.modules?.["Site Inspection"]?.["Generate Contract"] !== 1 && !inspection.estimatedInstallationDate) || !inspection.estimatedInstallationDate}>📄 Generate Contract</button>
             <button className="modal-close" onClick={onClose}>×</button>
           </div>
         </div>
@@ -1402,7 +1402,7 @@ const SiteInspection = () => {
                             <button className="act-btn act-edit" title="Edit" onClick={() => setModal({ type: 'edit', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Edit"] !== 1}>✏️</button>
                             <button className="act-btn act-edit" title="Manual Approve" onClick={() => setModal({ type: 'manual-approve', inspection: item })} hidden={item.customerHasAccount != false || permissions?.modules?.["Site Inspection"]?.["Edit"] !== 1}>✔️</button>
                             <button className="act-btn act-cancel" title="Cancel" onClick={() => setModal({ type: 'cancel', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Cancel"] !== 1}>🗑</button>
-                            <button className="act-btn act-contract" title="Generate Contract" onClick={() => setModal({ type: 'contract', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Generate Contract"] !== 1}>📄</button>
+                            <button className="act-btn act-contract" title="Generate Contract" onClick={() => setModal({ type: 'contract', inspection: item })} hidden={(permissions?.modules?.["Site Inspection"]?.["Generate Contract"] !== 1 && !item.estimatedInstallationDate) || !item.estimatedInstallationDate}>📄</button>
                           </>
                         )}
                       </div>

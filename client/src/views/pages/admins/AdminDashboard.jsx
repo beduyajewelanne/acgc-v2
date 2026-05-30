@@ -84,7 +84,7 @@ export default function AdminDashboard() {
           <i className="ti ti-arrow-right kpi-arrow" aria-hidden="true"></i>
         </button>
 
-        <button className="adm-kpi-card adm-kpi-amber" onClick={() => navigate('/admin/site-inspection', { state: { filter: 'pending' } })}>
+        <button className="adm-kpi-card adm-kpi-amber" onClick={() => navigate('/admin/site-inspections', { state: { filter: 'pending' } })}>
           <div className="kpi-icon"><i className="ti ti-clipboard-list" aria-hidden="true"></i></div>
           <div className="kpi-body">
             <span className="kpi-label">Pending Inspections</span>

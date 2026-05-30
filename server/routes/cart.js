@@ -745,10 +745,13 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
                                 qty: { $ifNull: ["$quantity", "$itemDetails.quantity", 1] },
                                 pricePerSqFt: "$itemDetails.ratePerSqFt",
                                 unit: "$itemDetails.unit",
+                                progressStatus: "$progressStatus",
+                                warranty: { $ifNull: ["$warranty", ""] },
+                                estimatedInstallationDate: "$estimatedInstallationDate"
                             }
                         },
                         // Sum up costs across all grouped documents
-                        totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" }
+                        totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" },
                     }
                 },
                 { $sort: { "baseDoc.createdAt": -1 } }
@@ -780,6 +783,37 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
                     customerEmail: b.clientEmail || "",
                     customerHasAccount: b.customerHasAccount == true ? true : b.user_id ? true : false ,
                     manualOverride: parseFloat(b.manualOverride) || "",
+                    paymentDate: b.paymentDate || "",
+                    contractId: b.contractId,
+                    totalPayment: b.totalPayment || 0,
+                    transactionNumber: b.transactionNumber || "",
+                    category: (() => {
+                        // 1. Instantly check if there are any unfinished items across the order
+                        const isAllCompleted = group.measurements.every(m => m.progressStatus === "Completed");
+                        
+                        if (!isAllCompleted) {
+                            return "In Progress";
+                        }
+
+                        // 2. Establish the exact timeline boundary for 90 days ago from right now
+                        const ninetyDaysAgo = new Date();
+                        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+                        // 3. Inspect if every single item has aged out past the 90-day threshold
+                        const isPastNinetyDaysAll = group.measurements.every(m => {
+                            // If a date string is somehow missing, keep it in "Warranty" for safety
+                            if (!m.estimatedInstallationDate) return false; 
+                            
+                            const installationDate = new Date(m.estimatedInstallationDate);
+                            return installationDate < ninetyDaysAgo;
+                        });
+
+                        // 4. Return categorical state classifications
+                        return isPastNinetyDaysAll ? "Completed Project" : "Warranty";
+                    })(),
+                    paymentMethod: b.paymentMethod || 'Cash',
+                    paymentStatus: b.paymentStatus || 'Pending',
+                    contractLink: b.contractLink || "",
                 };
             });
 
@@ -1464,6 +1498,105 @@ cartRoutes.post("/api/update_order_request_progress", async (req, res) => {
     } catch (err) {
         console.error("Critical error inside update_order_request_progress:", err);
         return res.status(500).json({ error: err.message });
+    }
+});
+
+cartRoutes.post("/api/edit_payment", async (req, res) => {
+    const { token, user_id, orderId, paymentMethod, totalPayment, transactionNumber } = req.body;
+
+    // 1. Initial input validation
+    if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session token" });
+    if (!user_id) return res.status(400).json({ remarks: "failed", message: "Missing security tracking identity coordinates" });
+    if (!orderId) return res.status(400).json({ remarks: "failed", message: "Missing orderId target reference identifier" });
+    
+    if (paymentMethod === undefined || paymentMethod === null) {
+        return res.status(400).json({ remarks: "failed", message: "Missing paymentMethod parameter" });
+    }
+    if (totalPayment === undefined || totalPayment === null) {
+        return res.status(400).json({ remarks: "failed", message: "Missing totalPayment parameter" });
+    }
+
+    try {
+        // 2. Wrap transaction securely within checkAuth security profiles
+        checkAuth(token, user_id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
+
+            const db = dbo.getDb();
+
+            // 3. Clean and explicitly type parameters
+            const cleanPaymentMethod = String(paymentMethod).trim();
+            const floatTotalPayment = parseFloat(totalPayment) || 0.0;
+            const cleanTransactionNumber = transactionNumber ? String(transactionNumber).trim() : "";
+
+            // 4. Retrieve a record from this group to check financial targets (manualOverride or estimatedTotal)
+            const targetSample = await db.collection("order_requests").findOne({ orderId: orderId });
+            
+            if (!targetSample) {
+                return res.status(404).json({ 
+                    remarks: "failed", 
+                    message: "No matching order records found with the provided orderId reference." 
+                });
+            }
+
+            // Extract threshold values safely from the cluster document
+            const manualOverrideTarget = parseFloat(targetSample.manualOverride) || 0.0;
+            const estimatedTotalTarget = parseFloat(targetSample.estimatedTotal) || 0.0;
+
+
+            const targetRequiredAmount = manualOverrideTarget > 0 ? manualOverrideTarget : estimatedTotalTarget;
+            // 5. Evaluate the payment status dynamically using safe numeric rounding
+            var calculatedPaymentStatus = "Pending"; 
+
+            // Round both numbers to 2 decimal places to remove binary precision tails safely
+            const roundedTotalPayment = Math.round(floatTotalPayment * 100) / 100;
+            const roundedTargetAmount = Math.round(targetRequiredAmount * 100) / 100;
+            var status = ""
+            if (roundedTotalPayment >= roundedTargetAmount) {
+                calculatedPaymentStatus = "Paid";
+                status = "Paid";
+            }
+
+            // Check your server console to verify both values are now clean numbers
+            console.log(`Comparing numbers: ${roundedTotalPayment} >= ${roundedTargetAmount} -> result:`, roundedTotalPayment >= roundedTargetAmount);
+
+            // 6. Update EVERY document inside the cluster matching the targeted orderId group instantly
+            const updateResult = await db.collection("order_requests").updateMany(
+                { orderId: orderId },
+                { 
+                    $set: { 
+                        paymentMethod: cleanPaymentMethod,
+                        totalPayment: floatTotalPayment,
+                        transactionNumber: cleanTransactionNumber,
+                        paymentStatus: calculatedPaymentStatus,
+                        paymentUpdatedAt: new Date(),
+                        ...(status != "" ? { status: status } : {})
+                    } 
+                }
+            );
+
+            // 7. Return execution response context profiles safely
+            if (updateResult.matchedCount > 0) {
+                // Log operation tracking metrics
+                await actionLog(
+                    user_id, 
+                    "Edit Payment Details", 
+                    `Updated payment details for group ID: ${orderId}. Status: ${calculatedPaymentStatus}, Amount: ${floatTotalPayment}, TxN: ${cleanTransactionNumber || 'N/A'}`
+                );
+                
+                return res.status(200).json({
+                    remarks: "success",
+                    message: `Payment fields and status [${calculatedPaymentStatus}] synchronized across ${updateResult.modifiedCount} line item documents successfully.`
+                });
+            } else {
+                return res.status(500).json({ 
+                    remarks: "failed", 
+                    message: "Failed to apply updates to database records." 
+                });
+            }
+        });
+    } catch (err) {
+        console.error("Critical error mapping execution processing inside /api/edit_payment handler:", err);
+        return res.status(500).json({ remarks: "error", error: err.message || err });
     }
 });
 

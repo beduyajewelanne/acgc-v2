@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useContext } from 'react';
 import './Transactions.css';
+import { CRUD } from 'services/data.services';
+import { UserContext } from 'App';
 
 const fmt = (n) => `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
 const fmtDate = (d) =>
@@ -769,6 +771,7 @@ const EditModal = ({ tx, onClose, onSave }) => {
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 const Transactions = () => {
+  const { user, permissions } = useContext(UserContext); 
   const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');

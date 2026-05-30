@@ -291,7 +291,7 @@ userRoutes.post("/api/get_user_dashboard", async (req, res) => {
                         $or: [
                             { contractApproved: 1 },
                             { contractSentToCustomer: true },
-                            { status: "Contract Declined" }
+                            { status: "Cancelled" }
                         ]
                     }
                 },

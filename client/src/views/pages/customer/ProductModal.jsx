@@ -129,10 +129,18 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
     if (e.target === overlayRef.current) onClose();
   };
 
-  
+  useEffect(() => {
+    if (initialIntent === 'order') {
+      setMeasurements({
+        width: product.width,
+        height: product.height,
+        unit: product.unit
+      })
+    }
+  },[initialIntent])
 
   useEffect(() => {
-    console.log(permissions)
+    console.log(permissions);console.log(product)
   }, [permissions])
 
   /* Keyboard ESC */

@@ -126,7 +126,7 @@ const MyOrders = () => {
           </div>
         ) : (
           orders.map((order) => {
-            const orderIdKey = order.id || order.orderId;
+            const orderIdKey = order.orderId;
             
             // Extracts explicit values directly from your payload object structures 
             const totalOrderCost = parseFloat(order.estimatedTotal) || 0;

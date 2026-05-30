@@ -2,6 +2,7 @@ import React, { useState, useRef, useContext, useEffect } from 'react';
 import './ProgressMonitor.css';
 import { CRUD, isEmpty } from 'services/data.services'
 import {UserContext} from "App"
+import { useLocation } from 'react-router-dom';
 // ─── Static Dummy Data ────────────────────────────────────────────────────────
 const INITIAL_PROJECTS = [
   {
@@ -692,6 +693,7 @@ const EditModal = ({ project, onClose, onSave }) => {
 
 // ─── ProgressMonitor (Main Page) ──────────────────────────────────────────────
 const ProgressMonitor = () => {
+  const location = useLocation();
   const { user, permissions } = useContext(UserContext);
   const [projects, setProjects]         = useState(INITIAL_PROJECTS);
   const [viewProject, setViewProject]   = useState(null);
@@ -705,6 +707,12 @@ const ProgressMonitor = () => {
     }
     console.log(permissions)
   }, [user])
+  
+  useEffect(() => {
+    if(location.state){
+      setViewProject(location.state.project)
+    }
+  }, [location])
 
   function fetchProjects(user){
     var token = user.token

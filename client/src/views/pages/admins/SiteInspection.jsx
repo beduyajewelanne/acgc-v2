@@ -3,6 +3,7 @@ import './SiteInspection.css';
 import { UserContext } from 'App';
 import { CRUD, isEmpty } from 'services/data.services';
 import html2pdf from 'html2pdf.js';
+import { useLocation } from 'react-router-dom';
 
 const PAYMENT_TERMS_OPTIONS = [
   '50% downpayment, 50% upon completion',
@@ -1137,6 +1138,7 @@ function InspectionFormModal({ initial, onClose, onSave }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 const SiteInspection = () => {
+  const location = useLocation();
   const { user, permissions } = useContext(UserContext)
   const [inspections, setInspections] = useState([]);
   const [modal, setModal] = useState(null);
@@ -1151,6 +1153,12 @@ const SiteInspection = () => {
       getRecords()
     }
   }, [user])
+
+  useEffect(() => {
+    if (location.state) {
+      setModal(location.state);
+    }
+  }, [location.state]);
 
   function getRecords() {
     const token = user.token

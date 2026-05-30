@@ -1600,4 +1600,199 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
     }
 });
 
+
+cartRoutes.post('/api/dashboard_data', async (req, res) => {
+    const { token, user_id } = req.body;
+
+    if (!token) return res.status(400).json({ remarks: "failed", message: "Missing token parameter" });
+    if (!user_id) return res.status(400).json({ remarks: "failed", message: "Missing user_id parameter" });
+
+    try {
+        // 2. Wrap transaction securely within checkAuth security profiles
+        checkAuth(token, user_id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
+
+            const pipeline = [
+                {
+                    $match: {
+                        $or: [
+                        { contractApproved: { $ne: 1 } },
+                        { status: "Completed" }
+                        ]
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$orderId",
+                        // Capture base document fields from the first occurrence
+                        baseDoc: { $first: "$$ROOT" },
+                        // Aggregate all items associated with this orderId
+                        measurements: {
+                            $push: {
+                                id: "$_id",
+                                product: "$itemDetails.name",
+                                width: "$itemDetails.width",
+                                height: "$itemDetails.height",
+                                qty: { $ifNull: ["$quantity", "$itemDetails.quantity", 1] },
+                                pricePerSqFt: "$itemDetails.ratePerSqFt",
+                                unit: "$itemDetails.unit",
+                            }
+                        },
+                        // Sum up costs across all grouped documents
+                        totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" }
+                    }
+                },
+                { $sort: { "baseDoc.createdAt": -1 } }
+            ];
+
+            const result = await get_data_helper("order_requests", pipeline);
+            const rawPayload = result?.payload || result || [];
+
+            const normalizedPayload = rawPayload.map(group => {
+                const b = group.baseDoc;
+                return {
+                    id: group._id, // orderId acts as the unique identifier
+                    clientName: b.clientName || "Unknown Client",
+                    clientAddress: b.installationAddress || "",
+                    clientNumber: b.clientPhone || "",
+                    siteAddress: b.installationAddress || "",
+                    dateCreated: b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : "",
+                    inspectionDate: b.inspectionDate || "",
+                    estimatedInstallationDate: b.estimatedInstallationDate || "",
+                    status: b.status || "Pending",
+                    estimatedTotal: b.estimatedTotal || group.totalEstimatedCost || 0,
+                    downpaymentPaid: b.downpaymentPaid || false,
+                    paymentTerms: b.paymentTerms || '50% downpayment, 50% upon completion',
+                    paymentDate: b.paymentDate || "",
+                    notes: b.clientNotes || "",
+                    measurements: group.measurements,
+                    contractSentToCustomer: b.contractSentToCustomer || false,
+                    customerHasAccount: b.customerHasAccount || false,
+                    customerEmail: b.clientEmail || "",
+                    customerHasAccount: b.customerHasAccount == true ? true : b.user_id ? true : false ,
+                    manualOverride: parseFloat(b.manualOverride) || "",
+                };
+            });
+
+            const query = [
+                {
+                    $match: {
+                        contractApproved: 1,
+                    }
+                },
+                {
+                    $addFields:{
+                        progressStatus: { 
+                            $ifNull: ["$progressStatus", "Pending"] 
+                        },
+                        stages: {
+                            $ifNull: ["$stages", []]
+                        }
+                    }
+                }
+            ];
+
+            const progress = await get_data_helper("order_requests", query);
+
+
+            const warranty_query = [
+                {
+                    $match: {
+                        contractApproved: { $exists: true, $ne: null }
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$orderId",
+                        // Capture base document fields from the first occurrence
+                        baseDoc: { $first: "$$ROOT" },
+                        // Aggregate all items associated with this orderId
+                        measurements: {
+                            $push: {
+                                id: "$_id",
+                                product: "$itemDetails.name",
+                                width: "$itemDetails.width",
+                                height: "$itemDetails.height",
+                                qty: { $ifNull: ["$quantity", "$itemDetails.quantity", 1] },
+                                pricePerSqFt: "$itemDetails.ratePerSqFt",
+                                unit: "$itemDetails.unit",
+                                progressStatus: "$progressStatus",
+                                warranty: { $ifNull: ["$warranty", ""] },
+                                estimatedInstallationDate: "$estimatedInstallationDate"
+                            }
+                        },
+                        // Sum up costs across all grouped documents
+                        totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" },
+                    }
+                },
+                { $sort: { "baseDoc.createdAt": -1 } }
+            ];
+
+            const warranty = await get_data_helper("order_requests", warranty_query);
+            const warrantyPayload = warranty?.payload || warranty || [];
+
+            var warrantyNormalized = warrantyPayload.map(group => {
+                const b = group.baseDoc;
+                return {
+                    id: group._id, // orderId acts as the unique identifier
+                    clientName: b.clientName || "Unknown Client",
+                    clientAddress: b.installationAddress || "",
+                    clientNumber: b.clientPhone || "",
+                    siteAddress: b.installationAddress || "",
+                    dateCreated: b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : "",
+                    inspectionDate: b.inspectionDate || "",
+                    estimatedInstallationDate: b.estimatedInstallationDate || "",
+                    status: b.status || "Pending",
+                    estimatedTotal: b.estimatedTotal || group.totalEstimatedCost || 0,
+                    downpaymentPaid: b.downpaymentPaid || false,
+                    paymentTerms: b.paymentTerms || '50% downpayment, 50% upon completion',
+                    paymentDate: b.paymentDate || "",
+                    notes: b.clientNotes || "",
+                    measurements: group.measurements,
+                    contractSentToCustomer: b.contractSentToCustomer || false,
+                    customerHasAccount: b.customerHasAccount || false,
+                    customerEmail: b.clientEmail || "",
+                    customerHasAccount: b.customerHasAccount == true ? true : b.user_id ? true : false ,
+                    manualOverride: parseFloat(b.manualOverride) || "",
+                    paymentDate: b.paymentDate || "",
+                    contractId: b.contractId,
+                    totalPayment: b.totalPayment || 0,
+                    transactionNumber: b.transactionNumber || "",
+                    category: (() => {
+                        // 1. Instantly check if there are any unfinished items across the order
+                        const isAllCompleted = group.measurements.every(m => m.progressStatus === "Completed");
+                        
+                        if (!isAllCompleted) {
+                            return "In Progress";
+                        }
+
+                        // 2. Establish the exact timeline boundary for 90 days ago from right now
+                        const ninetyDaysAgo = new Date();
+                        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+                        // 3. Inspect if every single item has aged out past the 90-day threshold
+                        const isPastNinetyDaysAll = group.measurements.every(m => {
+                            // If a date string is somehow missing, keep it in "Warranty" for safety
+                            if (!m.estimatedInstallationDate) return false; 
+                            
+                            const installationDate = new Date(m.estimatedInstallationDate);
+                            return installationDate < ninetyDaysAgo;
+                        });
+
+                        // 4. Return categorical state classifications
+                        return isPastNinetyDaysAll ? "Completed Project" : "Warranty";
+                    })(),
+                    paymentMethod: b.paymentMethod || 'Cash',
+                    paymentStatus: b.paymentStatus || 'Pending',
+                    contractLink: b.contractLink || "",
+                };
+            });
+            warrantyNormalized = warrantyNormalized.filter(d => d.category === "Warranty");
+            return res.status(200).json({ remarks: "success", payload:{ transactions: normalizedPayload, projects: progress.payload, warranty: warrantyNormalized } });
+        })
+    } catch (err) {
+        console.error("Critical error mapping execution processing inside /api/edit_payment handler:", err);
+        return res.status(500).json({ remarks: "error", error: err.message || err });
+    }
+})
 module.exports = cartRoutes;

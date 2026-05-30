@@ -200,7 +200,7 @@ const MyOrders = () => {
                     </div>
 
                     <div className="order-links" style={{ marginTop: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {order.contractLink && order.contractLink !== '#' && <a href={order.contractLink} className="link-btn" target="_blank" rel="noreferrer">View Contract</a>}
+                      {order.contractLink && order.contractLink !== '#' && <a href={window.base_api.replace('/api/', '') + order.contractLink} className="link-btn" target="_blank" rel="noreferrer">View Contract</a>}
                       {order.receiptLink && order.receiptLink !== '#' && <a href={order.receiptLink} className="link-btn" target="_blank" rel="noreferrer">View Receipt</a>}
                       {(order.status === "Pending" || order.status === "Pending Inspection" || order.is_cancelledAllowed === 1) && (
                         <button 

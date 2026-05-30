@@ -6,7 +6,7 @@ import html2pdf from 'html2pdf.js';
 
 const PAYMENT_TERMS_OPTIONS = [
   '50% downpayment, 50% upon completion',
-  'Full payment upon completion',
+  'Full payment',
   'Installment (3 months)',
   'Installment (6 months)',
   'Custom arrangement',
@@ -310,9 +310,10 @@ function MeasurementTable({ rows, setRows, editable = true }) {
 }
 
 // ─── Contract Modal ──────────────────────────────────────────────────────────
-function ContractModal({ inspection, onClose, onSend }) {
+function ContractModal({ inspection, onClose, onSend, permissions }) {
   const contractPaperRef = useRef(null);
-
+  console.log(inspection);
+  
   const grand = inspection.manualOverride && inspection.manualOverride !== ""
     ? parseFloat(inspection.manualOverride)
     : (inspection.estimatedTotal || calcGrandTotal(inspection.measurements));
@@ -326,9 +327,8 @@ function ContractModal({ inspection, onClose, onSend }) {
     const element = contractPaperRef.current;
     if (!element) return;
 
-    // Configuration settings tailored to force single-page compilation
     const options = {
-      margin:       [0.3, 0.3, 0.3, 0.3], // Tightened page padding boundaries
+      margin:       [0.3, 0.3, 0.3, 0.3], 
       filename:     `Contract_SI-${String(inspection.id).padStart(4, '0')}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { 
@@ -336,12 +336,10 @@ function ContractModal({ inspection, onClose, onSend }) {
         useCORS: true, 
         logging: false,
         letterRendering: true,
-        // Explicitly sets canvas window bounds to a standardized document ratio
         windowWidth: 816, 
         windowHeight: 1056 
       },
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
-      // Smart page-break rules: avoids slicing rows, prefers single viewport constraint
       pagebreak:    { mode: ['avoid-all', 'css'] } 
     };
 
@@ -355,13 +353,59 @@ function ContractModal({ inspection, onClose, onSend }) {
   };
 
   const handleSend = () => {
+    const element = contractPaperRef.current;
+    if (!element) return;
+
+    const exporter = window.html2pdf ? window.html2pdf : html2pdf;
+    if (!exporter) {
+      alert("PDF engine is still loading. Please try again.");
+      return;
+    }
+
     setSending(true);
-    setTimeout(() => {
-      setSending(false);
-      setSent(true);
-      onSend && onSend();
-    }, 1200);
+
+    const options = {
+      margin:       [0.3, 0.3, 0.3, 0.3],
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    exporter().set(options).from(element).outputPdf('blob').then((pdfBlob) => {
+      const formData = new FormData();
+      formData.append('contractFile', pdfBlob, `Contract_SI-${String(inspection.id).padStart(4, '0')}.pdf`);
+      formData.append('inspectionId', inspection.id);
+      formData.append('orderId', inspection.id || '');
+      formData.append('customerEmail', inspection.customerEmail || '');
+
+      const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/send_contract_email';
+
+      fetch(apiUri, {
+        method: 'POST',
+        body: formData,
+      })
+      .then((res) => res.json())
+      .then((data) => {
+        setSending(false);
+        if (data.remarks === 'success') {
+          setSent(true);
+          onSend && onSend();
+        } else {
+          alert(data.message || 'Failed to dispatch contract email.');
+        }
+      })
+      .catch((err) => {
+        setSending(false);
+        console.error("Error sending contract:", err);
+        alert('Network integration failure occurred while preparing document email.');
+      });
+    });
   };
+
+  // Normalization logic mapping payment option states
+  const cleanedTerms = String(inspection.paymentTerms || '').trim();
+  const is50PercentDp = cleanedTerms === '50% downpayment, 50% upon completion';
+  const isFullPayment = cleanedTerms === 'Full payment';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -382,22 +426,15 @@ function ContractModal({ inspection, onClose, onSend }) {
                 {sent ? '✅ Sent to Customer' : sending ? '⏳ Sending...' : '📨 Send to Customer'}
               </button>
             )}
-            <button className="contract-dl-btn" onClick={handleDownloadPDF}>
+            <button className="contract-dl-btn" onClick={handleDownloadPDF} hidden={permissions?.modules?.["Site Inspection"]?.["Download Contract"] !== 1}>
               ⬇️ Download PDF
             </button>
             <button className="modal-close" onClick={onClose}>×</button>
           </div>
         </div>
 
-        {/* ... Info Banners ... */}
-
         {/* Scrollable Contract Body Wrapper */}
         <div className="contract-modal-body">
-          {/* 
-            Notice the CSS additions below:
-            - page-break-inside: avoid handles rendering boundaries.
-            - Slightly reduced font scaling and dense line heights prevent unwanted overflows.
-          */}
           <div 
             className="contract-paper-inner" 
             ref={contractPaperRef} 
@@ -479,34 +516,83 @@ function ContractModal({ inspection, onClose, onSend }) {
               </tfoot>
             </table>
 
+            {/* PAYMENT TERMS WRAPPER */}
             <div className="contract-payment-box" style={{ background: '#f8fafc', padding: '10px', borderRadius: '4px', marginBottom: '12px' }}>
               <div className="contract-section-title" style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>PAYMENT TERMS</div>
-              <p style={{ margin: '0 0 6px 0', fontSize: '12px' }}>{inspection.paymentTerms}</p>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
-                <span>50% Downpayment Required:</span>
-                <strong>{fmtCurrency(dp)}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <span>Balance Upon Completion:</span>
-                <strong>{fmtCurrency(grand - dp)}</strong>
-              </div>
+              <p style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: '500', color: '#2d3748' }}>{inspection.paymentTerms}</p>
+              
+              {/* Scenario 1: Standard 50% split milestone mapping */}
+              {is50PercentDp && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
+                    <span>50% Downpayment Required:</span>
+                    <strong>{fmtCurrency(dp)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                    <span>Balance Upon Completion:</span>
+                    <strong>{fmtCurrency(grand - dp)}</strong>
+                  </div>
+                </>
+              )}
+
+              {/* Scenario 2: Standard Full Payment matching display layout */}
+              {isFullPayment && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span>Total Due Amount:</span>
+                  <strong>{fmtCurrency(grand)}</strong>
+                </div>
+              )}
+
+              {/* Scenario 3: All custom arrangements or installments displaying the critical payment date line */}
+              {!is50PercentDp && !isFullPayment && (
+                <div style={{ marginTop: '4px', fontSize: '12px', color: '#e53e3e', fontWeight: '600', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #edf2f7', paddingTop: '4px' }}>
+                  <span>Payment Schedule Constraint:</span>
+                  <span>Required payment date is by: {inspection.paymentDate ? new Date(inspection.paymentDate).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Specified Project Milestone Schedule'}</span>
+                </div>
+              )}
             </div>
 
-            {/* Warranty Section */}
+            {/* WARRANTY SECTION */}
             <div className="contract-section-title" style={{ fontSize: '12px', fontWeight: 'bold', borderBottom: '1px solid #edf2f7', paddingBottom: '2px', marginBottom: '4px' }}>WARRANTY</div>
-            <div className="contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '12px', fontSize: '11px' }}>
-              <div style={{ fontSize: '16px' }}>🛡️</div>
-              <div>
-                <strong>90-Day Warranty:</strong> GlassAlum Pro Inc. provides a 90-day warranty on all installed products and workmanship starting from installation completion.
+            
+            {inspection.warrantyTerms && Array.isArray(inspection.warrantyTerms) && inspection.warrantyTerms.length > 0 ? (
+              inspection.warrantyTerms.map((term, index) => (
+                <div key={index} className="contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontSize: '11px' }}>
+                  <div style={{ fontSize: '14px' }}>🛡️</div>
+                  <div>
+                    <strong>{term.title || 'Warranty Term'}:</strong> {term.description || term}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '12px', fontSize: '11px' }}>
+                <div style={{ fontSize: '16px' }}>🛡️</div>
+                <div>
+                  <strong>90-Day Warranty:</strong> GlassAlum Pro Inc. provides a 90-day warranty on all installed products and workmanship starting from installation completion.
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '12px', fontSize: '11px', backgroundColor: '#f0c400', padding: '10px', borderRadius: '4px' }}>
-              <div style={{ fontSize: '16px' }}>⚠️</div>
-              <div>
-                <strong>WARNING:</strong> 50% Down Payment is Required to start the project based on the store policy.
-              </div>
-            </div>
+            {/* DYNAMIC WARNINGS / CRITICAL CONDITIONS BANNER BLOCK (Bypassed if Full Payment) */}
+            {!isFullPayment && (
+              inspection.conditions && Array.isArray(inspection.conditions) && inspection.conditions.length > 0 ? (
+                inspection.conditions.map((cond, index) => (
+                  <div key={index} className="contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontSize: '11px', backgroundColor: '#fef3c7', padding: '10px', borderRadius: '4px', border: '1px solid #fde68a', color: '#92400e' }}>
+                    <div style={{ fontSize: '14px' }}>⚠️</div>
+                    <div>
+                      <strong>{cond.type || 'NOTICE'}:</strong> {cond.text || cond}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '12px', fontSize: '11px', backgroundColor: '#f0c400', padding: '10px', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '16px' }}>⚠️</div>
+                  <div>
+                    <strong>WARNING:</strong> 50% Down Payment is Required to start the project based on the store policy.
+                  </div>
+                </div>
+              )
+            )}
 
             {inspection.notes && (
               <div style={{ marginBottom: '12px' }}>
@@ -530,29 +616,12 @@ function ContractModal({ inspection, onClose, onSend }) {
             </div>
           </div>
         </div>
-
-        {/* Footer Actions */}
-        {/* <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Close</button>
-          <button className="contract-print-btn" onClick={() => window.print()}>🖨️ Print</button>
-          <button className="contract-dl-btn-lg" onClick={handleDownloadPDF}>⬇️ Download</button>
-          {inspection.customerHasAccount && (
-            <button
-              className={`btn-primary ${sent ? 'btn-primary--sent' : ''}`}
-              onClick={handleSend}
-              disabled={sending || sent}
-            >
-              {sent ? '✅ Sent' : sending ? 'Sending…' : '📨 Send to Customer'}
-            </button>
-          )}
-        </div> */}
       </div>
     </div>
   );
 }
-
 // ─── View Modal ──────────────────────────────────────────────────────────────
-function ViewModal({ inspection, onClose, onGenerateContract }) {
+function ViewModal({ inspection, onClose, onGenerateContract, permissions }) {
   console.log(inspection)
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -563,7 +632,7 @@ function ViewModal({ inspection, onClose, onGenerateContract }) {
             <p className="modal-subtitle">SI-{String(inspection.id).padStart(4, '0')} · Created {inspection.dateCreated}</p>
           </div>
           <div className="modal-topbar-actions">
-            <button className="gen-contract-btn" onClick={onGenerateContract}>📄 Generate Contract</button>
+            <button className="gen-contract-btn" onClick={onGenerateContract} hidden={permissions?.modules?.["Site Inspection"]?.["Generate Contract"] !== 1}>📄 Generate Contract</button>
             <button className="modal-close" onClick={onClose}>×</button>
           </div>
         </div>
@@ -699,6 +768,149 @@ function ConfirmCancelModal({ inspection, onConfirm, onClose }) {
   );
 }
 
+function ConfirmManualApproveModal({ inspection, onConfirm, onClose }) {
+  const [dragging, setDragging] = useState(false);
+  const [proof, setProof] = useState(null); 
+  const inputRef = useRef(null);
+
+  // Optimized file handling parser helper
+  const processIncomingFiles = (files) => {
+    if (!files || files.length === 0) return;
+    const targetFile = files[0];
+    
+    setProof({
+      id: Date.now() + '-' + Math.random(),
+      file: targetFile,
+      name: targetFile.name,
+      url: URL.createObjectURL(targetFile)
+    });
+  };
+
+  const onRemove = () => {
+    if (proof?.url) URL.revokeObjectURL(proof.url); 
+    setProof(null);
+  };
+
+  const handleSubmitApproval = () => {
+    console.log(proof)
+    if (!proof) {
+      alert("Please upload or drag a PDF or Image contract/receipt to complete the manual approval process.");
+      return;
+    }
+    onConfirm(inspection.id || inspection._id, proof.file);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box small-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px', borderRadius: '12px' }}>
+        
+        {/* Modal Header */}
+        <div style={{ marginBottom: '16px' }}>
+          <h2 className="modal-title" style={{ fontSize: '18px', fontWeight: '600', color: '#1a202c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>🔒</span> Confirm Manual Approval
+          </h2>
+          <p className="modal-desc" style={{ fontSize: '13px', color: '#718096', marginTop: '6px', lineHeight: '1.4' }}>
+            You are manually approving the contract for Order <strong>{inspection.orderId || `SI-${inspection.id}`}</strong>. Please upload the signed contract or payment receipt record to proceed.
+          </p>
+        </div>
+
+        {/* Drag and Drop Zone Wrapper */}
+        <div className="pm-proof-wrap" style={{ marginBottom: '24px' }}>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => { 
+              e.preventDefault(); 
+              setDragging(false); 
+              // FIXED: Dragged items live exclusively inside e.dataTransfer.files
+              if (e.dataTransfer && e.dataTransfer.files) {
+                processIncomingFiles(e.dataTransfer.files);
+              }
+            }}
+            onClick={() => inputRef.current.click()}
+            className={`pm-dropzone ${dragging ? 'pm-dragging' : ''}`}
+            style={{
+              border: dragging ? '2px dashed #2b6cb0' : '2px dashed #cbd5e0',
+              backgroundColor: dragging ? '#ebf8ff' : '#f7fafc',
+              borderRadius: '8px',
+              padding: '24px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="pm-hidden"
+              style={{ display: 'none' }}
+              // FIXED: Input browser selections live inside e.target.files
+              onChange={(e) => processIncomingFiles(e.target.files)}
+            />
+            
+            <div className="pm-dropzone-label" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: '#4a5568', fontSize: '13px' }}>
+              <svg className="pm-dropzone-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '36px', height: '36px', color: '#a0aec0' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span>Drag &amp; drop signed contract/receipt here, or <span className="pm-browse-link" style={{ color: '#2b6cb0', fontWeight: '600', textDecoration: 'underline' }}>browse</span></span>
+              <span style={{ fontSize: '11px', color: '#a0aec0' }}>Supports PDF, PNG, JPG up to 10MB</span>
+            </div>
+          </div>
+
+          {/* Uploaded File View Layout Block */}
+          {proof && (
+            <div className="pm-proof-grid" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#4a5568' }}>Selected Document:</span>
+              <div className="pm-proof-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#edf2f7', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', maxHeight: "100px" }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '0'}}>
+                  <span style={{ fontSize: '16px' }}>{proof.file.type === "application/pdf" ? "📄" : "🖼️"}</span>
+                  <span style={{ fontSize: '13px', color: '#2d3748', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proof.name}</span>
+                </div>
+                <button 
+                  type="button"
+                  className="pm-proof-remove" 
+                  onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                  style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontSize: '14px', padding: '0 4px', fontWeight: 'bold' }}
+                  title="Remove file"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons Footer */}
+        <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+          <button type="button" className="btn-danger" onClick={onClose} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: '500' }}>
+            Cancel
+          </button>
+          <button 
+            type="button"
+            className="btn-primary" 
+            onClick={handleSubmitApproval}
+            style={{ 
+              padding: '8px 16px', 
+              borderRadius: '6px', 
+              fontSize: '13px', 
+              fontWeight: '500', 
+              backgroundColor: !proof ? '#cbd5e0' : '#2b6cb0', 
+              color: '#fff',
+              cursor: !proof ? 'not-allowed' : 'pointer'
+            }}
+            disabled={!proof}
+          >
+            Complete Approval
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ─── New / Edit Modal ─────────────────────────────────────────────────────────
 function InspectionFormModal({ initial, onClose, onSave }) {
   const isEdit = !!initial;
@@ -748,7 +960,7 @@ function InspectionFormModal({ initial, onClose, onSave }) {
   };
 
   const needsPaymentDate = form.paymentTerms !== '50% downpayment, 50% upon completion'
-    && form.paymentTerms !== 'Full payment upon completion'
+    && form.paymentTerms !== 'Full payment'
     && !form.downpaymentPaid;
 
   return (
@@ -794,7 +1006,7 @@ function InspectionFormModal({ initial, onClose, onSave }) {
             <div className="form-grid-3 mt-12">
               <div className="form-field">
                 <label>Inspection Date <span className="req">*</span></label>
-                <input type="date" className={`fi ${errors.inspectionDate ? 'fi--err' : ''}`} value={form.inspectionDate} min={today} onChange={e => { set('inspectionDate', e.target.value); setErrors(x=>({...x,inspectionDate:''})); }} />
+                <input type="date" className={`fi ${errors.inspectionDate ? 'fi--err' : ''}`} value={form.inspectionDate} min={today} onChange={e => { set('inspectionDate', e.target.value); set('status', 'Scheduled'); setErrors(x=>({...x,inspectionDate:''})); }} />
                 {errors.inspectionDate && <span className="err-msg">{errors.inspectionDate}</span>}
               </div>
               <div className="form-field">
@@ -804,9 +1016,10 @@ function InspectionFormModal({ initial, onClose, onSave }) {
               </div>
               <div className="form-field">
                 <label>Status</label>
-                <select className="fi" value={form.status} onChange={e => set('status', e.target.value)}>
+                {/* <select className="fi" value={form.status} onChange={e => set('status', e.target.value)} disabled>
                   {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
-                </select>
+                </select> */}
+                <div><StatusBadge status={form.status === 'Pending' ? 'Needs to be Called' : form.status} /></div>
               </div>
             </div>
           </div>
@@ -923,7 +1136,7 @@ function InspectionFormModal({ initial, onClose, onSave }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 const SiteInspection = () => {
-  const { user } = useContext(UserContext)
+  const { user, permissions } = useContext(UserContext)
   const [inspections, setInspections] = useState([]);
   const [modal, setModal] = useState(null);
   const [search, setSearch] = useState('');
@@ -931,7 +1144,7 @@ const SiteInspection = () => {
   const [toast, setToast] = useState(null);
   const [showCanceled, setShowCanceled] = useState(false);
   const nextId = useRef(0);
-
+  // console.log(permissions)
   useEffect(() => {
     if(!isEmpty(user.token)) {
       getRecords()
@@ -1038,6 +1251,43 @@ const SiteInspection = () => {
         showToast(res?.message || 'Failed to cancel the inspection order.', 'danger');
       }
     });
+  ;}
+
+  const handleManualApprove = (id, selectedFile) => {
+    // Guard clause to ensure an administrative verification file is selected
+    if (!selectedFile) {
+      showToast('Please attach a verification receipt file before approving.', 'danger');
+      return;
+    }
+
+    const api_url = window.base_api + "manual_approve_order";
+
+    // Use FormData to allow file streams alongside text payloads
+    const formData = new FormData();
+    formData.append('orderId', id);
+    formData.append('receiptFile', selectedFile); // Must match upload.single('receiptFile')
+
+    // Retain your user context validations if needed by the api layer
+    formData.append('token', user.token);
+    formData.append('_id', user._id);
+    formData.append('userId', user._id);
+
+    const requestOptions = {
+      method: "POST",
+      body: formData,
+      // CRITICAL: Do NOT set "Content-Type" header here. 
+      // The browser will automatically assign multi-part/form-data with the correct boundary identifier.
+    };
+
+    CRUD(api_url, requestOptions, (res) => {
+      if (res && res.remarks === "success") {
+        showToast('Inspection Order Manually Approved.', 'success');
+        getRecords();
+        closeModal();
+      } else {
+        showToast(res?.message || 'Failed to approve the inspection order.', 'danger');
+      }
+    });
   };
 
   const handleSendContract = (id) => {
@@ -1052,14 +1302,14 @@ const SiteInspection = () => {
 
   const stats = [
     { label: 'Total Active', value: active.length, color: 'stat-blue' },
-    { label: 'Scheduled', value: active.filter(i => i.status === 'scheduled').length, color: 'stat-indigo' },
-    { label: 'Completed', value: active.filter(i => i.status === 'completed').length, color: 'stat-green' },
-    { label: 'Pending Payment', value: active.filter(i => i.status === 'pending_payment').length, color: 'stat-amber' },
+    { label: 'Scheduled', value: active.filter(i => i.status === 'Scheduled').length, color: 'stat-indigo' },
+    { label: 'Completed', value: active.filter(i => i.status === 'Completed').length, color: 'stat-green' },
+    { label: 'Pending Payment', value: active.filter(i => i.status === 'Pending Payment').length, color: 'stat-amber' },
   ];
 
   return (
     <div className="si-root">
-      {toast && <div className={`si-toast si-toast--${toast.type}`}>{toast.msg}</div>}
+      {toast && <div className={`si-toast si-toast--${toast.type}`} style={{ zIndex: 999999 }}>{toast.msg}</div>}
 
       <div className="si-page-header">
         <div>
@@ -1144,12 +1394,13 @@ const SiteInspection = () => {
                     <td className="td-price">{fmtCurrency(item.estimatedTotal)}</td>
                     <td>
                       <div className="action-group">
-                        <button className="act-btn act-view" title="View" onClick={() => setModal({ type: 'view', inspection: item })}>👁</button>
+                        <button className="act-btn act-view" title="View" onClick={() => setModal({ type: 'view', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["View Details"] !== 1}>👁</button>
                         {item.status !== 'Cancelled' && (
                           <>
-                            <button className="act-btn act-edit" title="Edit" onClick={() => setModal({ type: 'edit', inspection: item })}>✏️</button>
-                            <button className="act-btn act-cancel" title="Cancel" onClick={() => setModal({ type: 'cancel', inspection: item })}>🗑</button>
-                            <button className="act-btn act-contract" title="Generate Contract" onClick={() => setModal({ type: 'contract', inspection: item })}>📄</button>
+                            <button className="act-btn act-edit" title="Edit" onClick={() => setModal({ type: 'edit', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Edit"] !== 1}>✏️</button>
+                            <button className="act-btn act-edit" title="Manual Approve" onClick={() => setModal({ type: 'manual-approve', inspection: item })} hidden={item.customerHasAccount != false || permissions?.modules?.["Site Inspection"]?.["Edit"] !== 1}>✔️</button>
+                            <button className="act-btn act-cancel" title="Cancel" onClick={() => setModal({ type: 'cancel', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Cancel"] !== 1}>🗑</button>
+                            <button className="act-btn act-contract" title="Generate Contract" onClick={() => setModal({ type: 'contract', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Generate Contract"] !== 1}>📄</button>
                           </>
                         )}
                       </div>
@@ -1174,6 +1425,7 @@ const SiteInspection = () => {
           inspection={modal.inspection}
           onClose={closeModal}
           onGenerateContract={() => setModal({ type: 'contract', inspection: modal.inspection })}
+          permissions={permissions}
         />
       )}
       {modal?.type === 'cancel' && (
@@ -1189,8 +1441,16 @@ const SiteInspection = () => {
           onClose={closeModal}
           onSend={() => handleSendContract(modal.inspection.id)}
           onDownload={handleDownloadContract}
+          permissions={permissions}
         />
       )}
+      {modal?.type === 'manual-approve' && (
+        <ConfirmManualApproveModal
+          inspection={modal.inspection}
+          onConfirm={handleManualApprove}
+          onClose={closeModal}
+        />
+      )} 
     </div>
   );
 };

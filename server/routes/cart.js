@@ -5,7 +5,36 @@ const dbo = require("../helper/db");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const { ObjectId } = require("mongodb");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 const { get_data_helper, check_record_exists, decrypt, insert_one_helper, validateHash, hashPass, update_one_helper, delete_or_archive_many_helper, delete_or_archive_helper, checkAuth, actionLog } = require("../helper/Helper");
+
+// Configure file upload storage options
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '../uploads');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
+// Configure email transporter setup matching your system environment variables
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.SMTP_EMAIL || 'your-clinic-or-firm@gmail.com',
+    pass: process.env.SMTP_PASSWORD || 'your-app-password'
+  }
+});
 
 cartRoutes.post("/api/get_cart", async (req, res) => {
     const { token, _id } = req.body;
@@ -907,5 +936,123 @@ cartRoutes.post("/api/admin/update_site_inspection", async (req, res) => {
         });
     } catch (err) { return res.status(500).json({ error: err.message }); }
 });
+
+cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async (req, res) => {
+  const { inspectionId, orderId, customerEmail } = req.body;
+
+  if (!req.file) {
+    return res.status(400).json({ remarks: 'failed', message: 'Missing compiled contract binary file streaming parameter.' });
+  }
+
+  try {
+    const savedRelativePath = `/uploads/${req.file.filename}`;
+    const db = dbo.getDb ? dbo.getDb() : req.app.get('db');
+
+    // Update database paths systematically matching target references
+    if (orderId && orderId !== "") {
+      await db.collection('order_requests').updateMany(
+        { orderId: orderId },
+        { $set: { contractLink: savedRelativePath, contractSentToCustomer: true, contractUpdatedAt: new Date() } }
+      );
+    }
+
+    // Configure and dispatch the customer contract email payload context
+    if (customerEmail && customerEmail.trim() !== "") {
+      const mailOptions = {
+        from: `"ACGC System" <${process.env.SMTP_EMAIL}>`,
+        to: customerEmail,
+        subject: `ACGC System - Service Contract Confirmation - Order Reference: ${orderId || 'SI-' + inspectionId}`,
+        text: `Hello,\n\nPlease find attached the official Service Contract documentation regarding your service inquiry with ACGC Glass & Aluminum Services.\n\nBest regards,\nAdministration Team`,
+        attachments: [
+          {
+            filename: req.file.originalname || `Contract_Reference.pdf`,
+            path: req.file.path
+          }
+        ]
+      };
+
+      await transporter.sendMail(mailOptions);
+    }
+
+    return res.status(200).json({
+      remarks: 'success',
+      message: 'Contract path updated in database logs and email attachment routed successfully.',
+      path: savedRelativePath
+    });
+
+  } catch (error) {
+    console.error("Error executing background service contract dispatch automation pipeline:", error);
+    return res.status(500).json({ remarks: 'error', error: error.message });
+  }
+});
+
+cartRoutes.post("/api/manual_approve_order", upload.single('receiptFile'), async (req, res) => {
+  const { orderId } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ remarks: 'failed', message: 'Missing target validation identification context orderId.' });
+  }
+  if (!req.file) {
+    return res.status(400).json({ remarks: 'failed', message: 'Validation verification files attachment parameter streams required.' });
+  }
+
+  try {
+    const savedRelativePath = `/uploads/${req.file.filename}`;
+    const db = dbo.getDb ? dbo.getDb() : req.app.get('db');
+
+    // Fetch matching layout arrays across collections to scale up payment evaluations accurately
+    const matchItems = await db.collection('order_requests').find({ orderId: orderId }).toArray();
+    if (!matchItems || matchItems.length === 0) {
+      return res.status(404).json({ remarks: 'failed', message: 'Target order request mapping tracking parameters completely missing.' });
+    }
+
+    const orderRecord = matchItems[0];
+    
+    // Read the contract total values securely from database or derived computation layers
+    const finalGrandTotal = parseFloat(orderRecord.estimatedTotal || orderRecord.itemDetails?.estimatedCost || 0);
+    
+    // Normalization logic check: Clean up text parameters to match client component rules
+    const cleanedTerms = String(orderRecord.paymentTerms || '').trim();
+    const isFullPayment = cleanedTerms === 'Full payment';
+
+    // Build the dynamic update database parameters depending on paymentTerms definition context
+    let updateFields = {
+      receiptLink: savedRelativePath,
+      approvedAt: new Date()
+    };
+
+    if (isFullPayment) {
+      // Full Payment route adjustments
+      updateFields.status = 'Paid';
+      updateFields.fullPaymentPaid = finalGrandTotal;
+      updateFields.contractApproved = 1
+    } else {
+      // 50% down payment fallback route adjustments
+      const calculatedDpAmount = finalGrandTotal * 0.5;
+      updateFields.status = 'Pending Payment';
+      updateFields.contractApproved = 1
+    }
+
+    // Mutate and set validation fields inside target document blocks
+    await db.collection('order_requests').updateMany(
+      { orderId: orderId },
+      { $set: updateFields }
+    );
+
+    return res.status(200).json({
+      remarks: 'success',
+      message: isFullPayment 
+        ? 'Order fully approved and settled balance payload cataloged successfully.' 
+        : 'Order manually approved and downpayment asset verification logged successfully.',
+      path: savedRelativePath,
+      workflow: isFullPayment ? 'full_payment' : 'downpayment'
+    });
+
+  } catch (error) {
+    console.error("Error executing manual system administrative override approval:", error);
+    return res.status(500).json({ remarks: 'error', error: error.message });
+  }
+});
+
 
 module.exports = cartRoutes;

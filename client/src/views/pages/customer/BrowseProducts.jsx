@@ -23,6 +23,7 @@ const ProductCard = ({ product, onView, onAddToCart }) => (
     <div className="card-body">
       <p className="card-category">{product.category}</p>
       <h3 className="card-name">{product.name}</h3>
+      <p>{product.height} x {product.width} {product.unit}</p>
       <p className="card-price">
         ₱{product.price.toLocaleString()}
         <span className="card-unit"> / sq ft</span>

@@ -349,6 +349,7 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
                 <div className="order-product-info">
                   <p className="op-name">{product.name}</p>
                   <p className="op-meta">{product.type} · {product.category}</p>
+                  <span className="op-meta">₱{product.height} x ₱{product.width} {product.unit}</span>
                   <p className="op-rate">₱{product.price.toLocaleString()} / sq ft</p>
                 </div>
               </div>

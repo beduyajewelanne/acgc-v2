@@ -1,5 +1,7 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useContext } from 'react';
 import './AdminProfile.css';
+import {CRUD} from "services/data.services";
+import {UserContext} from 'App'
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const Icon = ({ d, size = 16, color = 'currentColor' }) => (
@@ -34,26 +36,12 @@ const IC = {
   alert:    'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01',
 };
 
-const MOD_ICONS  = { Auth: IC.login, Products: IC.package, Inspections: IC.clip, Transactions: IC.trend, Monitor: IC.activity, Users: IC.users, Backup: IC.download, Security: IC.shield };
-const MOD_COLORS = { Auth: '#3b82f6', Products: '#8b5cf6', Inspections: '#f59e0b', Transactions: '#10b981', Monitor: '#06b6d4', Users: '#ec4899', Backup: '#64748b', Security: '#ef4444' };
+// Dynamic mapping configuration setups updated to intercept specific contextual category identifiers
+const MOD_ICONS  = { Project: IC.package, Security: IC.shield, Assets: IC.clip, System: IC.activity };
+const MOD_COLORS = { Project: '#3b82f6', Security: '#ef4444', Assets: '#f59e0b', System: '#64748b' };
 
 // ── Static data ───────────────────────────────────────────────────────────────
 const INIT_USER = { name: 'Rafael Cristobal', role: 'Super Admin', email: 'rafael.cristobal@acgc.com', status: 'Active', joined: 'January 12, 2024', lastLogin: 'May 27, 2026 · 08:00 AM', avatar: 'RC' };
-
-const INIT_LOGS = [
-  { id: 1,  action: 'Logged into the system',      module: 'Auth',         date: '2026-05-27', time: '08:00 AM', status: 'Success' },
-  { id: 2,  action: 'Updated project progress',    module: 'Monitor',      date: '2026-05-27', time: '09:15 AM', status: 'Success' },
-  { id: 3,  action: 'Created a new product',       module: 'Products',     date: '2026-05-27', time: '10:42 AM', status: 'Success' },
-  { id: 4,  action: 'Edited a transaction record', module: 'Transactions', date: '2026-05-26', time: '02:30 PM', status: 'Success' },
-  { id: 5,  action: 'Updated site inspection',     module: 'Inspections',  date: '2026-05-26', time: '11:05 AM', status: 'Success' },
-  { id: 6,  action: 'Modified user permissions',   module: 'Users',        date: '2026-05-25', time: '03:20 PM', status: 'Warning' },
-  { id: 7,  action: 'Downloaded system backup',    module: 'Backup',       date: '2026-05-25', time: '04:00 PM', status: 'Success' },
-  { id: 8,  action: 'Changed account password',    module: 'Security',     date: '2026-05-24', time: '09:00 AM', status: 'Success' },
-  { id: 9,  action: 'Logged into the system',      module: 'Auth',         date: '2026-05-24', time: '08:10 AM', status: 'Success' },
-  { id: 10, action: 'Created a new product',       module: 'Products',     date: '2026-05-23', time: '01:15 PM', status: 'Success' },
-  { id: 11, action: 'Updated site inspection',     module: 'Inspections',  date: '2026-05-23', time: '10:00 AM', status: 'Failed'  },
-  { id: 12, action: 'Edited a transaction record', module: 'Transactions', date: '2026-05-22', time: '03:45 PM', status: 'Success' },
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function pwStrength(pw) {
@@ -98,7 +86,7 @@ const PwInput = ({ label, value, onChange, placeholder, error }) => {
   );
 };
 
-// ── Modal — rendered with inline style to guarantee visibility ─────────────────
+// ── Modal ─────────────────────────────────────────────────────────────────────
 const Modal = ({ user, onSave, onClose }) => {
   const [email,     setEmail]     = useState(user.email);
   const [curPw,     setCurPw]     = useState('');
@@ -107,7 +95,6 @@ const Modal = ({ user, onSave, onClose }) => {
   const [errs,      setErrs]      = useState({});
   const [loading,   setLoading]   = useState(false);
 
-  // Lock body scroll while open
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -125,14 +112,50 @@ const Modal = ({ user, onSave, onClose }) => {
     return e;
   };
 
-  const handleSave = () => {
+  // --- Updated: Handles Real Network Request to Backend API ---
+  const handleSave = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrs(e); return; }
+    
     setLoading(true);
-    setTimeout(() => { setLoading(false); onSave({ email }); }, 1100);
+    setErrs({});
+
+    try {
+      const response = await fetch(window.base_api + "update_admin_account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: user.token,
+          user_id: user._id,
+          email: email.trim(),
+          currentPassword: curPw ? curPw : undefined,
+          newPassword: newPw ? newPw : undefined
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.remarks === "success") {
+        // Pass the updated user parameters up to the main application state
+        onSave({ email: email.trim() });
+      } else {
+        // Map backend validation rejections directly to UI fields
+        if (data.field === "currentPassword") {
+          setErrs({ curPw: data.message });
+        } else if (data.field === "email") {
+          setErrs({ email: data.message });
+        } else {
+          alert(data.message || "An error occurred while updating profile configurations.");
+        }
+      }
+    } catch (err) {
+      console.error("Network connection error updating account records:", err);
+      alert("Failed to reach server pipeline infrastructure. Please check connection.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ── Overlay uses INLINE styles to be 100% immune to any CSS cascade issues ──
   const overlayStyle = {
     position:        'fixed',
     top:             0,
@@ -147,7 +170,7 @@ const Modal = ({ user, onSave, onClose }) => {
     display:         'flex',
     alignItems:      'center',
     justifyContent:  'center',
-    zIndex:          2147483647,   // max possible z-index
+    zIndex:          2147483647,
     padding:         '20px',
     boxSizing:       'border-box',
   };
@@ -155,8 +178,6 @@ const Modal = ({ user, onSave, onClose }) => {
   return (
     <div style={overlayStyle} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="ap-modal">
-
-        {/* Header */}
         <div className="ap-modal__hd">
           <div className="ap-modal__hd-left">
             <div className="ap-modal__icon"><Icon d={IC.edit} size={17} /></div>
@@ -168,9 +189,7 @@ const Modal = ({ user, onSave, onClose }) => {
           <button className="ap-icon-btn" onClick={onClose}><Icon d={IC.close} size={17} /></button>
         </div>
 
-        {/* Body */}
         <div className="ap-modal__body">
-          {/* Email */}
           <div className="ap-fg">
             <label className="ap-label">Email Address</label>
             <div className="ap-input-wrap">
@@ -231,7 +250,6 @@ const Modal = ({ user, onSave, onClose }) => {
           )}
         </div>
 
-        {/* Footer */}
         <div className="ap-modal__ft">
           <button className="ap-btn ap-btn--ghost" onClick={onClose} disabled={loading}>Cancel</button>
           <button className="ap-btn ap-btn--primary" onClick={handleSave} disabled={loading}>
@@ -252,21 +270,82 @@ const Toast = ({ message, type, onClose }) => (
   </div>
 );
 
+const Avatar = ({ name }) => (
+  <div className="avatar">{name.charAt(0).toUpperCase()}</div>
+);
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 const AdminProfile = () => {
-  const [user,       setUser]       = useState(INIT_USER);
-  const [logs,       setLogs]       = useState(INIT_LOGS);
-  const [showModal,  setShowModal]  = useState(false);
-  const [toast,      setToast]      = useState(null);
-  const [search,     setSearch]     = useState('');
-  const [modFilter,  setModFilter]  = useState('All');
-  const [dateFil,    setDateFil]    = useState('');
+  const {user, permission} = useContext(UserContext);
+  const [userData,       setUser]       = useState(user);
+  const [logs,       setLogs]           = useState([]);
+  const [showModal,  setShowModal]      = useState(false);
+  const [toast,      setToast]          = useState(null);
+  const [search,     setSearch]         = useState('');
+  const [modFilter,  setModFilter]      = useState('All');
+  const [dateFil,    setDateFil]        = useState('');
 
-  const modules = useMemo(() => ['All', ...Array.from(new Set(INIT_LOGS.map(l => l.module)))], []);
+  // Helper inside main scope to map production strings to internal color keys
+  const getModuleFromAction = (actionType = '') => {
+    const type = actionType.toLowerCase();
+    if (type.includes('project') || type.includes('order') || type.includes('workflow')) return 'Project';
+    if (type.includes('auth') || type.includes('login') || type.includes('password') || type.includes('permission')) return 'Security';
+    if (type.includes('file') || type.includes('proof') || type.includes('upload') || type.includes('inspection')) return 'Assets';
+    return 'System';
+  };
 
+  // Dynamically assemble available filters based on your parsed DB actions instead of static INIT_LOGS array
+  const modules = useMemo(() => {
+    const uniqueModules = new Set(logs.map(l => getModuleFromAction(l.actionType)));
+    return ['All', ...Array.from(uniqueModules)];
+  }, [logs]);
+
+  useEffect(() => {
+    if (user.token) {
+      fetchLogs(user);
+    }
+  }, [user])
+
+  function fetchLogs(user) {
+    const token = user.token
+    const user_id = user._id;
+
+    if (!token) return
+
+    const api_url = window.base_api + "get_logs";
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, user_id })
+    };
+
+    CRUD(api_url, requestOptions, (res) => {
+      if (res.remarks === "success") {
+        setLogs(res.payload);
+      } else {
+        console.error("Failed to fetch logs:", res.message);
+        setLogs([])
+      }
+    });
+  }
+
+  // --- Updated: Production DB Matching Filtering Pipeline ---
   const filtered = useMemo(() => logs.filter(l => {
-    const s = l.action.toLowerCase().includes(search.toLowerCase()) || l.module.toLowerCase().includes(search.toLowerCase());
-    return s && (modFilter === 'All' || l.module === modFilter) && (!dateFil || l.date === dateFil);
+    const actionStr = l.actionType || '';
+    const descStr = l.description || '';
+    const computedMod = getModuleFromAction(actionStr);
+    
+    // Check if user search matches description or code categories
+    const matchesSearch = actionStr.toLowerCase().includes(search.toLowerCase()) || 
+                          descStr.toLowerCase().includes(search.toLowerCase()) ||
+                          computedMod.toLowerCase().includes(search.toLowerCase());
+
+    // Compare date portions of ISO strings safely
+    const logDateISO = l.createdAt ? l.createdAt.slice(0, 10) : ''; // Extracts 'YYYY-MM-DD'
+    const matchesDate = !dateFil || logDateISO === dateFil;
+    const matchesModule = modFilter === 'All' || computedMod === modFilter;
+
+    return matchesSearch && matchesModule && matchesDate;
   }), [logs, search, modFilter, dateFil]);
 
   const notify = (msg, type = 'success') => {
@@ -274,11 +353,14 @@ const AdminProfile = () => {
     setTimeout(() => setToast(null), 3500);
   };
 
+  // Updated: Mocks a data entry format matching your Mongo payload patterns
   const handleSave = ({ email }) => {
-    const newLog = { id: logs.length + 1, action: 'Updated account email', module: 'Security',
-      date: new Date().toISOString().slice(0, 10),
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      status: 'Success' };
+    const newLog = { 
+      _id: 'mock' + Date.now(),
+      actionType: 'Update Profile Settings', 
+      description: 'Modified account layout verification parameters for profile email coordination.',
+      createdAt: new Date().toISOString()
+    };
     setUser(u => ({ ...u, email }));
     setLogs(l => [newLog, ...l]);
     setShowModal(false);
@@ -287,18 +369,14 @@ const AdminProfile = () => {
 
   return (
     <div className="ap-root">
-
-      {/* Toast — also inline-positioned so it always shows */}
       {toast && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 2147483647 }}>
           <Toast {...toast} onClose={() => setToast(null)} />
         </div>
       )}
 
-      {/* Modal */}
-      {showModal && <Modal user={user} onSave={handleSave} onClose={() => setShowModal(false)} />}
+      {showModal && <Modal user={userData} onSave={handleSave} onClose={() => setShowModal(false)} />}
 
-      {/* Page header */}
       <div className="ap-ph">
         <div>
           <h1 className="ap-ph__title">Admin Profile</h1>
@@ -309,32 +387,28 @@ const AdminProfile = () => {
         </button>
       </div>
 
-      {/* Profile card */}
       <div className="ap-card">
         <div className="ap-card__accent" />
-
-        {/* Avatar */}
         <div className="ap-card__avatar-col">
           <div className="ap-avatar">
-            <span>{user.avatar}</span>
+            <span>{userData.firstName?.trim().charAt(0).toUpperCase() || 'A'}</span>
             <span className="ap-avatar__dot" />
           </div>
-          <span className="ap-status-pill"><span className="ap-status-dot" />{user.status}</span>
+          <span className="ap-status-pill"><span className="ap-status-dot" />{userData.status || 'Active'}</span>
         </div>
 
-        {/* Fields */}
         <div className="ap-card__info">
           <div className="ap-card__name-row">
-            <h2 className="ap-card__name">{user.name}</h2>
-            <span className="ap-role-badge"><Icon d={IC.shield} size={11} />{user.role}</span>
+            <h2 className="ap-card__name">{userData.name || (userData.firstName + ' ' + userData.lastName)}</h2>
+            <span className="ap-role-badge"><Icon d={IC.shield} size={11} />{userData.role}</span>
           </div>
           <div className="ap-fields">
             {[
-              { icon: IC.mail,     label: 'Email Address', value: user.email,     disabled: false },
-              { icon: IC.user,     label: 'Full Name',     value: user.name,      disabled: true  },
-              { icon: IC.shield,   label: 'Role',          value: user.role,      disabled: true  },
-              { icon: IC.clock,    label: 'Last Login',    value: user.lastLogin, disabled: false },
-              { icon: IC.calendar, label: 'Member Since',  value: user.joined,    disabled: false },
+              { icon: IC.mail,     label: 'Email Address', value: userData.email,     disabled: false },
+              { icon: IC.user,     label: 'Full Name',     value: userData.firstName + ' ' + userData.lastName,      disabled: true  },
+              { icon: IC.shield,   label: 'Role',          value: userData.role ? (userData.role.trim().charAt(0).toUpperCase() + userData.role.trim().slice(1)) : '',      disabled: true  },
+              { icon: IC.clock,    label: 'Last Login',    value: userData.lastLogin ? new Date(userData.lastLogin).toLocaleDateString() : 'Never', disabled: false },
+              { icon: IC.calendar, label: 'Member Since',  value: userData.createdAt ? new Date(userData.createdAt).toLocaleDateString() : 'N/A',    disabled: false },
             ].map(f => (
               <div key={f.label} className={'ap-field' + (f.disabled ? ' ap-field--ro' : '')}>
                 <span className="ap-field__ico"><Icon d={f.icon} size={13} /></span>
@@ -350,12 +424,16 @@ const AdminProfile = () => {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="ap-card__stats">
           {[
             { label: 'Total Actions', value: logs.length },
-            { label: 'This Month',    value: logs.filter(l => l.date.startsWith('2026-05')).length },
-            { label: 'Modules Used',  value: new Set(logs.map(l => l.module)).size },
+            { 
+              label: 'This Month',    
+              value: logs.filter(l => {
+                const currentMonthStr = new Date().toISOString().slice(0, 7);
+                return l.createdAt && l.createdAt.startsWith(currentMonthStr);
+              }).length 
+            },
           ].map(s => (
             <div key={s.label} className="ap-stat">
               <span className="ap-stat__val">{s.value}</span>
@@ -365,7 +443,6 @@ const AdminProfile = () => {
         </div>
       </div>
 
-      {/* Activity log */}
       <div className="ap-log">
         <div className="ap-log__hd">
           <div>
@@ -375,8 +452,12 @@ const AdminProfile = () => {
           <div className="ap-log__controls">
             <div className="ap-search">
               <Icon d={IC.search} size={13} color="#94a3b8" />
-              <input className="ap-search__input" placeholder="Search activities…"
-                value={search} onChange={e => setSearch(e.target.value)} />
+              <input 
+                className="ap-search__input" 
+                placeholder="Search activities…"
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+              />
             </div>
             <div className="ap-sel-wrap">
               <Icon d={IC.filter} size={12} color="#64748b" />
@@ -389,8 +470,10 @@ const AdminProfile = () => {
               <input type="date" className="ap-sel" value={dateFil} onChange={e => setDateFil(e.target.value)} />
             </div>
             {(search || modFilter !== 'All' || dateFil) && (
-              <button className="ap-btn ap-btn--ghost ap-btn--sm"
-                onClick={() => { setSearch(''); setModFilter('All'); setDateFil(''); }}>
+              <button 
+                className="ap-btn ap-btn--ghost ap-btn--sm"
+                onClick={() => { setSearch(''); setModFilter('All'); setDateFil(''); }}
+              >
                 Clear
               </button>
             )}
@@ -406,27 +489,47 @@ const AdminProfile = () => {
             </div>
           ) : (
             <div className="ap-timeline">
-              {filtered.map((log, idx) => (
-                <div key={log.id} className="ap-tl-item" style={{ '--d': `${idx * 35}ms` }}>
-                  <div className="ap-tl-spine">
-                    <div className="ap-tl-dot" style={{ background: MOD_COLORS[log.module] || '#3b82f6' }}>
-                      <Icon d={MOD_ICONS[log.module] || IC.activity} size={10} color="#fff" />
+              {filtered.map((log, idx) => {
+                const computedModule = getModuleFromAction(log.actionType);
+                
+                const dateObj = log.createdAt ? new Date(log.createdAt) : new Date();
+                const displayDate = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                const displayTime = dateObj.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+                return (
+                  <div key={log._id || log.id} className="ap-tl-item" style={{ '--d': `${idx * 35}ms` }}>
+                    <div className="ap-tl-spine">
+                      <div className="ap-tl-dot" style={{ background: MOD_COLORS[computedModule] || '#3b82f6' }}>
+                        <Icon d={MOD_ICONS[computedModule] || IC.activity} size={10} color="#fff" />
+                      </div>
+                      {idx < filtered.length - 1 && <div className="ap-tl-line" />}
                     </div>
-                    {idx < filtered.length - 1 && <div className="ap-tl-line" />}
-                  </div>
-                  <div className="ap-log-card">
-                    <div className="ap-log-card__l">
-                      <p className="ap-log-card__action">{log.action}</p>
-                      <div className="ap-log-card__meta">
-                        <span className="ap-chip" style={{ '--c': MOD_COLORS[log.module] || '#3b82f6' }}>{log.module}</span>
-                        <span className="ap-meta-item"><Icon d={IC.calendar} size={11} color="#94a3b8" />{log.date}</span>
-                        <span className="ap-meta-item"><Icon d={IC.clock} size={11} color="#94a3b8" />{log.time}</span>
+                    <div className="ap-log-card">
+                      <div className="ap-log-card__l">
+                        <p className="ap-log-card__action" style={{ fontWeight: '600', color: '#1e293b' }}>
+                          {log.actionType}
+                        </p>
+                        <p className="ap-log-card__desc" style={{ fontSize: '13px', color: '#64748b', marginTop: '2px', marginBottom: '8px' }}>
+                          {log.description}
+                        </p>
+                        <div className="ap-log-card__meta">
+                          <span className="ap-chip" style={{ '--c': MOD_COLORS[computedModule] || '#3b82f6' }}>
+                            {computedModule}
+                          </span>
+                          <span className="ap-meta-item">
+                            <Icon d={IC.calendar} size={11} color="#94a3b8" />
+                            {displayDate}
+                          </span>
+                          <span className="ap-meta-item">
+                            <Icon d={IC.clock} size={11} color="#94a3b8" />
+                            {displayTime}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <Badge status={log.status} />
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

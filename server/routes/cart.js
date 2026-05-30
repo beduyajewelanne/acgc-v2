@@ -214,8 +214,6 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
 
             const processedOrders = [];
             const cartItemsToRemove = [];
-            
-            // Generate ONE shared order ID for this entire batch request assignment
             const sharedOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
             for (const item of items) {
@@ -228,26 +226,33 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
                 
                 const productData = rawProductList[0];
 
+                // Ensure quantity defaults cleanly to an integer
+                const finalQuantity = parseInt(quantity) || 1;
+
                 const widthVal = width !== "" && width !== undefined ? parseFloat(width) : (parseFloat(productData.width) || 0);
                 const heightVal = height !== "" && height !== undefined ? parseFloat(height) : (parseFloat(productData.height) || 0);
-                const unitVal = width !== "" && width !== undefined ? (unit || "cm") : (productData.unit || "cm");
+                
+                // Keep 'ft' or 'in' or whatever the product default template uses if user unit is missing
+                const unitVal = width !== "" && width !== undefined ? (unit || "in") : (productData.unit || "in");
 
-                // Metric Area calculation engine matching image_f39ec2.png definitions
                 let areaSqFt = 0;
                 const ratePerSqFt = parseFloat(productData.pricePerSqFt) || parseFloat(productData.price) || 0;
                 
+                // Conversions Engine
                 if (unitVal === "cm") {
-                    // Standard industry calculation conversion path: (W * H) / 929.03 to scale to sqft
                     areaSqFt = (widthVal * heightVal) / 929.03;
+                } else if (unitVal === "m") {
+                    areaSqFt = (widthVal * 3.28084) * (heightVal * 3.28084);
+                } else if (unitVal === "in") {
+                    areaSqFt = (widthVal / 12) * (heightVal / 12);
                 } else {
-                    let wFt = widthVal;
-                    let hFt = heightVal;
-                    if (unitVal === 'm') { wFt = widthVal * 3.28084; hFt = heightVal * 3.28084; }
-                    else if (unitVal === 'in') { wFt = widthVal / 12; hFt = heightVal / 12; }
-                    areaSqFt = wFt * hFt;
+                    // Default assume unit is already feet ('ft')
+                    areaSqFt = widthVal * heightVal;
                 }
                 
-                const estimatedCost = areaSqFt > 0 ? (areaSqFt * ratePerSqFt) : ratePerSqFt;
+                // Calculate item base cost, then scale cleanly by quantity
+                const baseItemCost = areaSqFt > 0 ? (areaSqFt * ratePerSqFt) : ratePerSqFt;
+                const totalEstimatedCost = baseItemCost * finalQuantity;
 
                 const structuralOrderRequest = {
                     user_id: new ObjectId(userId),
@@ -267,13 +272,13 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
                         unit: unitVal,
                         areaSqFt: parseFloat(areaSqFt.toFixed(4)),
                         ratePerSqFt: ratePerSqFt,
-                        estimatedCost: parseFloat(estimatedCost.toFixed(2)*quantity)
+                        estimatedCost: parseFloat(totalEstimatedCost.toFixed(2)) // <-- Fixed: Formats safely after multiplication
                     },
-                    orderId: sharedOrderId, // Shared tracking assignment across all records inside this batch
+                    orderId: sharedOrderId, 
                     status: "Pending",
                     isCancelled: 0,
                     createdAt: new Date(),
-                    quantity: quantity,
+                    quantity: finalQuantity,
                     paymentTerms: '50% downpayment, 50% upon completion'
                 };
 
@@ -291,6 +296,7 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
                 return res.status(500).json({ remarks: "failed", message: "Database rejected properties insertion profiles." });
             }
 
+            // Cleanup processed items out of cart database
             if (cartItemsToRemove.length > 0) {
                 for (const targetId of cartItemsToRemove) {
                     await delete_or_archive_helper("cart", { _id: targetId });
@@ -312,8 +318,10 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
 });
 
 cartRoutes.post("/api/submit_order_request", async (req, res) => {
-    const { token, userId, customer, product_id, clientNotes } = req.body;
-    console.log(customer)
+    // 1. Extract measurements and quantity from the payload
+    const { token, userId, customer, product_id, clientNotes, measurements, quantity } = req.body;
+    
+    console.log(customer);
     if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Token is missing" });
     if (!product_id) return res.status(400).json({ remarks: "failed", message: "Missing specifications payload" });
 
@@ -323,7 +331,26 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
 
             const productResult = await get_data_helper("products", [{ $match: { _id: new ObjectId(product_id) } }]);
-            const product = productResult?.payload?.[0] || productResult?.payload?.[0] || null;
+            const product = productResult?.payload?.[0] || null;
+
+            if (!product) return res.status(404).json({ remarks: "failed", message: "Product not found" });
+
+            // 2. Parse incoming user measurements, fall back to product defaults if not provided
+            const finalWidth = parseFloat(measurements?.width) || parseFloat(product.width) || 0;
+            const finalHeight = parseFloat(measurements?.height) || parseFloat(product.height) || 0;
+            const finalUnit = measurements?.unit || product.unit || "in";
+            
+            // Optional: Recalculate area dynamically if the user provided custom dimensions
+            const finalArea = measurements?.width && measurements?.height 
+                ? finalWidth * finalHeight 
+                : (parseFloat(product.areaSqFt) || 0);
+
+            const rate = parseFloat(product.pricePerSqFt) || 0;
+            const finalQuantity = parseInt(quantity) || 1; // Fallback to 1 if not provided
+            
+            // Calculate dynamic estimated cost based on custom area and quantity
+            const dynamicEstimatedCost = finalArea * rate * finalQuantity;
+
             const newOrderRequest = {
                 user_id: new ObjectId(userId),
                 clientName: customer?.fullName || "",
@@ -335,19 +362,19 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
                     name: product.name,
                     type: product.type,
                     category: product.category,
-                    width: parseFloat(product.width) || 0,
-                    height: parseFloat(product.height) || 0,
-                    unit: product.unit || "in",
-                    areaSqFt: parseFloat(product.areaSqFt) || 0,
-                    ratePerSqFt: parseFloat(product.ratePerSqFt) || 0,
-                    estimatedCost: parseFloat(product.estimatedCost) || 0
+                    width: finalWidth,          // <-- Fixed: Now uses user input
+                    height: finalHeight,        // <-- Fixed: Now uses user input
+                    unit: finalUnit,            // <-- Fixed: Now uses user input
+                    areaSqFt: finalArea,
+                    ratePerSqFt: rate,
+                    estimatedCost: dynamicEstimatedCost > 0 ? dynamicEstimatedCost : (parseFloat(product.estimatedCost) || 0)
                 },
                 orderId: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 clientNotes: clientNotes || "",
                 status: "Pending",
                 isCancelled: 0,
                 createdAt: new Date(),
-                quantity: 1,
+                quantity: finalQuantity,        // <-- Fixed: Now uses user quantity
                 paymentTerms: '50% downpayment, 50% upon completion'
             };
 
@@ -773,30 +800,36 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
 
             const db = await dbo.getDb();
             let matchedUserId = null;
-            let matchedUser = null
+            let matchedUser = null; // Correctly initialized
 
-            // Find user_id from users collection using client email if has account is true
+            // Find user_id from users collection safely
             if (customerHasAccount && customerEmail) {
                 const userDoc = await db.collection("users").findOne({ email: customerEmail.trim() });
-                if (userDoc) matchedUserId = userDoc._id; matchedUser = userDoc
+                if (userDoc) {
+                    matchedUserId = userDoc._id; 
+                    matchedUser = userDoc; // Fixed: Wrapped securely inside proper braces
+                }
             }
 
             const sharedOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             const isCancelledValue = status === "Canceled" || status === "Cancelled" ? 1 : 0;
 
-            // Map each row in measurements to an individual document to align with aggregation queries
-            const documentBatch = (measurements || []).map(row => {
+            // Map each row in measurements safely
+            const documentBatch = (measurements || []).map((row, index) => {
                 const widthVal = parseFloat(row.width) || 0;
                 const heightVal = parseFloat(row.height) || 0;
                 const qtyVal = parseInt(row.qty) || 1;
                 const rateVal = parseFloat(row.pricePerSqFt) || 0;
-                const unitVal = row.unit || "cm"; // Default fallback match
                 
-                // Dynamic conversion to Square Feet
+                // Normalization Safeguard: Handle both "in" and "inch" uniform assignments
+                let unitVal = row.unit || "cm";
+                if (unitVal === "in") unitVal = "inch"; 
+                
+                // Dynamic conversion engine to Square Feet
                 let areaSqFt = 0;
                 if (unitVal === "cm") {
                     areaSqFt = (widthVal * heightVal) / 929.03;
-                } else if (unitVal === "inch") {
+                } else if (unitVal === "inch" || unitVal === "in") {
                     areaSqFt = (widthVal * heightVal) / 144;
                 } else if (unitVal === "ft") {
                     areaSqFt = widthVal * heightVal;
@@ -811,7 +844,7 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
                     clientPhone: clientNumber || "",
                     installationAddress: siteAddress || "",
                     clientNotes: notes || "",
-                    orderId: sharedOrderId, // (or targetOrderId for updates)
+                    orderId: sharedOrderId, 
                     status: status || "Pending",
                     isCancelled: isCancelledValue,
                     createdAt: new Date(),
@@ -821,14 +854,18 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
                     downpaymentPaid: downpaymentPaid === true || downpaymentPaid === "true",
                     paymentDate: paymentDate || "",
                     customerHasAccount: !!matchedUserId,
-                    manualOverride: manualOverride !== undefined && manualOverride !== null ? parseFloat(manualOverride) : "",
-                    estimatedTotal: parseFloat(estimatedTotal) || 0,
+                    
+                    // Integrity Fix: Only attach the total transaction financial figures to the FIRST item doc 
+                    // to avoid multi-row duplicate compounding errors inside aggregation lookups
+                    manualOverride: index === 0 && manualOverride !== undefined && manualOverride !== null ? parseFloat(manualOverride) : 0,
+                    estimatedTotal: index === 0 ? (parseFloat(estimatedTotal) || 0) : 0,
+                    
                     quantity: qtyVal,
                     itemDetails: {
                         name: row.product || "",
                         width: widthVal,
                         height: heightVal,
-                        unit: unitVal, // Stores the exact selected unit choice safely
+                        unit: unitVal, 
                         areaSqFt: parseFloat(areaSqFt.toFixed(4)),
                         ratePerSqFt: rateVal,
                         estimatedCost: parseFloat(estimatedCost.toFixed(2))
@@ -840,7 +877,9 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
                 return res.status(400).json({ remarks: "failed", message: "Cannot create an inspection without measurements rows." });
             }
 
+            // High performance direct batch execution
             const result = await db.collection("order_requests").insertMany(documentBatch);
+            
             if (result.acknowledged) {
                 await actionLog(_id, "Created Site Inspection Order", `Manually added order tracking for ${clientName}`);
                 return res.status(200).json({ remarks: "success", message: "Inspection context created successfully" });

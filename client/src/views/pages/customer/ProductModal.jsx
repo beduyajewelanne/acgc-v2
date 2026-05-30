@@ -238,6 +238,7 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
               ₱{product.price.toLocaleString()}
               <span className="detail-unit"> / sq ft</span>
             </p>
+            <p className="detail-description">{product.height} x {product.width} {product.unit}</p>
             <p className="detail-description">{product.description}</p>
 
             <hr className="detail-divider" />

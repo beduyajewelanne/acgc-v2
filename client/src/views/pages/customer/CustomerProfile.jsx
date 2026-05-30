@@ -4,6 +4,7 @@ import EditProfileModal from './EditProfileModal';
 import { useNavigate } from 'react-router-dom';
 import { UserContext } from 'App';
 import { CRUD } from 'services/data.services';
+import StatusBadge from './StatusBadge';
 
 const CustomerProfile = () => {
   const { user, setUser: setGlobalUser } = useContext(UserContext); 
@@ -202,14 +203,14 @@ const CustomerProfile = () => {
           <span className="cp-nav-sub">{activeContractsCount} active</span>
         </div>
 
-        <div className="cp-nav-item" onClick={() => navigate('/receipts')}>
+        {/* <div className="cp-nav-item" onClick={() => navigate('/receipts')}>
           <svg className="cp-nav-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 11 12 14 22 4"/>
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
           </svg>
           <span className="cp-nav-label">Receipts</span>
           <span className="cp-nav-sub">{receipts.length} documents</span>
-        </div>
+        </div> */}
       </div>
 
       <div className="cp-section-header">
@@ -237,16 +238,14 @@ const CustomerProfile = () => {
                   </svg>
                 </div>
                 <div className="cp-order-info">
-                  <h4 className="cp-order-name">{order.itemDetails.name || order.item_name || 'Aluminum Window Frame Profile'}</h4>
+                  <h4 className="cp-order-name">{order?.itemsList?.length > 0 ? `${order.itemsList.length} item${order.itemsList.length > 1 ? 's' : ''}` : order.itemsList?.[0]?.name}</h4>
                   <p className="cp-order-meta">
-                    {order.orderId || order.tracking_id || 'ACGC-MOTQ0BX6'} &nbsp;·&nbsp; {order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : 'Recent'}
+                    {order._id || order.tracking_id || 'N-A'} &nbsp;·&nbsp; {order.createdAt ? new Date(order.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : 'Recent'}
                   </p>
                 </div>
               </div>
               <div className="cp-order-right">
-                <span className={`cp-badge cp-badge--${(order.status || 'pending').toLowerCase()}`}>
-                  {order.status || 'Pending'}
-                </span>
+                <StatusBadge status={order.status} />
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cp-chevron">
                   <polyline points="9 18 15 12 9 6"/>
                 </svg>

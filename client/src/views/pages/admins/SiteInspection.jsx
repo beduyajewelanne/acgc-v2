@@ -377,6 +377,7 @@ function ContractModal({ inspection, onClose, onSend, permissions }) {
       formData.append('inspectionId', inspection.id);
       formData.append('orderId', inspection.id || '');
       formData.append('customerEmail', inspection.customerEmail || '');
+      formData.append('contractId', `CTR-${String(inspection.id).padStart(4, '0')}`);
 
       const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/send_contract_email';
 
@@ -414,7 +415,7 @@ function ContractModal({ inspection, onClose, onSend, permissions }) {
         <div className="modal-topbar">
           <div>
             <h2 className="modal-title">📄 Service Contract</h2>
-            <p className="modal-subtitle">Contract No: SI-{String(inspection.id).padStart(4, '0')}</p>
+            <p className="modal-subtitle">Contract No: CTR-{String(inspection.id).padStart(4, '0')}</p>
           </div>
           <div className="modal-topbar-actions">
             {inspection.customerHasAccount && (
@@ -1270,6 +1271,7 @@ const SiteInspection = () => {
     // Retain your user context validations if needed by the api layer
     formData.append('token', user.token);
     formData.append('_id', user._id);
+    formData.append('contractId', `CTR-${String(id).padStart(4, '0')}`);
     formData.append('userId', user._id);
 
     const requestOptions = {

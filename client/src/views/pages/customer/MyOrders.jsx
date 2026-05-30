@@ -6,6 +6,39 @@ import './MyOrders.css';
 // Absolute clean local financial numbers presentation formatter
 const fmtCurrency = (num) => '₱ ' + (Number(num) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// Systematic dimension normalization to Feet (sq.ft tracking math helper)
+const calcProductLineTotal = (prod) => {
+  const w = parseFloat(prod.width) || 0;
+  const h = parseFloat(prod.height) || 0;
+  
+  // FIX: Explicitly targeting 'ratePerSqFt' from your exact database payload structure
+  const rate = parseFloat(prod.ratePerSqFt) || parseFloat(prod.pricePerSqFt) || parseFloat(prod.rate) || 0;
+  const qty = parseInt(prod.quantity) || parseInt(prod.qty) || 1;
+
+  // If dimensions or rate are completely missing, only then fallback safely to lineTotal
+  if (w === 0 || h === 0 || rate === 0) return parseFloat(prod.lineTotal) || 0;
+
+  const unitStr = String(prod.unit || 'in').toLowerCase().trim();
+
+  let widthInFeet = w;
+  let heightInFeet = h;
+
+  // Convert given values to feet based on dynamic unit strings
+  if (unitStr === 'in' || unitStr === 'inch' || unitStr === 'inches') {
+    widthInFeet = w / 12;
+    heightInFeet = h / 12;
+  } else if (unitStr === 'm' || unitStr === 'meter' || unitStr === 'meters') {
+    widthInFeet = w * 3.28084;
+    heightInFeet = h * 3.28084;
+  } else if (unitStr === 'cm' || unitStr === 'centimeter') {
+    widthInFeet = w / 30.48;
+    heightInFeet = h / 30.48;
+  }
+
+  const sqFt = widthInFeet * heightInFeet;
+  return sqFt * rate * qty;
+};
+
 const MyOrders = () => {
   const { user } = useContext(UserContext);
   const [orders, setOrders] = useState([]);
@@ -72,7 +105,6 @@ const MyOrders = () => {
     );
   };
 
-  // Maps backend data keys into precise lower-case normalized tokens for style sheet lookup matches
   const getPillClass = (statusStr) => {
     if (!statusStr) return 'status-pending';
     return `status-${statusStr.toLowerCase().replace(/\s+/g, '-')}`;
@@ -97,7 +129,6 @@ const MyOrders = () => {
             const orderIdKey = order.id || order.orderId;
             
             // Extracts explicit values directly from your payload object structures 
-            // instead of miscalculating line subtotals manually on client runtimes.
             const totalOrderCost = parseFloat(order.estimatedTotal) || 0;
             const downpaymentPaid = parseFloat(order.downpaymentPaid) || 0;
             const requiredDP = parseFloat(order.requiredDownpayment) || (totalOrderCost * 0.5);
@@ -109,7 +140,6 @@ const MyOrders = () => {
                     <h3>{order.name}</h3>
                     <p>ID: {order.orderId} • {order.date}</p>
                   </div>
-                  {/* Primary Order Status Pill */}
                   <span className={`status-pill ${getPillClass(order.status)}`}>
                     {order.status || 'Pending'}
                   </span>
@@ -121,18 +151,26 @@ const MyOrders = () => {
                     <div className="order-items-summary" style={{ marginBottom: '20px', background: '#f9f9f9', padding: '15px', borderRadius: '6px' }}>
                       <p style={{ fontWeight: '600', margin: '0 0 10px 0', fontSize: '14px', color: '#444' }}>Products inside this Tracked Request:</p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {(order.items || []).map((prod, pIdx) => (
-                          <div key={pIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderBottom: '1px solid #eee', paddingBottom: '6px' }}>
-                            <div>
-                              <span style={{ fontWeight: '600', color: '#2c3e50' }}>{prod.name}</span>
-                              <span style={{ color: '#888', marginLeft: '6px', fontSize: '12px' }}>x{prod.quantity}</span>
-                              <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '2px' }}>Size: {prod.dimensions || `${prod.width}${prod.unit} x ${prod.height}${prod.unit}`}</div>
+                        {(order.items || []).map((prod, pIdx) => {
+                          // Recalculates dynamically over the raw parameters
+                          const calculatedLinePrice = calcProductLineTotal(prod);
+
+                          return (
+                            <div key={pIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderBottom: '1px solid #eee', paddingBottom: '6px' }}>
+                              <div>
+                                <span style={{ fontWeight: '600', color: '#2c3e50' }}>{prod.name}</span>
+                                <span style={{ color: '#888', marginLeft: '6px', fontSize: '12px' }}>x{prod.quantity || prod.qty || 1}</span>
+                                <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '2px' }}>
+                                  Size: {prod.dimensions || `${prod.width || 0}${prod.unit || 'in'} x ${prod.height || 0}${prod.unit || 'in'}`}
+                                  {prod.ratePerSqFt && ` (@ ${fmtCurrency(prod.ratePerSqFt)}/sqft)`}
+                                </div>
+                              </div>
+                              <span style={{ fontWeight: '600', color: '#34495e' }}>
+                                {fmtCurrency(calculatedLinePrice)}
+                              </span>
                             </div>
-                            <span style={{ fontWeight: '600', color: '#34495e' }}>
-                              {fmtCurrency(prod.lineTotal)}
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -154,7 +192,6 @@ const MyOrders = () => {
                       <div>
                         <label>SITE INSPECTION:</label> 
                         <div style={{ marginTop: '4px' }}>
-                          {/* Site Inspection Status Pill instead of raw text strings */}
                           <span className={`status-pill ${getPillClass(order.status)}`}>
                             {order.status || 'Pending'}
                           </span>

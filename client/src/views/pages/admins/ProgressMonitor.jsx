@@ -824,7 +824,7 @@ const ProgressMonitor = () => {
           <table className="pm-table">
             <thead>
               <tr className="pm-thead-row">
-                {['Client', 'Product', 'Site Inspection', 'Est. Installation', 'Progress', 'Status', 'Actions'].map(
+                {['Client', 'Product', 'Quantity', 'Site Inspection', 'Est. Installation', 'Progress', 'Status', 'Actions'].map(
                   (h) => (
                     <th key={h} className="pm-th">{h}</th>
                   )
@@ -843,6 +843,9 @@ const ProgressMonitor = () => {
                       <p className="pm-td-primary">{p.clientName}</p>
                     </td>
                     <td className="pm-td pm-td-secondary">{p?.itemDetails?.name}</td>
+                    <td className="pm-td pm-td-secondary">
+                      <p className="text-center m-0">{p.quantity}</p>
+                    </td>
                     <td className="pm-td pm-td-secondary">{fmt(p?.inspectionDate)}</td>
                     <td className="pm-td pm-td-secondary">{fmt(p.estimatedInstallationDate)}</td>
                     <td className="pm-td pm-td-progress">

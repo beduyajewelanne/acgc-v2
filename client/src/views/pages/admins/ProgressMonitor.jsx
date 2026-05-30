@@ -703,6 +703,7 @@ const ProgressMonitor = () => {
     if (!isEmpty(user.token)){
       fetchProjects(user)
     }
+    console.log(permissions)
   }, [user])
 
   function fetchProjects(user){
@@ -746,7 +747,7 @@ const ProgressMonitor = () => {
       })
     }
     CRUD(api_url, requestOptions, (res) => {
-      console.log("Transaction result:", res);
+      // console.log("Transaction result:", res);
       if (res.remarks == "success") {
         fetchProjects(user); 
       } else {
@@ -778,10 +779,10 @@ const ProgressMonitor = () => {
               {projects.length} Projects
             </span>
             <span className="pm-badge pm-badge-green">
-              {projects.filter((p) => p.status === 'Completed').length} Completed
+              {projects.filter((p) => p.progressStatus === 'Completed').length} Completed
             </span>
             <span className="pm-badge pm-badge-red">
-              {projects.filter((p) => p.status === 'Delayed').length} Delayed
+              {projects.filter((p) => p.progressStatus === 'Delayed').length} Delayed
             </span>
           </div>
         </div>
@@ -852,7 +853,7 @@ const ProgressMonitor = () => {
                     </td>
                     <td className="pm-td">
                       <div className="pm-actions">
-                        <button onClick={() => setViewProject(p)} title="View" className="pm-action-btn pm-view">
+                        <button onClick={() => setViewProject(p)} title="View" className="pm-action-btn pm-view" hidden={permissions?.modules?.['Progress Monitor']?.["View Details"] != 1}>
                           <svg className="pm-icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -860,7 +861,7 @@ const ProgressMonitor = () => {
                               d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </button>
-                        <button onClick={() => setEditProject(p)} title="Edit" className="pm-action-btn pm-edit">
+                        <button onClick={() => setEditProject(p)} title="Edit" className="pm-action-btn pm-edit" hidden={permissions?.modules?.['Progress Monitor']?.["Edit"] != 1}>
                           <svg className="pm-icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

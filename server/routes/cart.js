@@ -613,6 +613,15 @@ cartRoutes.post("/api/get_order_requests", async (req, res) => {
 
             const pipeline = [
                 {
+                    $match: {
+                        $or: [
+                        { contractApproved: { $ne: 1 } },
+                        { contractApproved: { $exists: false } },
+                        { status: "Completed" }
+                        ]
+                    }
+                },
+                {
                     $group: {
                         _id: "$orderId",
                         // Capture base document fields from the first occurrence
@@ -938,7 +947,7 @@ cartRoutes.post("/api/admin/update_site_inspection", async (req, res) => {
 });
 
 cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async (req, res) => {
-  const { inspectionId, orderId, customerEmail } = req.body;
+  const { inspectionId, orderId, customerEmail, contractId } = req.body;
 
   if (!req.file) {
     return res.status(400).json({ remarks: 'failed', message: 'Missing compiled contract binary file streaming parameter.' });
@@ -952,7 +961,7 @@ cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async
     if (orderId && orderId !== "") {
       await db.collection('order_requests').updateMany(
         { orderId: orderId },
-        { $set: { contractLink: savedRelativePath, contractSentToCustomer: true, contractUpdatedAt: new Date() } }
+        { $set: { contractLink: savedRelativePath, contractSentToCustomer: true, contractUpdatedAt: new Date(), contractId: contractId } }
       );
     }
 
@@ -987,7 +996,7 @@ cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async
 });
 
 cartRoutes.post("/api/manual_approve_order", upload.single('receiptFile'), async (req, res) => {
-  const { orderId } = req.body;
+  const { orderId, contractId } = req.body;
 
   if (!orderId) {
     return res.status(400).json({ remarks: 'failed', message: 'Missing target validation identification context orderId.' });
@@ -1017,14 +1026,14 @@ cartRoutes.post("/api/manual_approve_order", upload.single('receiptFile'), async
 
     // Build the dynamic update database parameters depending on paymentTerms definition context
     let updateFields = {
-      receiptLink: savedRelativePath,
-      approvedAt: new Date()
+      contractLink: savedRelativePath,
+      approvedAt: new Date(),
+      contractId: contractId
     };
 
     if (isFullPayment) {
       // Full Payment route adjustments
-      updateFields.status = 'Paid';
-      updateFields.fullPaymentPaid = finalGrandTotal;
+      updateFields.status = 'Pending Payment';
       updateFields.contractApproved = 1
     } else {
       // 50% down payment fallback route adjustments

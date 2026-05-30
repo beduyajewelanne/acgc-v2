@@ -220,8 +220,13 @@ userRoutes.post("/api/get_user_dashboard", async (req, res) => {
 
             // FIX: Added .toArray() to fully resolve cursors into plain data arrays
             const orders = await db_connect.collection("order_requests").find({ user_id: userObjectId }).toArray();
-            const receipts = await db_connect.collection("receipts").find({ user_id: userObjectId }).toArray();
-            const contracts = await db_connect.collection("contracts").find({ user_id: userObjectId }).toArray();
+            const contracts = await db_connect.collection("order_requests").find({
+            user_id: userObjectId,
+            $or: [
+                { contractApproved: 1 },
+                { contractSentToCustomer: true }
+            ]
+            }).toArray();
 
             // Arrays are always truthy, so we check if records were parsed successfully 
             return res.status(200).json({ 
@@ -229,7 +234,6 @@ userRoutes.post("/api/get_user_dashboard", async (req, res) => {
                 message: "Data fetched successfully", 
                 payload: { 
                     orders: orders, 
-                    receipts: receipts, 
                     contracts: contracts 
                 } 
             });

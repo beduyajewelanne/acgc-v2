@@ -1063,5 +1063,187 @@ cartRoutes.post("/api/manual_approve_order", upload.single('receiptFile'), async
   }
 });
 
+cartRoutes.route("/api/get_my_contracts").post(async (req, res) => {
+  const { token, userId } = req.body;
+
+  if (!token) return res.status(401).json({ remarks: "Unauthorized" });
+
+  try {
+    // Utilize your existing checkAuth validation helper
+    checkAuth(token, userId, async (isValid) => {
+      if (!isValid) return res.status(401).json({ remarks: "Unauthorized" });
+
+      const userObjectId = new ObjectId(userId);
+
+      // Aggregation pipeline matching your architecture's grouping schema
+      const pipeline = [
+        {
+          $match: {
+            user_id: userObjectId,
+            $or: [
+              { contractApproved: 1 },
+              { contractSentToCustomer: true },
+              { status: "Completed" },
+              { status: "Contract Declined" } // Ensures declined contracts stay visible to clients
+            ]
+          }
+        },
+        {
+          $group: {
+            _id: "$orderId",
+            // Capture base document metadata configurations from the cluster root
+            baseDoc: { $first: "$$ROOT" },
+            // Gather item configurations out of the nested itemDetails object
+            measurements: {
+              $push: {
+                id: "$_id",
+                product: "$itemDetails.name",
+                width: "$itemDetails.width",
+                height: "$itemDetails.height",
+                qty: { $ifNull: ["$quantity", "$itemDetails.quantity", 1] },
+                pricePerSqFt: "$itemDetails.ratePerSqFt",
+                unit: "$itemDetails.unit"
+              }
+            },
+            totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" }
+          }
+        },
+        { $sort: { "baseDoc.createdAt": -1 } }
+      ];
+
+      // Use your native helper utility to execute the query
+      const result = await get_data_helper("order_requests", pipeline);
+      const rawPayload = result?.payload || result || [];
+
+      // Normalize properties mapping seamlessly to your frontend template fields
+      const normalizedPayload = rawPayload.map(group => {
+        const b = group.baseDoc;
+        return {
+          orderId: group._id, // Set the shared grouping key explicitly
+          id: group._id,
+          clientName: b.clientName || "Unknown Client",
+          clientAddress: b.installationAddress || "",
+          siteAddress: b.installationAddress || "",
+          date: b.createdAt ? new Date(b.createdAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : "Recent",
+          inspectionDate: b.inspectionDate || "",
+          estimatedInstallationDate: b.estimatedInstallationDate || "",
+          status: b.status || "Pending Approval",
+          estimatedTotal: parseFloat(b.estimatedTotal) || group.totalEstimatedCost || 0,
+          paymentTerms: b.paymentTerms || '50% downpayment, 50% upon completion',
+          paymentDate: b.paymentDate || "",
+          notes: b.clientNotes || "",
+          measurements: group.measurements,
+          contractLink: b.contractLink || "#",
+          contractApproved: b.contractApproved || 0,
+          contractSentToCustomer: b.contractSentToCustomer || false,
+          customerEmail: b.clientEmail || "",
+          manualOverride: parseFloat(b.manualOverride) || ""
+        };
+      });
+
+      return res.status(200).json({ 
+        remarks: "success", 
+        message: "Client contractual data streams compiled successfully.", 
+        payload: normalizedPayload 
+      });
+    });
+  } catch (err) {
+    console.error("Error executing collection fetch for get_my_contracts:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFile"), async (req, res) => {
+  const { token, userId, orderId, action } = req.body;
+
+  // Immediately clean up uploaded file if initial validation requirements fail
+  if (!token || !userId || !orderId || !action) {
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ remarks: "failed", message: "Missing tracking credentials or response parameters." });
+  }
+
+  try {
+    // Wrap inside checkAuth logic block securely
+    checkAuth(token, userId, async (isValid) => {
+      try {
+        if (!isValid) {
+          if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+          return res.status(401).json({ remarks: "failed", message: "Unauthorized transaction attempt." });
+        }
+
+        const db = dbo.getDb();
+        const userObjectId = new ObjectId(userId);
+
+        // Find a single sample document from the group to check for an existing file path link
+        const targetGroupSample = await db.collection("order_requests").findOne({
+          orderId: orderId,
+          user_id: userObjectId
+        });
+
+        if (!targetGroupSample) {
+          if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+          return res.status(404).json({ remarks: "failed", message: "Target order reference group not found." });
+        }
+
+        let savedRelativePath = targetGroupSample.contractLink || "#";
+
+        // Physical File Asset Overwrite Execution (Happens exactly once for the base file)
+        if (req.file) {
+          const targetUploadDir = path.join(__dirname, "../uploads");
+          
+          if (targetGroupSample.contractLink && targetGroupSample.contractLink !== "#") {
+            const oldFileName = path.basename(targetGroupSample.contractLink);
+            const oldFilePath = path.join(targetUploadDir, oldFileName);
+            
+            if (fs.existsSync(oldFilePath)) {
+              try {
+                fs.unlinkSync(oldFilePath); // Deletes the original un-stamped file from disk
+              } catch (e) {
+                console.warn("File target locked or already moved, skipping deletion path:", e);
+              }
+            }
+          }
+          savedRelativePath = `/uploads/${req.file.filename}`;
+        }
+
+        // Map dynamic fields based on customer's choice
+        let updateFields = {
+          contractLink: savedRelativePath,
+          contractUpdatedAt: new Date()
+        };
+
+        if (action === "Approve") {
+          updateFields.contractApproved = 1; // 1 = Approved / Accepted Status
+          updateFields.status = "Pending Payment"; 
+        } else if (action === "Decline") {
+          updateFields.contractApproved = 0; // 0 = Rejected / Declined Status
+          updateFields.status = "Contract Declined";
+        }
+
+        // CRITICAL FIX: Synchronize EVERY document inside the cluster matching the targeted orderId group instantly
+        const result = await db.collection("order_requests").updateMany(
+          { orderId: orderId, user_id: userObjectId },
+          { $set: updateFields }
+        );
+
+        return res.status(200).json({
+          remarks: "success",
+          message: `Successfully updated base contract file asset and synchronized [${action}] status across ${result.modifiedCount} line item collections.`,
+          path: savedRelativePath
+        });
+
+      } catch (innerError) {
+        console.error("Error inside checkAuth query lifecycle block:", innerError);
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        return res.status(500).json({ remarks: "error", message: "Internal data synchronization processing error." });
+      }
+    });
+
+  } catch (error) {
+    console.error("Critical outer pipeline crash in client_respond_contract:", error);
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    return res.status(500).json({ remarks: "error", message: "Internal server error executing file operations." });
+  }
+});
 
 module.exports = cartRoutes;

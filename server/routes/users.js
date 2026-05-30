@@ -209,7 +209,7 @@ userRoutes.post ("/api/get_user_profile", async (req, res) => {
 
 userRoutes.post("/api/get_user_dashboard", async (req, res) => {
     const { token, _id } = req.body;
-    if (!token) return res.status(400).json({ error: "Token is required" });
+    if (!token || !_id) return res.status(400).json({ error: "Token and user ID are required" });
 
     checkAuth(token, _id, async (isValid) => {
         if (!isValid) return res.status(401).json({ error: "Unauthorized" });
@@ -218,26 +218,142 @@ userRoutes.post("/api/get_user_dashboard", async (req, res) => {
             const db_connect = dbo.getDb();
             const userObjectId = new ObjectId(_id);
 
-            // FIX: Added .toArray() to fully resolve cursors into plain data arrays
-            const orders = await db_connect.collection("order_requests").find({ user_id: userObjectId }).toArray();
-            const contracts = await db_connect.collection("order_requests").find({
-            user_id: userObjectId,
-            $or: [
-                { contractApproved: 1 },
-                { contractSentToCustomer: true }
-            ]
-            }).toArray();
+            // 1. Pipeline for Grouped Orders Dashboard Display
+            const orderPipeline = [
+                {
+                    $match: {
+                        user_id: userObjectId
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$orderId", // Group entries sharing the same orderId cluster
+                        docId: { $first: "$_id" },
+                        user_id: { $first: "$user_id" },
+                        clientName: { $first: "$clientName" },
+                        clientEmail: { $first: "$clientEmail" },
+                        clientPhone: { $first: "$clientPhone" },
+                        installationAddress: { $first: "$installationAddress" },
+                        clientNotes: { $first: { $ifNull: ["$clientNotes", ""] } },
+                        status: { $first: "$status" },
+                        isCancelled: { $first: { $ifNull: ["$isCancelled", 0] } },
+                        createdAt: { $first: "$createdAt" },
+                        quantity: { $first: { $ifNull: ["$quantity", 1] } },
+                        paymentTerms: { $first: { $ifNull: ["$paymentTerms", "50% downpayment, 50% upon completion"] } },
+                        // Pulls the items into an array structure or preserves the structural sample mapping
+                        itemsList: {
+                            $push: {
+                                product_id: "$itemDetails.product_id",
+                                name: "$itemDetails.name",
+                                type: "$itemDetails.type",
+                                category: "$itemDetails.category",
+                                variant: "$itemDetails.variant",
+                                width: "$itemDetails.width",
+                                height: "$itemDetails.height",
+                                unit: "$itemDetails.unit",
+                                areaSqFt: "$itemDetails.areaSqFt",
+                                ratePerSqFt: "$itemDetails.ratePerSqFt",
+                                estimatedCost: "$itemDetails.estimatedCost"
+                            }
+                        },
+                        estimatedTotal: { $sum: "$itemDetails.estimatedCost" }
+                    }
+                },
+                { $sort: { createdAt: -1 } }
+            ];
 
-            // Arrays are always truthy, so we check if records were parsed successfully 
+            const rawOrders = await db_connect.collection("order_requests").aggregate(orderPipeline).toArray();
+
+            // // Format grouped results to resemble your precise flat JSON structure mapping
+            // const normalizedOrders = rawOrders.map(group => ({
+            //     _id: group.docId,
+            //     user_id: group.user_id,
+            //     clientName: group.clientName || "Unknown Client",
+            //     clientEmail: group.clientEmail || "",
+            //     clientPhone: group.clientPhone || "",
+            //     installationAddress: group.installationAddress || "",
+            //     clientNotes: group.clientNotes,
+            //     itemDetails: group.itemsList[0] || {}, // Returns the main context product or change to list if needed
+            //     orderId: group._id,
+            //     status: group.status || "Pending",
+            //     isCancelled: group.isCancelled,
+            //     createdAt: group.createdAt,
+            //     quantity: group.quantity,
+            //     paymentTerms: group.paymentTerms,
+            //     estimatedTotal: group.estimatedTotal
+            // }));
+
+            // 2. Fetch Active Contracts Pipeline 
+            const contractPipeline = [
+                {
+                    $match: {
+                        user_id: userObjectId,
+                        $or: [
+                            { contractApproved: 1 },
+                            { contractSentToCustomer: true },
+                            { status: "Contract Declined" }
+                        ]
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$orderId",
+                        docId: { $first: "$_id" },
+                        user_id: { $first: "$user_id" },
+                        clientName: { $first: "$clientName" },
+                        clientEmail: { $first: "$clientEmail" },
+                        clientPhone: { $first: "$clientPhone" },
+                        installationAddress: { $first: "$installationAddress" },
+                        clientNotes: { $first: { $ifNull: ["$clientNotes", ""] } },
+                        status: { $first: "$status" },
+                        isCancelled: { $first: { $ifNull: ["$isCancelled", 0] } },
+                        createdAt: { $first: "$createdAt" },
+                        quantity: { $first: { $ifNull: ["$quantity", 1] } },
+                        paymentTerms: { $first: "$paymentTerms" },
+                        contractLink: { $first: "$contractLink" },
+                        contractApproved: { $first: "$contractApproved" },
+                        itemsList: {
+                            $push: {
+                                name: "$itemDetails.name",
+                                width: "$itemDetails.width",
+                                height: "$itemDetails.height",
+                                qty: { $ifNull: ["$quantity", 1] },
+                                pricePerSqFt: "$itemDetails.ratePerSqFt"
+                            }
+                        },
+                        estimatedTotal: { $sum: "$itemDetails.estimatedCost" }
+                    }
+                },
+                { $sort: { createdAt: -1 } }
+            ];
+
+            const rawContracts = await db_connect.collection("order_requests").aggregate(contractPipeline).toArray();
+
+            const normalizedContracts = rawContracts.map(group => ({
+                _id: group.docId,
+                orderId: group._id,
+                user_id: group.user_id,
+                clientName: group.clientName,
+                installationAddress: group.installationAddress,
+                status: group.status,
+                createdAt: group.createdAt,
+                estimatedTotal: group.estimatedTotal,
+                contractLink: group.contractLink || "#",
+                contractApproved: group.contractApproved || 0,
+                measurements: group.itemsList
+            }));
+
             return res.status(200).json({ 
                 remarks: "success", 
-                message: "Data fetched successfully", 
+                message: "Dashboard data metrics compiled successfully.", 
                 payload: { 
-                    orders: orders, 
-                    contracts: contracts 
+                    orders: rawOrders, 
+                    contracts: normalizedContracts 
                 } 
             });
+
         } catch (err) {
+            console.error("Dashboard calculation pipeline error:", err);
             return res.status(500).json({ error: err.message });
         }
     });

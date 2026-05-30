@@ -305,7 +305,7 @@ const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
                 {items.map((item) => (
                   <div className="order-product-card" key={item.id} style={{ marginBottom: '8px', padding: '8px' }}>
                     {item.image && (
-                      <img src={item.image} alt={item.name} className="order-product-img" style={{ width: '45px', height: '45px' }} />
+                      <img src={`${window.base_api.replace('/api/', '')}${item.image}`} alt={item.name} className="order-product-img" style={{ width: '45px', height: '45px' }} />
                     )}
                     <div className="order-product-info">
                       <p className="op-name" style={{ fontSize: '13px' }}>{item.name}</p>

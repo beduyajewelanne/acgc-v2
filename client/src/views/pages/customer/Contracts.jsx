@@ -191,7 +191,7 @@ const Contracts = () => {
       
       <div className="contracts-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {contracts.map((item) => {
-          const isPending = item.contractApproved !== 1 && item.status !== "Contract Declined" && item.status !== "Completed";
+          const isPending = item.contractApproved !== 1 && item.status !== "Cancelled" && item.status !== "Completed";
 
           return (
             <div className="contract-card" key={item.orderId} style={{ border: '1px solid #e2e8f0', padding: '20px', borderRadius: '8px', background: '#fff' }}>
@@ -208,8 +208,8 @@ const Contracts = () => {
                     fontSize: '11px', 
                     borderRadius: '4px', 
                     fontWeight: 'bold',
-                    background: item.contractApproved === 1 ? '#dcfce7' : item.status === 'Contract Declined' ? '#fee2e2' : '#fef3c7',
-                    color: item.contractApproved === 1 ? '#15803d' : item.status === 'Contract Declined' ? '#b91c1c' : '#d97706'
+                    background: item.contractApproved === 1 ? '#dcfce7' : item.status === 'Cancelled' ? '#fee2e2' : '#fef3c7',
+                    color: item.contractApproved === 1 ? '#15803d' : item.status === 'Cancelled' ? '#b91c1c' : '#d97706'
                   }}>
                     {item.status}
                   </span>

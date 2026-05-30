@@ -1159,7 +1159,7 @@ cartRoutes.route("/api/get_my_contracts").post(async (req, res) => {
               { contractApproved: 1 },
               { contractSentToCustomer: true },
               { status: "Completed" },
-              { status: "Contract Declined" } // Ensures declined contracts stay visible to clients
+              { status: "Cancelled" } // Ensures declined contracts stay visible to clients
             ]
           }
         },
@@ -1292,7 +1292,7 @@ cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFil
           updateFields.status = "Pending Payment"; 
         } else if (action === "Decline") {
           updateFields.contractApproved = 0; // 0 = Rejected / Declined Status
-          updateFields.status = "Contract Declined";
+          updateFields.status = "Cancelled";
         }
 
         // CRITICAL FIX: Synchronize EVERY document inside the cluster matching the targeted orderId group instantly

@@ -559,14 +559,14 @@ cartRoutes.post("/api/cancel_order_request", async (req, res) => {
             const targetOrder = existingOrderList[0];
 
             // 2. Prevent cancellation if design process has proceeded past initial verification status unless explicitly allowed
-            const isPending = targetOrder.status === "Pending" || targetOrder.status === "Pending Inspection";
+            // const isPending = targetOrder.status === "Pending" || targetOrder.status === "Pending Inspection";
 
-            if (!isPending) {
-                return res.status(400).json({ 
-                    remarks: "failed", 
-                    message: "Cannot cancel order requests already processed into production status or inspection clearance loops" 
-                });
-            }
+            // if (!isPending) {
+            //     return res.status(400).json({ 
+            //         remarks: "failed", 
+            //         message: "Cannot cancel order requests already processed into production status or inspection clearance loops" 
+            //     });
+            // }
 
             // 3. Instead of deleting, update the document status to "Cancelled"
             // const updateResult = await update_many_helper(

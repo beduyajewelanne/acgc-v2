@@ -318,7 +318,6 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
 });
 
 cartRoutes.post("/api/submit_order_request", async (req, res) => {
-    // 1. Extract measurements and quantity from the payload
     const { token, userId, customer, product_id, clientNotes, measurements, quantity } = req.body;
     
     console.log(customer);
@@ -326,7 +325,6 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
     if (!product_id) return res.status(400).json({ remarks: "failed", message: "Missing specifications payload" });
 
     try {
-        // Authenticate request parameters with user database tokens
         checkAuth(token, userId, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
 
@@ -335,21 +333,31 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
 
             if (!product) return res.status(404).json({ remarks: "failed", message: "Product not found" });
 
-            // 2. Parse incoming user measurements, fall back to product defaults if not provided
             const finalWidth = parseFloat(measurements?.width) || parseFloat(product.width) || 0;
             const finalHeight = parseFloat(measurements?.height) || parseFloat(product.height) || 0;
             const finalUnit = measurements?.unit || product.unit || "in";
             
-            // Optional: Recalculate area dynamically if the user provided custom dimensions
-            const finalArea = measurements?.width && measurements?.height 
-                ? finalWidth * finalHeight 
-                : (parseFloat(product.areaSqFt) || 0);
+            // --- FIX: Dynamic Unit Conversion Engine to Square Feet ---
+            let areaSqFt = 0;
+            if (finalUnit === "cm") {
+                areaSqFt = (finalWidth * finalHeight) / 929.03;
+            } else if (finalUnit === "in" || finalUnit === "inch") {
+                areaSqFt = (finalWidth * finalHeight) / 144; // 12in * 12in = 144 sq inches per sq ft
+            } else if (finalUnit === "m") {
+                areaSqFt = (finalWidth * 3.28084) * (finalHeight * 3.28084);
+            } else if (finalUnit === "ft") {
+                areaSqFt = finalWidth * finalHeight;
+            } else {
+                // Fallback to whatever is saved on the template product data if units don't match
+                areaSqFt = parseFloat(product.areaSqFt) || 0;
+            }
 
-            const rate = parseFloat(product.pricePerSqFt) || 0;
-            const finalQuantity = parseInt(quantity) || 1; // Fallback to 1 if not provided
+            const rate = parseFloat(product.pricePerSqFt) || parseFloat(product.price) || 0;
+            const finalQuantity = parseInt(quantity) || 1;
             
-            // Calculate dynamic estimated cost based on custom area and quantity
-            const dynamicEstimatedCost = finalArea * rate * finalQuantity;
+            // Calculate real item estimation safely
+            const baseItemCost = areaSqFt > 0 ? (areaSqFt * rate) : rate;
+            const dynamicEstimatedCost = baseItemCost * finalQuantity;
 
             const newOrderRequest = {
                 user_id: new ObjectId(userId),
@@ -362,19 +370,19 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
                     name: product.name,
                     type: product.type,
                     category: product.category,
-                    width: finalWidth,          // <-- Fixed: Now uses user input
-                    height: finalHeight,        // <-- Fixed: Now uses user input
-                    unit: finalUnit,            // <-- Fixed: Now uses user input
-                    areaSqFt: finalArea,
+                    width: finalWidth,          
+                    height: finalHeight,        
+                    unit: finalUnit,            
+                    areaSqFt: parseFloat(areaSqFt.toFixed(4)), // Clean decimals
                     ratePerSqFt: rate,
-                    estimatedCost: dynamicEstimatedCost > 0 ? dynamicEstimatedCost : (parseFloat(product.estimatedCost) || 0)
+                    estimatedCost: parseFloat(dynamicEstimatedCost.toFixed(2)) // Clean currency rounding
                 },
                 orderId: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 clientNotes: clientNotes || "",
                 status: "Pending",
                 isCancelled: 0,
                 createdAt: new Date(),
-                quantity: finalQuantity,        // <-- Fixed: Now uses user quantity
+                quantity: finalQuantity,        
                 paymentTerms: '50% downpayment, 50% upon completion'
             };
 
@@ -552,9 +560,8 @@ cartRoutes.post("/api/cancel_order_request", async (req, res) => {
 
             // 2. Prevent cancellation if design process has proceeded past initial verification status unless explicitly allowed
             const isPending = targetOrder.status === "Pending" || targetOrder.status === "Pending Inspection";
-            const isExplicitlyAllowed = targetOrder.is_cancelledAllowed == 1 || targetOrder.is_cancelledAllowed === "1";
 
-            if (!isPending && !isExplicitlyAllowed) {
+            if (!isPending) {
                 return res.status(400).json({ 
                     remarks: "failed", 
                     message: "Cannot cancel order requests already processed into production status or inspection clearance loops" 

@@ -7,7 +7,7 @@ import { CRUD } from '../../../services/data.services';
 const ALL_MODULES = [
   { id: 'Dashboard', label: 'Dashboard', icon: '▦', actions: ['View'] },
   { id: 'Products', label: 'Product Management', icon: '⬡', actions: ['View', 'Add', 'Edit', 'Delete'] },
-  { id: 'Site Inspection', label: 'Site Inspection', icon: '◈', actions: ['View', 'Add', 'View Details', 'Edit', 'Cancel', 'Generate Contract', 'Send Email', 'Download Contract'] },
+  { id: 'Site Inspection', label: 'Site Inspection', icon: '◈', actions: ['View', 'Add', 'View Details', 'Edit', 'Cancel', 'Generate Contract', 'Send Email', 'Download Contract', 'Manual Approve'] },
   { id: 'Progress Monitor', label: 'Progress Monitoring', icon: '◎', actions: ['View', 'View Details', 'Edit'] },
   { id: 'Transactions', label: 'Transactions', icon: '⬕', actions: ['View', 'View Details', 'Edit', 'View Contract', 'Download Contract', 'Send Email'] },
   { id: 'Settings', label: 'Settings', icon: '⚙', actions: ['View'] },

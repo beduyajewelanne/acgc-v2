@@ -616,7 +616,6 @@ cartRoutes.post("/api/get_order_requests", async (req, res) => {
                     $match: {
                         $or: [
                         { contractApproved: { $ne: 1 } },
-                        { contractApproved: { $exists: false } },
                         { status: "Completed" }
                         ]
                     }
@@ -681,7 +680,83 @@ cartRoutes.post("/api/get_order_requests", async (req, res) => {
         return res.status(500).json({ error: err.message });
     }
 });
- 
+
+cartRoutes.post("/api/get_transactions", async (req, res) => {
+    const { token, user_id } = req.body;
+
+    if (!token) return res.status(401).json({ remarks: "Unauthorized" });
+
+    try {
+        checkAuth(token, user_id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "Unauthorized" });
+
+            const pipeline = [
+                {
+                    $match: {
+                        contractApproved: { $exists: true, $ne: null }
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$orderId",
+                        // Capture base document fields from the first occurrence
+                        baseDoc: { $first: "$$ROOT" },
+                        // Aggregate all items associated with this orderId
+                        measurements: {
+                            $push: {
+                                id: "$_id",
+                                product: "$itemDetails.name",
+                                width: "$itemDetails.width",
+                                height: "$itemDetails.height",
+                                qty: { $ifNull: ["$quantity", "$itemDetails.quantity", 1] },
+                                pricePerSqFt: "$itemDetails.ratePerSqFt",
+                                unit: "$itemDetails.unit",
+                            }
+                        },
+                        // Sum up costs across all grouped documents
+                        totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" }
+                    }
+                },
+                { $sort: { "baseDoc.createdAt": -1 } }
+            ];
+
+            const result = await get_data_helper("order_requests", pipeline);
+            const rawPayload = result?.payload || result || [];
+
+            const normalizedPayload = rawPayload.map(group => {
+                const b = group.baseDoc;
+                return {
+                    id: group._id, // orderId acts as the unique identifier
+                    clientName: b.clientName || "Unknown Client",
+                    clientAddress: b.installationAddress || "",
+                    clientNumber: b.clientPhone || "",
+                    siteAddress: b.installationAddress || "",
+                    dateCreated: b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : "",
+                    inspectionDate: b.inspectionDate || "",
+                    estimatedInstallationDate: b.estimatedInstallationDate || "",
+                    status: b.status || "Pending",
+                    estimatedTotal: b.estimatedTotal || group.totalEstimatedCost || 0,
+                    downpaymentPaid: b.downpaymentPaid || false,
+                    paymentTerms: b.paymentTerms || '50% downpayment, 50% upon completion',
+                    paymentDate: b.paymentDate || "",
+                    notes: b.clientNotes || "",
+                    measurements: group.measurements,
+                    contractSentToCustomer: b.contractSentToCustomer || false,
+                    customerHasAccount: b.customerHasAccount || false,
+                    customerEmail: b.clientEmail || "",
+                    customerHasAccount: b.customerHasAccount == true ? true : b.user_id ? true : false ,
+                    manualOverride: parseFloat(b.manualOverride) || "",
+                };
+            });
+
+            return res.status(200).json({ remarks: "success", payload: normalizedPayload });
+        });
+    } catch (err) {
+        console.error("Error fetching grouped site inspections:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── 4. ADMIN WORKSPACE: CREATE NEW ORDER REQUEST RECORD ──────────────────
 cartRoutes.post("/api/create_order_request", async (req, res) => {
     const { 

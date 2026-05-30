@@ -415,4 +415,120 @@ userRoutes.post("/api/update_user_profile", async (req, res) => {
     }
 });
 
+userRoutes.post("/api/update_admin_account", async (req, res) => {
+    const { token, user_id, email, currentPassword, newPassword } = req.body;
+    
+    if (!token) return res.status(400).json({ error: "Token is required" });
+    if (!user_id) return res.status(400).json({ error: "User ID is required" });
+    if (!email) return res.status(400).json({ error: "Email address is required" });
+
+    try {
+        // Enforce state session authenticity using your existing validation module hook
+        checkAuth(token, user_id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            const db = dbo.getDb();
+            const targetQuery = { _id: new ObjectId(user_id) };
+
+            // Fetch current record to verify current password and validate email changes
+            const userRecord = await db.collection("users").findOne(targetQuery);
+            if (!userRecord) {
+                return res.status(404).json({ remarks: "failed", message: "User record not found" });
+            }
+
+            // Check if email is already allocated to another administrator account
+            if (email.trim().toLowerCase() !== userRecord.email?.toLowerCase()) {
+                const emailInUse = await db.collection("users").findOne({ 
+                    email: email.trim().toLowerCase(), 
+                    _id: { $ne: new ObjectId(user_id) } 
+                });
+                if (emailInUse) {
+                    return res.status(400).json({ remarks: "failed", field: "email", message: "This email address is already in use by another account." });
+                }
+            }
+
+            // Build the standard update payload tracking structural elements
+            const updateFields = {
+                email: email.trim().toLowerCase()
+            };
+
+            // Dynamic Security Validation: If a user changes their password, enforce verification
+            if (newPassword && newPassword.trim() !== "") {
+                if (!currentPassword || currentPassword.trim() === "") {
+                    return res.status(400).json({ remarks: "failed", field: "curPw", message: "Current password is required to update security credentials." });
+                }
+
+                // Verify the user's current password matches the database string hash
+                const passwordIsValid = validateHash(currentPassword, userRecord.password);
+                if (!passwordIsValid) {
+                    return res.status(400).json({ remarks: "failed", field: "currentPassword", message: "Incorrect current password verification." });
+                }
+
+                // Utilizing your helper function 'hashPass' provided in your helper utilities
+                updateFields.password = await hashPass(newPassword.trim());
+            }
+
+            // Perform targeted document updates inside the users database collection
+            const updateResult = await db.collection("users").updateOne(
+                targetQuery,
+                { $set: updateFields }
+            );
+
+            if (updateResult.matchedCount === 0) {
+                return res.status(404).json({ remarks: "failed", message: "User record not found" });
+            }
+
+            // Fire audit log action mapping your application helper's signature parameters
+            const logActionType = newPassword ? "Update Security Credentials" : "Update Profile Details";
+            await actionLog(user_id, logActionType, "Users");
+
+            return res.status(200).json({ 
+                remarks: "success", 
+                message: "Profile updated successfully"
+            });
+        });
+    } catch (err) {
+        console.error("Admin account profile settings writing failure:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+userRoutes.post("/api/get_logs", async (req, res) => {
+    const { token, user_id } = req.body;
+    
+    if (!token) return res.status(400).json({ error: "Token is required" });
+    if (!user_id) return res.status(400).json({ error: "User ID is required" });
+
+    try {
+        // Enforce state session authenticity using your existing validation module hook
+        checkAuth(token, user_id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            const filter_query = [ 
+                {
+                    $match: {
+                        userId: new ObjectId(user_id)
+                    }
+                },
+                {
+                    $sort: { createdAt: -1 }
+                }
+            ]
+
+            const response = await get_data_helper("action_logs", filter_query);
+            if (response && response.payload.length > 0) {
+                return res.status(200).json({ 
+                    remarks: "success", 
+                    message: "Profile updated successfully", 
+                    payload: response.payload
+                });
+            }
+
+        });
+    } catch (err) {
+        console.error("Profile settings writing failure:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = userRoutes;

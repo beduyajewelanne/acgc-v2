@@ -469,7 +469,7 @@ function ContractModal({ inspection, onClose, onSend, permissions }) {
             <div className="contract-parties" style={{ marginBottom: '15px' }}>
               <div>
                 <div className="contract-label" style={{ fontSize: '10px', color: '#718096' }}>SERVICE PROVIDER</div>
-                <div className="contract-value" style={{ fontWeight: 'bold' }}>GlassAlum Pro Inc.</div>
+                <div className="contract-value" style={{ fontWeight: 'bold' }}>ACGC Glass & Aluminum Services</div>
                 <div className="contract-sub">Olongapo City, Zambales</div>
               </div>
               <div>
@@ -570,7 +570,7 @@ function ContractModal({ inspection, onClose, onSend, permissions }) {
               <div className="contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '12px', fontSize: '11px' }}>
                 <div style={{ fontSize: '16px' }}>🛡️</div>
                 <div>
-                  <strong>90-Day Warranty:</strong> GlassAlum Pro Inc. provides a 90-day warranty on all installed products and workmanship starting from installation completion.
+                  <strong>90-Day Warranty:</strong> ACGC Glass & Aluminum Services provides a 90-day warranty on all installed products and workmanship starting from installation completion.
                 </div>
               </div>
             )}
@@ -613,7 +613,7 @@ function ContractModal({ inspection, onClose, onSend, permissions }) {
                 <div style={{ fontSize: '10px', textAlign: 'center', color: '#718096', marginTop: '2px' }}>{inspection.clientName}</div>
               </div>
               <div style={{ width: '50%', background: '#f7fafc', padding: '8px', borderRadius: '4px', fontSize: '10px', color: '#718096', lineHeight: '1.3' }}>
-                <strong>Admin Note:</strong> This contract is officially issued by GlassAlum Pro Inc. Administration. Signature is implicit upon automated generation.
+                <strong>Admin Note:</strong> This contract is officially issued by ACGC Glass & Aluminum Services Administration. Signature is implicit upon automated generation.
               </div>
             </div>
           </div>

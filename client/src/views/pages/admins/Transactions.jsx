@@ -562,6 +562,80 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
   );
 };
 
+// ─── Feedback Summary Modal Component ─────────────────────────────────────────
+const FeedbackSummaryModal = ({ tx, onClose }) => {
+  if (!tx) return null;
+
+  const ratingScore = tx.rating || 5;
+  const productName = tx.measurements && tx.measurements.length > 0
+    ? tx.measurements.map(m => m.product).join(", ")
+    : tx.productName || "Glass & Aluminum Project";
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-header-left">
+            <p className="modal-eyebrow">Customer Feedback Summary</p>
+            <h2 className="modal-title">{tx.clientName || 'Customer'}</h2>
+            <p className="modal-sub">{tx.contractId || tx.id}</p>
+          </div>
+          <button className="modal-close-btn" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body">
+          {/* 1. Rating & Feedback Box */}
+          <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Rating Given</span>
+              <span style={{ color: '#f59e0b', fontSize: '16px' }}>
+                {'★'.repeat(ratingScore)}{'☆'.repeat(5 - ratingScore)} ({ratingScore}/5)
+              </span>
+            </div>
+            <p style={{ fontSize: '13.5px', color: '#1e293b', lineHeight: '1.5', margin: 0, fontStyle: 'italic', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              "{tx.feedback || 'No comment provided.'}"
+            </p>
+          </div>
+
+          {/* 2. Customer Context */}
+          <div className="info-section">
+            <p className="info-section-title">Customer Info</p>
+            <div className="info-row">
+              <span className="info-label">Full Name</span>
+              <span className="info-value">{tx.clientName || '—'}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Email / Contact</span>
+              <span className="info-value">{tx.customerEmail || tx.clientNumber || '—'}</span>
+            </div>
+          </div>
+
+          {/* 3. Project Context */}
+          <div className="info-section">
+            <p className="info-section-title">Project Summary</p>
+            <div className="info-row">
+              <span className="info-label">Product / Project</span>
+              <span className="info-value" style={{ fontWeight: '600' }}>{productName}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Category</span>
+              <span className="info-value">{tx.category || tx.productCategory || 'Completed Project'}</span>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Total Amount</span>
+              <span className="info-value mono">₱{Number(tx.manualOverride || tx.estimatedTotal || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const InfoSection = ({ title, children }) => (
   <div className="info-section">
     <p className="info-section-title">{title}</p>
@@ -729,6 +803,8 @@ const Transactions = () => {
   const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [feedbackCategory, setFeedbackCategory] = useState('All');
+  const [feedbackSortDate, setFeedbackSortDate] = useState('newest'); // 'newest' o 'oldest'
   const [viewTx, setViewTx] = useState(null);
   const [editTx, setEditTx] = useState(null);
   const [contractTx, setContractTx] = useState(null);
@@ -765,6 +841,34 @@ const Transactions = () => {
     });
   }
 
+const handleDeleteFeedback = (feedbackId) => {
+  if (!feedbackId) return;
+
+  const apiUri = (window.base_api || "http://localhost:5000/api/") + "delete_feedback/" + feedbackId;
+  const payload = {
+    token: user.token,
+    userId: user._id
+  };
+
+  CRUD(
+    apiUri,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    },
+    (res) => {
+      if (res && res.remarks === 'success') {
+        // Tanggalin sa UI ni Admin
+        setTransactions(prev => prev.filter(item => (item.id || item._id) !== feedbackId));
+        alert("Feedback deleted successfully.");
+      } else {
+        alert(res?.message || "Failed to delete feedback from database.");
+      }
+    }
+  );
+};
+
   const summary = useMemo(() => {
     return transactions.reduce(
       (acc, t) => {
@@ -780,6 +884,13 @@ const Transactions = () => {
       { revenue: 0, collected: 0, pending: 0, completed: 0 }
     );
   }, [transactions]);
+  const ratingSummary = useMemo(() => {
+    const feedbackItems = transactions.filter((t) => t.feedback || t.rating || (t.feedbacks && t.feedbacks.length > 0));
+    if (feedbackItems.length === 0) return { average: 0, count: 0 };
+    const totalRating = feedbackItems.reduce((sum, t) => sum + (Number(t.rating) || 0), 0);
+    return { average: totalRating / feedbackItems.length, count: feedbackItems.length };
+  }, [transactions]);
+
 
   const filtered = useMemo(() => {
     let list = [...transactions];
@@ -787,7 +898,22 @@ const Transactions = () => {
       list = list.filter((t) => t.category === 'Completed Project' || t.category === 'Completed');
     } else if (filter === 'Contract & Warranties') {
       list = list.filter((t) => t.category === 'Contract' || t.category === 'Warranty' || t.category === 'In Progress');
+    } else if (filter === 'Customer Feedbacks') {
+    list = list.filter((t) => t.feedback || t.rating || (t.feedbacks && t.feedbacks.length > 0));
+
+    if (feedbackCategory !== 'All') {
+      list = list.filter((t) => {
+        const cat = t.category || t.productCategory;
+        return cat === feedbackCategory;
+      });
     }
+
+    list.sort((a, b) => {
+      const dateA = new Date(a.dateCreated || a.paymentDate || 0);
+      const dateB = new Date(b.dateCreated || b.paymentDate || 0);
+      return feedbackSortDate === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+  }
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -795,11 +921,12 @@ const Transactions = () => {
         const nameMatch = t.clientName?.toLowerCase().includes(q);
         const contractMatch = t.contractId?.toLowerCase().includes(q) || t.id?.toLowerCase().includes(q);
         const productMatch = t.measurements?.some(m => m.product?.toLowerCase().includes(q));
+        const feedbackMatch = t.feedback?.toLowerCase().includes(q);
         return nameMatch || contractMatch || productMatch;
       });
     }
     return list;
-  }, [transactions, filter, search]);
+  }, [transactions, filter, search, feedbackCategory, feedbackSortDate]);
 
 const handleSave = (id, updates, onSuccess, onError) => {
     if (!user || !user.token) {
@@ -853,7 +980,7 @@ const handleSave = (id, updates, onSuccess, onError) => {
     });
   };
 
-  const FILTERS = ['All', 'Completed Projects', 'Contract & Warranties'];
+  const FILTERS = ['All', 'Completed Projects', 'Contract & Warranties','Customer Feedbacks'];
 
   return (
     <div className="page-root">
@@ -871,6 +998,12 @@ const handleSave = (id, updates, onSuccess, onError) => {
         <SummaryCard icon="✅" label="Total Collected" value={fmt(summary.collected)} color="green" />
         <SummaryCard icon="⏳" label="Pending Balance" value={fmt(summary.pending)} color="amber" />
         <SummaryCard icon="🏗️" label="Completed Projects" value={summary.completed} color="purple" />
+        <SummaryCard
+          icon="⭐"
+          label="Average Customer Rating"
+          value={ratingSummary.count > 0 ? `${ratingSummary.average.toFixed(1)} / 5 (${ratingSummary.count})` : 'No ratings yet'}
+          color="amber"
+        />
       </div>
 
       <div className="controls-bar">
@@ -881,6 +1014,36 @@ const handleSave = (id, updates, onSuccess, onError) => {
             </button>
           ))}
         </div>
+
+        {filter === 'Customer Feedbacks' && (
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {/* Category Dropdown */}
+            <select 
+              value={feedbackCategory} 
+              onChange={(e) => setFeedbackCategory(e.target.value)}
+              className="search-input"
+              style={{ padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              <option value="All">All Categories</option>
+              <option value="Completed Project">Completed Projects</option>
+
+              <option value="Contract">Contract</option>
+              <option value="Warranty">Warranty</option>
+            </select>
+
+            {/* Date Sorting Dropdown */}
+            <select 
+              value={feedbackSortDate} 
+              onChange={(e) => setFeedbackSortDate(e.target.value)}
+              className="search-input"
+              style={{ padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              <option value="newest">Sort: Newest First</option>
+              <option value="oldest">Sort: Oldest First</option>
+            </select>
+          </div>
+        )}
+
         <div className="search-box">
           <span className="search-ico">🔍</span>
           <input
@@ -897,113 +1060,216 @@ const handleSave = (id, updates, onSuccess, onError) => {
       <div className="table-card">
         <div className="table-scroll">
           <table className="data-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Client</th>
-                <th>Product / Project</th>
-                <th>Paid / Total</th>
-                <th>Method</th>
-                <th>Customer Type</th>
-                <th>Install Date</th>
-                <th>Category</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="empty-cell">
-                    <div className="empty-state">
-                      <span className="empty-icon">📭</span>
-                      <p>No records found for this filter.</p>
-                    </div>
-                  </td>
-                </tr>
+            {filter === 'Customer Feedbacks' ? (
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Customer Name</th>
+                    <th>Product / Project</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                    <th>Rating</th>
+                    <th>Feedback</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
               ) : (
-                filtered.map((t, i) => {
-                  const totalAmount = Number(t.manualOverride || t.estimatedTotal || 0);
-                  const paidAmount = Number(t.totalPayment || 0);
-                  const isFullyPaid = deriveStatus(paidAmount, totalAmount) === 'Fully Paid';
-                  
-                  // Extract dynamic measurement product title text
-                  const productDisplay = t.measurements && t.measurements.length > 0 
-                    ? t.measurements.map(m => m.product).join(", ") 
-                    : "Glass Fitting";
-
-                  return (
-                    <tr key={t.id} className="data-row">
-                      <td className="col-num">{i + 1}</td>
-                      <td>
-                        <div className="client-cell">
-                          <Avatar name={t.clientName} />
-                          <div>
-                            <p className="client-name">{t.clientName || '—'}</p>
-                            <p className="client-email">{t.customerEmail || '—'}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <p className="product-name">{productDisplay}</p>
-                        <p className="contract-num">{t.contractId || t.id}</p>
-                      </td>
-                      <td>
-                        <p className="col-paid">{fmt(paidAmount)}</p>
-                        <p className="col-total">of {fmt(totalAmount)}</p>
-                      </td>
-                      <td>
-                        <span className={`method-chip ${t.paymentMethod === 'Online' ? 'chip-online' : 'chip-cash'}`}>
-                          {t.paymentMethod === 'Online' ? '💳 Online' : '💵 Cash'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="type-chip">
-                          {t.customerHasAccount ? '🌐 Website Order' : '🚶 Walk-in'}
-                        </span>
-                      </td>
-                      <td className="col-date">{fmtDate(t.estimatedInstallationDate)}</td>
-                      <td><CategoryBadge category={t.category} /></td>
-                      <td>
-                        {t.status == "Paid" ?
-                        <span className="badge-paid">✓ Fully Paid</span> :
-                        <span className="badge-pending">⏳ Pending</span>
-                        }
-                      </td>
-                      <td>
-                        <div className="action-group">
-                          <button className="action-btn btn-edit" onClick={() => setViewTx(t)} title="View Details" hidden={permissions?.modules?.["Transactions"]?.["View Details"] !== 1}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
-                              <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                          </button>
-                          <button
-                            className={`action-btn btn-edit ${isFullyPaid ? 'btn-locked' : ''}`}
-                            onClick={() => !isFullyPaid && setEditTx(t)}
-                            disabled={isFullyPaid}
-                            title={isFullyPaid ? 'Locked — fully paid' : 'Edit Payment'}
-                          >
-                            {isFullyPaid
-                              ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                              : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                            }
-                          </button>
-                          <button className="action-btn btn-contract" onClick={() => setContractTx(t)} title="View/Download Contract" hidden={permissions?.modules?.["Transactions"]?.["Edit"] !== 1}>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Client</th>
+                    <th>Product / Project</th>
+                    <th>Paid / Total</th>
+                    <th>Method</th>
+                    <th>Customer Type</th>
+                    <th>Install Date</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            <tbody>
+        {filtered.length === 0 ? (
+          <tr>
+            <td colSpan={filter === 'Customer Feedbacks' ? 8 : 10} className="empty-cell">
+              <div className="empty-state">
+                <span className="empty-icon"></span>
+                <p>
+                  {filter === 'Customer Feedbacks' 
+                    ? "No feedbacks yet." 
+                    : "No records found for this filter."}
+                </p>
+              </div>
+            </td>
+          </tr>
+        ) : filter === 'Customer Feedbacks' ? (
+      
+          filtered.map((t, i) => {
+            const productDisplay = t.measurements && t.measurements.length > 0
+              ? t.measurements.map(m => m.product).join(", ")
+              : "Glass Fitting";
+            
+            const ratingScore = t.rating || 5;
 
-      {viewTx && <ViewModal tx={viewTx} onClose={() => setViewTx(null)} onViewContract={setContractTx} />}
+            return (
+              <tr key={t.id || i} className="data-row">
+                <td className="col-num">{i + 1}</td>
+                <td>
+                  <div className="client-cell">
+                    <Avatar name={t.clientName} />
+                    <div>
+                      <p className="client-name">{t.clientName || '-'}</p>
+                      <p className="client-email">{t.customerEmail || '-'}</p>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <p className="product-name">{productDisplay}</p>
+                  <p className="contract-num">{t.contractId || t.id}</p>
+                </td>
+                <td><CategoryBadge category={t.category} /></td>
+                <td className="col-date">{fmtDate(t.dateCreated || t.paymentDate)}</td>
+                <td>
+                  <span style={{ color: '#f59e0b', fontSize: '14px' }}>
+                    {'★'.repeat(ratingScore)}{'☆'.repeat(5 - ratingScore)}
+                  </span>
+                </td>
+                <td style={{ maxWidth: '280px', color: '#334155', fontSize: '13px' }}>
+                  {t.feedback || "No comment provided."}
+                </td>
+                <td>
+       
+              <div className="action-group">             
+                <button 
+                  className="action-btn btn-edit" 
+                  onClick={() => setViewTx(t)} 
+                  title="View Feedback Summary"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </button>
+
+                {/* Delete Feedback Button */}
+                <button 
+                  className="action-btn" 
+                  style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }}
+                  onClick={() => {
+                    if (window.confirm("Are you sure you want to delete this customer feedback?")) {
+                      handleDeleteFeedback(t.id || t._id);
+                    }
+                  }} 
+                  title="Delete Feedback"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              </div>
+            </td>
+              </tr>
+            );
+          })
+        ) : (
+
+          filtered.map((t, i) => {
+            const totalAmount = Number(t.manualOverride || t.estimatedTotal || 0);
+            const paidAmount = Number(t.totalPayment || 0);
+            const isFullyPaid = deriveStatus(paidAmount, totalAmount) === 'Fully Paid';
+            const productDisplay = t.measurements && t.measurements.length > 0
+              ? t.measurements.map(m => m.product).join(",")
+              : "Glass Fitting";
+
+            return (
+              <tr key={t.id} className="data-row">
+                <td className="col-num">{i + 1}</td>
+                <td>
+                  <div className="client-cell">
+                    <Avatar name={t.clientName} />
+                    <div>
+                      <p className="client-name">{t.clientName || '-'}</p>
+                      <p className="client-email">{t.customerEmail || '-'}</p>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <p className="product-name">{productDisplay}</p>
+                  <p className="contract-num">{t.contractId || t.id}</p>
+                </td>
+                <td>
+                  <p className="col-paid">{fmt(paidAmount)}</p>
+                  <p className="col-total">of {fmt(totalAmount)}</p>
+                </td>
+                <td>
+                  <span className={`method-chip ${t.paymentMethod === 'Online' ? 'chip-online' : 'chip-cash'}`}>
+                    {t.paymentMethod === 'Online' ? 'Online' : 'Cash'}
+                  </span>
+                </td>
+                <td>
+                  <span className="type-chip">
+                    {t.customerHasAccount ? 'Website Order' : 'Walk-in'}
+                  </span>
+                </td>
+                <td className="col-date">{fmtDate(t.estimatedInstallationDate)}</td>
+                <td><CategoryBadge category={t.category} /></td>
+                <td>
+                  {t.status === "Paid" ? (
+                    <span className="badge-paid">Fully Paid</span>
+                  ) : (
+                    <span className="badge-pending">Pending</span>
+                  )}
+                </td>
+                <td>
+                  <div className="action-group">
+                    <button 
+                      className="action-btn btn-edit" 
+                      onClick={() => setViewTx(t)} 
+                      title="View Details"
+                      hidden={permissions?.modules?.["Transactions"]?.["View Details"] !== 1}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </button>
+                    <button
+                      className={`action-btn btn-edit ${isFullyPaid ? 'btn-locked' : ''}`}
+                      onClick={() => !isFullyPaid && setEditTx(t)}
+                      disabled={isFullyPaid}
+                      title={isFullyPaid ? 'Locked fully paid' : 'Edit Payment'}
+                    >
+                      {isFullyPaid ? (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      ) : (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      )}
+                    </button>
+                    <button 
+                      className="action-btn btn-contract" 
+                      onClick={() => setContractTx(t)} 
+                      title="View/Download Contract"
+                      hidden={permissions?.modules?.["Transactions"]?.["Edit"] !== 1}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
+      {viewTx && filter === 'Customer Feedbacks' ? (
+        <FeedbackSummaryModal tx={viewTx} onClose={() => setViewTx(null)} />
+      ) : viewTx ? (
+        <ViewModal tx={viewTx} onClose={() => setViewTx(null)} onViewContract={setContractTx} />
+      ) : null}
       {editTx && <EditModal tx={editTx} onClose={() => setEditTx(null)} onSave={handleSave} />}
       {contractTx && <ContractModal tx={contractTx} onClose={() => setContractTx(null)} />}
     </div>

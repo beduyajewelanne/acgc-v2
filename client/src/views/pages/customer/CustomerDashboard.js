@@ -8,9 +8,45 @@ import { isEmpty, CRUD } from 'services/data.services';
 
 const CustomerDashboard = ({ isLoggedIn }) => {
   const navigate = useNavigate();
-  const { user } = useContext(UserContext);
+  const { user, permissions } = useContext(UserContext);
 
   const [featuredProducts, setFeaturedProducts] = useState([]);
+
+  const [ratingData, setRatingData] = useState({
+    averageRating: 0,
+    breakdown: []
+  });
+  const clientPerms = permissions?.modules?.["Client"];
+  const [globalRatingEnabled, setGlobalRatingEnabled] = useState(false);
+
+  useEffect(() => {
+    if (user && !isEmpty(user.token)) return; // may sarili nang permissions ang naka-login na user
+
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: user?.token || "", _id: user?._id || "" })
+    };
+
+    CRUD(window.base_api + "get_global_client_template", requestOptions, (res) => {
+      if (res && res.remarks === "success" && res.payload) {
+        setGlobalRatingEnabled(res.payload["Show Ratings Homepage"] === 1);
+      } else {
+        setGlobalRatingEnabled(false); // safe default: itago kapag hindi matukoy
+      }
+    });
+  }, [user]);
+
+  const isHomepageRatingEnabled = clientPerms
+    ? clientPerms["Show Ratings Homepage"] === 1
+    : globalRatingEnabled;
+
+  useEffect(() => {
+    console.log("=== CUSTOMER DASHBOARD DEBUG ===");
+    console.log("User Context:", user);
+    console.log("Permissions Context:", permissions);
+    console.log("Is Homepage Rating Enabled?:", isHomepageRatingEnabled);
+  }, [user, permissions, isHomepageRatingEnabled]);
 
   useEffect(() => {
     const requestOptions = {
@@ -26,7 +62,26 @@ const CustomerDashboard = ({ isLoggedIn }) => {
       } else if (res && Array.isArray(res.payload)) {
         setFeaturedProducts(res.payload);
       } else {
-        console.warn("Unexpected featured products payload format:", res);
+        console.error("Dashboard: Error fetching featured products payload:", res);
+      }
+    });
+  }, []);
+
+    /* Fetch Dynamic Ratings Data */
+  useEffect(() => {
+    const requestOptions = {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    };
+
+    CRUD(window.base_api + "customer_ratings", requestOptions, (res) => {
+      console.log("Dashboard: Ratings API response:", res);
+      if (res && res.remarks === "success" && res.payload) {
+        setRatingData(res.payload);
+      } else if (res && res.averageRating !== undefined) {
+        setRatingData(res);
+      } else {
+        console.error("Dashboard: Error fetching ratings data:", res);
       }
     });
   }, []);
@@ -39,6 +94,20 @@ const CustomerDashboard = ({ isLoggedIn }) => {
       console.log("User is logged in:", user);
     }
   }, [user]);
+
+  const renderStars = (rating) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      if (rating >= i) {
+        stars.push(<span key={i} className="star full">★</span>);
+      } else if (rating >= i - 0.5) {
+        stars.push(<span key={i} className="star half">★</span>);
+      } else {
+        stars.push(<span key={i} className="star empty">☆</span>);
+      }
+    }
+    return stars;
+  };
 
   return (
     <div className="homepage-container">
@@ -92,14 +161,43 @@ const CustomerDashboard = ({ isLoggedIn }) => {
         </div>
       </section>
 
-      <section className="cta-section">
-        <h2>Ready to Start Your Project?</h2>
-        <p>Contact us today for a free consultation and site inspection.</p>
-        <div className="cta-buttons">
-          <button className="btn-primary" onClick={() => navigate('/customer/products')}>Browse & Order Now</button>
-          <a href="tel:+639123456789" className="btn-secondary-dark">📞 Call +63 912 345 6789</a>
-        </div>
-      </section>
+      {isHomepageRatingEnabled && (
+        <section className="rating-section">
+          <h2>Customer Ratings</h2>
+
+          <div className="rating-container">
+            <div className="rating-score-box">
+              <div className="rating-number">
+                {Number(ratingData.averageRating).toFixed(1)}
+              </div>
+              <div className="stars-gold">
+                {renderStars(ratingData.averageRating)}
+              </div>
+              <div className="rating-label">Average Rating</div>
+            </div>
+
+            <div className="rating-bars">
+              {ratingData.breakdown.map((item) => (
+                <div className="rating-bar-row" key={item.stars}>
+                  <div className="bar-background">
+                    <div
+                      className="bar-fill"
+                      style={{ width: `${item.percentage}%` }}
+                    ></div>
+                  </div>
+w
+                  <div className="bar-meta">
+                    <div className="stars-gold">
+                      {renderStars(item.stars)}
+                    </div>
+                    <span className="percentage-text">{item.percentage}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 };

@@ -407,6 +407,109 @@ html { font-size: 18px; }
   color: var(--slate);
 }
 
+.rating-section {
+  padding: 0 1rem 3rem;
+  max-width: 800px;
+  margin: -20px auto 40px; 
+}
+
+.rating-section h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: #000;
+}
+
+.rating-container {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+}
+
+/* Score Box */
+.rating-score-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 140px;
+}
+
+.rating-number {
+  font-size: 3.8rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #000;
+}
+
+.stars-gold {
+  color: #fbc02d;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.rating-label {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111;
+}
+
+/* Breakdown Bars */
+.rating-bars {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.rating-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bar-background {
+  flex-grow: 1;
+  height: 16px;
+  background-color: #f1f3f5;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background-color: #3182ce;
+  border-radius: 20px;
+  transition: width 0.4s ease-in-out;
+}
+
+.bar-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 140px;
+  justify-content: flex-end;
+}
+
+.percentage-text {
+  color: #3182ce;
+  font-size: 0.95rem;
+  font-weight: 500;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* Responsive Fix for Smaller Screens */
+@media (max-width: 600px) {
+  .rating-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.5rem;
+  }
+}
+
 /* ── Responsive ── */
 @media (max-width: 1024px) {
   .product-grid { grid-template-columns: repeat(2, 1fr); }

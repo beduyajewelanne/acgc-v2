@@ -1288,6 +1288,67 @@
     display: none;
 }
 
+/*  Customer Feedback Custom Styles  */
+.cf-custom-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #475569;
+  margin-top: 12px;
+}
+
+.cf-custom-wrapper {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.cf-custom-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.cf-custom-card {
+  padding: 10px;
+  border-radius: 6px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.cf-custom-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.cf-custom-author {
+  font-weight: 600;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.cf-custom-stars {
+  display: flex;
+  gap: 2px;
+  color: #f59e0b;
+}
+
+.cf-custom-comment {
+  margin: 0;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.4;
+}
 /* ================================================================
    RESPONSIVE
    ================================================================ */

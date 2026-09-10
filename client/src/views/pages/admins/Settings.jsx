@@ -31,6 +31,8 @@ const CUSTOMER_PERMS = [
   { id: 'View Only', label: 'View Only Access', desc: 'Read-only access to their account' },
   { id: 'Request Site Inspection', label: 'Can Request Site Inspection', desc: 'Schedule on-site inspections' },
   { id: 'Track Project Progress', label: 'Can Track Project Progress', desc: 'Monitor active project status' },
+  { id: 'Can upload feedback', label: 'Can Upload/View Feedback', desc: 'Allow customers to view product feedbacks' },
+  { id: 'Show Ratings Homepage', label: 'Show Ratings on Homepage', desc: 'Display average customer ratings section on homepage' }
 ];
 
 const INITIAL_BACKUPS = [

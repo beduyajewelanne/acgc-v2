@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   X, ChevronLeft, ChevronRight, ShoppingCart, Zap, Phone,
-  Ruler, Calculator, Info, ArrowLeft, CheckCircle2
+  Ruler, Calculator, Info, ArrowLeft, CheckCircle2,MessageSquareOff, Star
 } from 'lucide-react';
 import OrderRequestForm from './OrderRequestForm';
-import {isEmpty} from "services/data.services"
+import {isEmpty, CRUD} from "services/data.services"
 
 /* ─── Unit conversion helpers ────────────────────────────────────────────── */
 const toFeet = (value, unit) => {
@@ -116,6 +116,98 @@ const PriceEstimator = ({ product, measurements, onMeasurementsChange }) => {
   );
 };
 
+const PrivateFeedbackForm = ({ product, user }) => {
+  const [open, setOpen] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!user || !user.token) {
+      alert("Please login first to submit feedback.");
+      return;
+    }
+
+    const payload = {
+      token: user.token,
+      productId: product._id || product.id,
+      rating: rating,
+      comment: comment,
+      isApprovedByAdmin: 0 
+    };
+
+    CRUD(window.base_api + "submit_feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }, (res) => {
+      setSubmitted(true);
+      setOpen(false);
+    });
+  };
+
+  if (submitted) {
+    return (
+      <p style={{ fontSize: '12px', color: '#16a34a', marginTop: '6px' }}>
+        ✓ Thank you! Your feedback was sent privately to the admin.
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: '8px' }}>
+      {!open ? (
+        <button 
+          onClick={() => setOpen(true)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#1d4ed8',
+            fontSize: '12px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            padding: 0
+          }}
+        >
+          + Leave private feedback for admin
+        </button>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '600' }}>Submit Private Feedback</span>
+          
+          {/* Star Rating Selector */}
+          <div style={{ display: 'flex', gap: '4px', cursor: 'pointer' }}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star
+                key={star}
+                size={16}
+                onClick={() => setRating(star)}
+                fill={star <= rating ? '#f59e0b' : 'none'}
+                color={star <= rating ? '#f59e0b' : '#cbd5e1'}
+              />
+            ))}
+          </div>
+
+          <textarea
+            placeholder="Write your feedback here (visible to store owner only)..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            required
+            rows={2}
+            style={{ width: '100%', fontSize: '12px', padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+          />
+
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+            <button type="button" onClick={() => setOpen(false)} style={{ fontSize: '12px', padding: '4px 8px', background: '#e2e8f0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+            <button type="submit" style={{ fontSize: '12px', padding: '4px 8px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Submit</button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+};
+
 /* ─── Product Modal ──────────────────────────────────────────────────────── */
 const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, permissions }) => {
   const navigate = useNavigate();
@@ -139,9 +231,50 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
     }
   },[initialIntent])
 
+  const clientPerms = permissions?.modules?.["Client"];
+  const isFeedbackAllowed = clientPerms 
+    ? (clientPerms["Can upload feedback"] === 1 || 
+       clientPerms["Can Upload/View Feedback"] === 1 || 
+       clientPerms["Customer Feedback"] === 1)
+    : true; 
+
+  const [modalFeedbacks, setModalFeedbacks] = useState([]);
+
   useEffect(() => {
-    console.log(permissions);console.log(product)
-  }, [permissions])
+    if (product) {
+      if (product.feedbacks && Array.isArray(product.feedbacks)) {
+        setModalFeedbacks(product.feedbacks);
+        return;
+      }
+
+      const api_url = window.base_api + "get_products_client";
+      CRUD(api_url, { method: "GET" }, (res) => {
+        const list = res?.payload || [];
+        const pId = String(product._id || product.id || '').trim();
+        const pName = String(product.name || '').toLowerCase().trim();
+
+        const matched = list.find(p => {
+          const itemId = String(p._id || p.id || '').trim();
+          const itemName = String(p.name || '').toLowerCase().trim();
+          return (pId && itemId && pId === itemId) || (pName && itemName && pName === itemName);
+        });
+
+        if (matched?.feedbacks && Array.isArray(matched.feedbacks)) {
+          setModalFeedbacks(matched.feedbacks);
+        }
+      });
+    }
+  }, [product]);
+
+  useEffect(() => {
+    console.log("=== PRODUCT MODAL DEBUG LOGS ===");
+    console.log("1. Selected Product Payload:", product);
+    console.log("2. Attached Feedbacks Array:", product?.feedbacks);
+    console.log("3. User Context:", user);
+    console.log("4. Permissions Context:", permissions);
+    console.log("5. Is Feedback Allowed?:", isFeedbackAllowed);
+  }, [permissions, product, user, isFeedbackAllowed]);
+
 
   /* Keyboard ESC */
   useEffect(() => {
@@ -175,8 +308,6 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
       />
     );
   }
-
-
 
   return (
     <div className="modal-overlay" ref={overlayRef} onClick={handleOverlayClick}>
@@ -252,15 +383,13 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
             <hr className="detail-divider" />
 
             {/* Price Estimator */}
-            
-
-              {permissions?.modules?.[ "Client" ]?.["Estimate Pricing"] == 1 && (
+            {permissions?.modules?.[ "Client" ]?.["Estimate Pricing"] == 1 && (
               <PriceEstimator
                 product={product}
                 measurements={measurements}
                 onMeasurementsChange={setMeasurements} 
               />
-              )}
+            )}
 
             {/* CTA Buttons */}
             <div className="modal-cta">
@@ -302,6 +431,86 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
               <Phone size={14} />
               <span>Call for inquiries: <strong>09123456789</strong></span>
             </div>
+
+            {/* Feedback */}
+            {!isFeedbackAllowed ? (
+              <div style={{ marginTop: '12px' }}>
+                <div className="cf-custom-container">
+                  <CheckCircle2 size={14} />
+                  <span>Customer feedback and reviews will be available soon.</span>
+                </div>
+              </div>
+            ) : (
+              (() => {
+             
+                const rawFeedbacks = (product?.feedbacks && product.feedbacks.length > 0) 
+  ? product.feedbacks 
+  : (product?.reviews || modalFeedbacks);
+
+               
+                const matchedFeedbacks = rawFeedbacks.filter(item => {
+                  if (!item) return false;
+                  
+                  const pId = String(product._id || product.id || '').trim();
+                  const pName = String(product.name || '').toLowerCase().trim();
+
+                  const itemPId = String(item.productId || '').trim();
+                  const itemPName = String(item.productName || item.product || '').toLowerCase().trim();
+
+                  if (pId && itemPId && pId === itemPId) return true;
+                  if (pName && itemPName && (itemPName.includes(pName) || pName.includes(itemPName))) return true;
+
+                  return false;
+                });
+
+                if (matchedFeedbacks.length === 0) {
+                  return (
+                    <div style={{ marginTop: '12px' }}>
+                      <div className="cf-custom-container">
+                        <MessageSquareOff size={14} />
+                        <span>No customer feedback for this product yet.</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="cf-custom-wrapper" style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                    <div className="cf-custom-title" style={{ fontWeight: '700', fontSize: '14px', marginBottom: '8px', color: '#1e293b' }}>
+                      Customer Reviews ({matchedFeedbacks.length})
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
+                      {matchedFeedbacks.map((item, idx) => {
+                        const rScore = parseInt(item.rating) || 5;
+                        return (
+                          <div key={item._id || item.id || idx} className="cf-custom-card" style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <div className="cf-custom-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                              <span className="cf-custom-author" style={{ fontWeight: '600', fontSize: '12px', color: '#0f172a' }}>
+                                {item.userName || item.author || 'Verified Buyer'}
+                              </span>
+                              <div className="cf-custom-stars" style={{ display: 'flex', gap: '2px' }}>
+                                {[...Array(5)].map((_, starIndex) => (
+                                  <Star
+                                    key={starIndex}
+                                    size={12}
+                                    fill={starIndex < rScore ? '#f59e0b' : 'none'}
+                                    color={starIndex < rScore ? '#f59e0b' : '#cbd5e1'}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <p className="cf-custom-comment" style={{ fontSize: '12px', color: '#334155', margin: 0, lineHeight: '1.4' }}>
+                              {item.comment || item.feedback || 'No written review.'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()
+            )}
           </div>
         </div>
       </div>

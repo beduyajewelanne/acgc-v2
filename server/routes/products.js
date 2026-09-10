@@ -83,17 +83,33 @@ productRoutes.get("/api/get_products_client", async (req, res) => {
             $match: {
                 active: true
             }
-        }]
+        }];
         const result = await get_data_helper("products", product_query);
-        if (result?.payload?.length > 0) {
-            response = { remarks: "success", message: "Data fetched successfully", payload: result.payload };
-        } else {
-            response = { remarks: "failed", message: "No data found", payload: null };
-        }
-        res.status(200).json(response);
+        const products = result?.payload || [];
+
+        const feedbacksResult = await get_data_helper("feedbacks", []);
+        const allFeedbacks = feedbacksResult?.payload || [];
+
+        const productsWithFeedbacks = products.map(product => {
+            const matchedFeedbacks = allFeedbacks.filter(f => 
+                String(f.productId) === String(product._id || product.id) ||
+                (f.productName && product.name && String(f.productName).trim().toLowerCase() === String(product.name).trim().toLowerCase())
+            );
+
+            return {
+                ...product,
+                feedbacks: matchedFeedbacks
+            };
+        });
+
+        return res.status(200).json({ 
+            remarks: "success", 
+            message: "Data fetched successfully", 
+            payload: productsWithFeedbacks 
+        });
     } catch (err) {
-        console.error("Error in /api/get_products:", err);
-        res.status(500).json({ error: err });
+        console.error("Error in /api/get_products_client:", err);
+        return res.status(500).json({ error: err.message || err });
     }
 });
 
@@ -393,4 +409,198 @@ productRoutes.get("/api/featured_products", async (req, res) => {
     }
 });
 
+productRoutes.post("/api/submit_feedback", async (req, res) => {
+    const { token, userId, userName, orderId, productId, productName, productCategory, rating, comment, isApprovedByAdmin } = req.body;
+
+    if (!token) return res.status(400).json({ error: "Token is required" });
+    if (!comment || !rating) return res.status(400).json({ error: "Rating and comment are required" });
+
+    try {
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            if (orderId) {
+                const existingFeedback = await get_data_helper("feedbacks", [
+                    { $match: { orderId: orderId, userId: userId } }
+                ]);
+
+                if (existingFeedback?.payload?.length > 0) {
+                    return res.status(400).json({ 
+                        remarks: "failed", 
+                        message: "You have already submitted feedback for this order." 
+                    });
+                }
+            }
+
+            const newFeedback = {
+                userId: userId,
+                userName: userName || "Customer",
+                orderId: orderId || null,
+                productId: productId || null,
+                productName: productName || "",
+                productCategory: productCategory || "Completed Project",
+                rating: parseInt(rating) || 5,
+                comment: comment || "",
+                isApprovedByAdmin: isApprovedByAdmin !== undefined ? isApprovedByAdmin : 0,
+                createdAt: new Date()
+            };
+
+            const result = await insert_one_helper("feedbacks", newFeedback);
+
+            if (orderId) {
+                await update_one_helper("orders", { orderId: orderId }, {
+                    $set: { 
+                        feedback: comment,
+                        rating: parseInt(rating) || 5,
+                        isFeedbackSubmitted: true
+                    }
+                });
+            }
+
+            return res.status(200).json({ 
+                remarks: "success", 
+                message: "Feedback submitted successfully", 
+                payload: result 
+            });
+        });
+    } catch (err) {
+        console.error("Error in /api/submit_feedback:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
+productRoutes.get("/api/customer_ratings", async (req, res) => {
+    try {
+        const feedbacksResult = await get_data_helper("feedbacks", []);
+        const feedbacks = feedbacksResult?.payload || [];
+
+        if (feedbacks.length === 0) {
+            return res.status(200).json({
+                remarks: "success",
+                payload: {
+                    averageRating: 0,
+                    breakdown: [
+                        { stars: 5, percentage: 0 },
+                        { stars: 4, percentage: 0 },
+                        { stars: 3, percentage: 0 },
+                        { stars: 2, percentage: 0 },
+                        { stars: 1, percentage: 0 }
+                    ]
+                }
+            });
+        }
+
+        const total = feedbacks.length;
+        const sum = feedbacks.reduce((acc, curr) => acc + (parseInt(curr.rating) || 0), 0);
+        const avg = (sum / total).toFixed(1);
+
+        const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        feedbacks.forEach(f => {
+            const r = parseInt(f.rating) || 5;
+            if (counts[r] !== undefined) counts[r]++;
+        });
+
+        const breakdown = [5, 4, 3, 2, 1].map(stars => ({
+            stars: stars,
+            percentage: Math.round((counts[stars] / total) * 100)
+        }));
+
+        return res.status(200).json({
+            remarks: "success",
+            payload: {
+                averageRating: parseFloat(avg),
+                breakdown: breakdown
+            }
+        });
+    } catch (err) {
+        console.error("Error in /api/customer_ratings:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
+// GET TRANSACTIONS (INCLUDES FEEDBACKS FOR ADMIN) 
+productRoutes.post("/api/get_transactions", async (req, res) => {
+    const { token, user_id } = req.body;
+    if (!token) return res.status(400).json({ error: "Token is required" });
+
+    try {
+        checkAuth(token, user_id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            const ordersResult = await get_data_helper("orders", []);
+            const orders = ordersResult?.payload || [];
+
+            const feedbacksResult = await get_data_helper("feedbacks", []);
+            const feedbacks = feedbacksResult?.payload || [];
+
+            const transactionList = orders.map(order => {
+                const matchedFeedbacks = feedbacks.filter(f => 
+                    String(f.orderId) === String(order.orderId || order.id || order._id)
+                );
+
+                const latestFeedback = matchedFeedbacks.length > 0 ? matchedFeedbacks[matchedFeedbacks.length - 1] : null;
+
+                return {
+                    ...order,
+                    id: order.orderId || order._id,
+                    clientName: order.userName || order.clientName || (order.user ? `${order.user.firstName} ${order.user.lastName}` : "Customer"),
+                    customerEmail: order.userEmail || order.email || "",
+                    feedback: latestFeedback ? latestFeedback.comment : order.feedback || "",
+                    rating: latestFeedback ? latestFeedback.rating : order.rating || null,
+                    feedbacks: matchedFeedbacks
+                };
+            });
+
+            
+            feedbacks.forEach(f => {
+                const exists = transactionList.some(t => String(t.id) === String(f.orderId));
+                if (!exists) {
+                    transactionList.push({
+                        id: f._id || f.orderId || `FB-${Math.random().toString(36).substr(2, 5)}`,
+                        contractId: f.orderId || "Direct Feedback",
+                        clientName: f.userName || "Customer",
+                        customerEmail: "",
+                        category: f.productCategory || "Completed Project",
+                        dateCreated: f.createdAt,
+                        feedback: f.comment,
+                        rating: f.rating,
+                        feedbacks: [f]
+                    });
+                }
+            });
+
+            return res.status(200).json({
+                remarks: "success",
+                message: "Transactions and feedbacks fetched successfully",
+                payload: transactionList
+            });
+        });
+    } catch (err) {
+        console.error("Error in /api/get_transactions:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
+// --- DELETE FEEDBACK (ADMIN) ---
+productRoutes.post("/api/delete_feedback/:id", async (req, res) => {
+    const { token, userId } = req.body;
+    const feedbackId = req.params.id;
+
+    if (!token) return res.status(400).json({ error: "Token is required" });
+
+    try {
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+           
+            const result = await delete_or_archive_helper("feedbacks", { _id: new ObjectId(feedbackId) });
+
+            return res.status(200).json({
+                remarks: "success",
+                message: "Feedback permanently deleted",
+                payload: result
+            });
+        });
+    } catch (err) {
+        console.error("Error in /api/delete_feedback:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
 module.exports = productRoutes;

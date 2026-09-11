@@ -26,7 +26,10 @@ const Header = ({ isLoggedIn }) => {
   return (
     <header className="dashboard-header">
       <div className="logo">
-        <Link to="/"><h2>ACGC SYSTEM</h2></Link>
+        <Link to="/">
+          <img src="/images/acgc-logo.png" alt="ACGC Logo" className="logo-img" />
+          <h2>ACGC SYSTEM</h2>
+        </Link>
       </div>
       <nav className="nav-links">
         {isLoggedIn ? (

@@ -9,7 +9,7 @@ const AboutUs = () => {
     <div className="about-container">
       <header className="header-section">
         <span className="badge">EST. 2010</span>
-        <h1>About GlassWork PH</h1>
+        <h1>About ACGC</h1>
         <p>
           Premier glass and aluminum fabrication services. Located in Maligaya 1, 
           Kataasan, Dinalupihan, Bataan. Dedicated to delivering high-quality custom 
@@ -30,10 +30,7 @@ const AboutUs = () => {
           <ul className="services-list">
             <li>Custom Glass Windows & Doors</li>
             <li>Aluminum Frames & Partitions</li>
-            <li>Curtain Wall Systems</li>
-            <li>Glass Railings & Balustrades</li>
             <li>Sliding Doors & Panels</li>
-            <li>Storefront Systems</li>
             <li>Site Inspection & Consultation</li>
             <li>Professional Installation</li>
           </ul>

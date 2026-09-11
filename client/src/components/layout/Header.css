@@ -28,16 +28,10 @@
   gap: 12px;
 }
 
-/* Logo icon mark — glass pane shape */
-.logo a::before {
-  content: '';
-  display: inline-block;
-  width: 36px;
-  height: 36px;
-  background-color: #8b1e22;
-  border-radius: 6px;
-  /* diamond / pane shape via clip-path */
-  clip-path: polygon(50% 0%, 100% 30%, 100% 70%, 50% 100%, 0% 70%, 0% 30%);
+.logo-img {
+  height: 40px;        
+  width: auto;         
+  object-fit: contain;
   flex-shrink: 0;
 }
 

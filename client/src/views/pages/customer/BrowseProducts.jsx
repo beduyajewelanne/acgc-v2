@@ -7,26 +7,32 @@ import { UserContext } from 'App';
 import './BrowseProduct.css';
 
 const CartToast = ({ product, message, onDismiss }) => (
-  <div className="cart-toast">
-    <CheckCircle2 size={18} className="toast-icon" />
+  <div className="bp-cart-toast">
+    <CheckCircle2 size={18} className="bp-toast-icon" />
     <span>{message || <span><strong>{product.name}</strong> added to cart</span>}</span>
-    <button onClick={onDismiss} className="toast-close"><X size={14} /></button>
+    <button onClick={onDismiss} className="bp-toast-close"><X size={14} /></button>
   </div>
 );
 
 const ProductCard = ({ product, onView, onAddToCart }) => (
-  <div className="product-card">
-    <div className="card-image-wrap">
-      <img src={product.images[0] || 'https://via.placeholder.com/600x400?text=No+Image'} alt={product.name} className="card-image" />
-      <span className="card-badge">{product.type}</span>
+  <div className="bp-product-card">
+    <div className="bp-card-image-wrap">
+      <img src={product.images[0] || 'https://via.placeholder.com/600x400?text=No+Image'} alt={product.name} className="bp-card-image" />
+      <span className="bp-card-badge">{product.type}</span>
+      {product.isTopProduct && (
+        <span className="bp-card-top-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Top Pick
+        </span>
+      )}
     </div>
-    <div className="card-body">
-      <p className="card-category">{product.category}</p>
-      <h3 className="card-name">{product.name}</h3>
+    <div className="bp-card-body">
+      <p className="bp-card-category">{product.category}</p>
+      <h3 className="bp-card-name">{product.name}</h3>
       <p>{product.height} x {product.width} {product.unit}</p>
-      <p className="card-price">
+      <p className="bp-card-price">
         ₱{product.price.toLocaleString()}
-        <span className="card-unit"> / sq ft</span>
+        <span className="bp-card-unit"> / sq ft</span>
       </p>
       {product.width > 0 && product.height > 0 && (() => {
         const toFeet = (val, unit) => {
@@ -39,21 +45,21 @@ const ProductCard = ({ product, onView, onAddToCart }) => (
         const area = toFeet(product.width, product.unit) * toFeet(product.height, product.unit);
         const computed = area * product.price;
         return (
-          <p className="card-computed-price">
+          <p className="bp-card-computed-price">
             ₱{computed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         );
       })()}
     </div>
-    <div className="card-actions">
-      <button className="btn-view" onClick={() => onView(product)}>
+    <div className="bp-card-actions">
+      <button className="bp-btn-view" onClick={() => onView(product)}>
         <Eye size={15} />
         View Product
       </button>
-      <button className="btn-order" onClick={() => onView(product, 'order')}>
+      <button className="bp-btn-order" onClick={() => onView(product, 'order')}>
         <Zap size={15} />
       </button>
-      <button className="btn-cart" onClick={() => onAddToCart(product)}>
+      <button className="bp-btn-cart" onClick={() => onAddToCart(product)}>
         <ShoppingCart size={15} />
       </button>
     </div>
@@ -114,7 +120,8 @@ const BrowseProducts = () => {
             variant: p.variant || '',
             width: p.width || 0,
             height: p.height || 0,
-            unit: p.unit || 'in'
+            unit: p.unit || 'in',
+            isTopProduct: !!p.isTopProduct
           };
         });
         setProducts(normalized);
@@ -130,15 +137,17 @@ const BrowseProducts = () => {
   const uniqueCategories = useMemo(() => [...new Set(products.map(p => p.category).filter(Boolean))], [products]);
 
   const filtered = useMemo(() => {
-    return products.filter((p) => {
-      const matchType = !filterType || p.type === filterType;
-      const matchCategory = !filterCategory || p.category === filterCategory;
-      const matchSearch =
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.type.toLowerCase().includes(search.toLowerCase()) ||
-        p.category.toLowerCase().includes(search.toLowerCase());
-      return matchType && matchCategory && matchSearch;
-    });
+    return products
+      .filter((p) => {
+        const matchType = !filterType || p.type === filterType;
+        const matchCategory = !filterCategory || p.category === filterCategory;
+        const matchSearch =
+          p.name.toLowerCase().includes(search.toLowerCase()) ||
+          p.type.toLowerCase().includes(search.toLowerCase()) ||
+          p.category.toLowerCase().includes(search.toLowerCase());
+        return matchType && matchCategory && matchSearch;
+      })
+      .sort((a, b) => (b.isTopProduct === true) - (a.isTopProduct === true));
   }, [search, filterType, filterCategory, products]);
 
   const handleView = (product, intent = 'view') => {
@@ -193,37 +202,37 @@ const BrowseProducts = () => {
   };
 
   return (
-    <div className="browse-page">
-      <div className="browse-hero">
-        <div className="hero-inner">
-          <p className="hero-eyebrow">Premium Selection</p>
-          <h1 className="hero-title">Browse Our Collection</h1>
-          <p className="hero-sub">
+    <div className="bp-browse-page">
+      <div className="bp-browse-hero">
+        <div className="bp-hero-inner">
+          <p className="bp-hero-eyebrow">Premium Selection</p>
+          <h1 className="bp-hero-title">Browse Our Collection</h1>
+          <p className="bp-hero-sub">
             Architectural glass & aluminum solutions crafted for lasting elegance.
           </p>
         </div>
       </div>
 
-      <div className="controls-row">
-        <div className="search-wrap">
-          <Search size={16} className="search-icon" />
+      <div className="bp-controls-row">
+        <div className="bp-search-wrap">
+          <Search size={16} className="bp-search-icon" />
           <input
             type="text"
             placeholder="Search products…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
+            className="bp-search-input"
           />
           {search && (
-            <button className="search-clear" onClick={() => setSearch('')}>
+            <button className="bp-search-clear" onClick={() => setSearch('')}>
               <X size={14} />
             </button>
           )}
         </div>
-          <div className="filter-wrap">
-            <SlidersHorizontal size={15} className="filter-icon" />
+          <div className="bp-filter-wrap">
+            <SlidersHorizontal size={15} className="bp-filter-icon" />
             <select
-              className="filter-select"
+              className="bp-filter-select"
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
             >
@@ -233,7 +242,7 @@ const BrowseProducts = () => {
               ))}
             </select>
             <select
-              className="filter-select"
+              className="bp-filter-select"
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
             >
@@ -245,19 +254,19 @@ const BrowseProducts = () => {
           </div>
       </div>
 
-      <div className="results-row">
-        <span className="results-count">
+      <div className="bp-results-row">
+        <span className="bp-results-count">
           {filtered.length} product{filtered.length !== 1 ? 's' : ''} found
         </span>
         {cart.length > 0 && (
-          <span className="cart-count">
+          <span className="bp-cart-count">
             <ShoppingCart size={14} /> {cart.reduce((sum, item) => sum + (item.quantity || 1), 0)} in cart
           </span>
         )}
       </div>
 
       {filtered.length > 0 ? (
-        <div className="product-grid">
+        <div className="bp-product-grid">
           {filtered.map((p) => (
             <ProductCard
               key={p.id}
@@ -268,12 +277,12 @@ const BrowseProducts = () => {
           ))}
         </div>
       ) : (
-        <div className="empty-state">
-          <p className="empty-icon">🔍</p>
-          <p className="empty-title">No products found</p>
-          <p className="empty-sub">Try adjusting your search or filter.</p>
+        <div className="bp-empty-state">
+          <p className="bp-empty-icon">🔍</p>
+          <p className="bp-empty-title">No products found</p>
+          <p className="bp-empty-sub">Try adjusting your search or filter.</p>
           <button
-            className="btn-reset"
+            className="bp-btn-reset"
             onClick={() => { setSearch(''); setActiveCategory('All Products'); }}
           >
             Reset Filters

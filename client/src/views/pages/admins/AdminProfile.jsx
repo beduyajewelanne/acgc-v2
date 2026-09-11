@@ -271,7 +271,7 @@ const Toast = ({ message, type, onClose }) => (
 );
 
 const Avatar = ({ name }) => (
-  <div className="avatar">{name.charAt(0).toUpperCase()}</div>
+  <div className="ap-avatar-mini">{name.charAt(0).toUpperCase()}</div>
 );
 
 // ── Main ──────────────────────────────────────────────────────────────────────

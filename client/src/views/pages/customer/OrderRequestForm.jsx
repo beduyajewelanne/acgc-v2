@@ -32,86 +32,86 @@ const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
   const downpay = total * 0.5;
 
   return (
-    <div className="summary-overlay">
-      <div className="summary-modal">
-        <div className="summary-header">
-          <CheckCircle2 size={22} className="summary-icon" />
-          <h3 className="summary-title">Order Request Summary</h3>
+    <div className="bp-summary-overlay">
+      <div className="bp-summary-modal">
+        <div className="bp-summary-header">
+          <CheckCircle2 size={22} className="bp-summary-icon" />
+          <h3 className="bp-summary-title">Order Request Summary</h3>
         </div>
 
-        <div className="summary-body">
+        <div className="bp-summary-body">
           {/* Customer */}
-          <div className="summary-section">
-            <p className="summary-section-label">Customer Information</p>
-            <div className="summary-row"><User size={13} /><span>{customer?.fullName || ''}</span></div>
-            <div className="summary-row"><Mail size={13} /><span>{customer?.email || ''}</span></div>
-            <div className="summary-row"><Phone size={13} /><span>{customer?.phone || ''}</span></div>
-            <div className="summary-row"><MapPin size={13} /><span>{customer?.address || ''}</span></div>
+          <div className="bp-summary-section">
+            <p className="bp-summary-section-label">Customer Information</p>
+            <div className="bp-summary-row"><User size={13} /><span>{customer?.fullName || ''}</span></div>
+            <div className="bp-summary-row"><Mail size={13} /><span>{customer?.email || ''}</span></div>
+            <div className="bp-summary-row"><Phone size={13} /><span>{customer?.phone || ''}</span></div>
+            <div className="bp-summary-row"><MapPin size={13} /><span>{customer?.address || ''}</span></div>
           </div>
 
           {/* Product */}
-          <div className="summary-section">
-            <p className="summary-section-label">Product Details</p>
-            <div className="summary-row"><Package size={13} /><span>{product.name}</span></div>
-            <div className="summary-row-plain">
-              <span className="sl">Type</span><span>{product.type}</span>
+          <div className="bp-summary-section">
+            <p className="bp-summary-section-label">Product Details</p>
+            <div className="bp-summary-row"><Package size={13} /><span>{product.name}</span></div>
+            <div className="bp-summary-row-plain">
+              <span className="bp-sl">Type</span><span>{product.type}</span>
             </div>
-            <div className="summary-row-plain">
-              <span className="sl">Category</span><span>{product.category}</span>
+            <div className="bp-summary-row-plain">
+              <span className="bp-sl">Category</span><span>{product.category}</span>
             </div>
           </div>
 
           {/* Measurements & Pricing */}
-          <div className="summary-section">
-            <p className="summary-section-label">
+          <div className="bp-summary-section">
+            <p className="bp-summary-section-label">
               <Calculator size={13} style={{ display: 'inline', marginRight: 4 }} />
               Pricing Estimate
             </p>
             {hasMeas ? (
               <>
-                <div className="summary-row-plain">
-                  <span className="sl">Dimensions</span>
+                <div className="bp-summary-row-plain">
+                  <span className="bp-sl">Dimensions</span>
                   <span>{measurements.width} × {measurements.height} {measurements.unit}</span>
                 </div>
-                <div className="summary-row-plain">
-                  <span className="sl">Area</span>
+                <div className="bp-summary-row-plain">
+                  <span className="bp-sl">Area</span>
                   <span>{area.toFixed(2)} sq ft</span>
                 </div>
               </>
             ) : (
-              <div className="summary-row-plain">
-                <span className="sl">Measurements</span>
-                <span className="text-muted">Not provided (base rate applied)</span>
+              <div className="bp-summary-row-plain">
+                <span className="bp-sl">Measurements</span>
+                <span className="bp-text-muted">Not provided (base rate applied)</span>
               </div>
             )}
-            <div className="summary-row-plain">
-              <span className="sl">Rate</span>
+            <div className="bp-summary-row-plain">
+              <span className="bp-sl">Rate</span>
               <span>₱{product.price.toLocaleString()} / sq ft</span>
             </div>
-            <div className="summary-row-plain total">
-              <span className="sl">Est. Total</span>
+            <div className="bp-summary-row-plain bp-total">
+              <span className="bp-sl">Est. Total</span>
               <span>
                 ₱{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 {!hasMeas && ' (base rate)'}
               </span>
             </div>
-            <div className="summary-row-plain downpay">
-              <span className="sl">50% Downpayment</span>
+            <div className="bp-summary-row-plain bp-downpay">
+              <span className="bp-sl">50% Downpayment</span>
               <span>
                 ₱{downpay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>
 
-          <div className="summary-note">
+          <div className="bp-summary-note">
             <AlertCircle size={13} />
             <span>Final pricing will be confirmed during shop discussion or site inspection. Contact: <strong>09123456789</strong></span>
           </div>
         </div>
 
-        <div className="summary-actions">
-          <button className="sum-cancel" onClick={onCancel}>Cancel</button>
-          <button className="sum-proceed" onClick={onProceed}>
+        <div className="bp-summary-actions">
+          <button className="bp-sum-cancel" onClick={onCancel}>Cancel</button>
+          <button className="bp-sum-proceed" onClick={onProceed}>
             <Zap size={15} /> Proceed
           </button>
         </div>
@@ -122,24 +122,24 @@ const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
 
 /* ─── Order Success Page ─────────────────────────────────────────────────── */
 const OrderSuccessPage = ({ onClose,backToOrders }) => (
-  <div className="success-overlay">
-    <div className="success-card">
-      <div className="success-icon-wrap">
+  <div className="bp-success-overlay">
+    <div className="bp-success-card">
+      <div className="bp-success-icon-wrap">
         <CheckCircle2 size={48} />
       </div>
-      <h2 className="success-title">Order Request Submitted!</h2>
-      <p className="success-sub">
+      <h2 className="bp-success-title">Order Request Submitted!</h2>
+      <p className="bp-success-sub">
         Thank you! Your order request has been received. Our team will contact you
         shortly to confirm the details and discuss final pricing.
       </p>
-      <p className="success-contact">
+      <p className="bp-success-contact">
         <Phone size={14} /> Questions? Call us at <strong>09123456789</strong>
       </p>
-      <div className="success-actions">
-        <button className="btn-your-orders" onClick={() => backToOrders()}>
+      <div className="bp-success-actions">
+        <button className="bp-btn-your-orders" onClick={() => backToOrders()}>
           View Your Orders
         </button>
-        <button className="btn-back-browse" onClick={onClose}>
+        <button className="bp-btn-back-browse" onClick={onClose}>
           Continue Browsing
         </button>
       </div>
@@ -248,85 +248,85 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-container order-form-container" role="dialog" aria-modal="true">
+    <div className="bp-modal-overlay">
+      <div className="bp-modal-container bp-order-form-container" role="dialog" aria-modal="true">
 
-        <button className="modal-close" onClick={onClose} aria-label="Close">
+        <button className="bp-modal-close" onClick={onClose} aria-label="Close">
           <X size={18} />
         </button>
 
-        <button className="modal-back" onClick={onBack}>
+        <button className="bp-modal-back" onClick={onBack}>
           <ArrowLeft size={15} /> Back to Product
         </button>
 
-        <div className="form-page">
-          <div className="form-page-header">
-            <h2 className="form-page-title">Place Order Request</h2>
-            <p className="form-page-sub">Review your details and submit your request.</p>
+        <div className="bp-form-page">
+          <div className="bp-form-page-header">
+            <h2 className="bp-form-page-title">Place Order Request</h2>
+            <p className="bp-form-page-sub">Review your details and submit your request.</p>
           </div>
 
-          <div className="form-layout">
+          <div className="bp-form-layout">
             {/* ── Left: Customer Info ── */}
-            <div className="form-section">
-              <p className="form-section-title">
+            <div className="bp-form-section">
+              <p className="bp-form-section-title">
                 <User size={15} /> Customer Information
               </p>
 
-              <div className="form-field">
-                <label className="form-label">Full Name</label>
-                <div className="readonly-field">
-                  <User size={13} className="field-icon" />
-                  <input type="text" value={customer.fullName} readOnly className="form-input readonly" />
-                  <span className="readonly-badge">Auto-filled</span>
+              <div className="bp-form-field">
+                <label className="bp-form-label">Full Name</label>
+                <div className="bp-readonly-field">
+                  <User size={13} className="bp-field-icon" />
+                  <input type="text" value={customer.fullName} readOnly className="bp-form-input bp-readonly" />
+                  <span className="bp-readonly-badge">Auto-filled</span>
                 </div>
               </div>
 
-              <div className="form-field">
-                <label className="form-label">Email Address</label>
-                <div className="readonly-field">
-                  <Mail size={13} className="field-icon" />
-                  <input type="email" value={customer.email} readOnly className="form-input readonly" />
-                  <span className="readonly-badge">Auto-filled</span>
+              <div className="bp-form-field">
+                <label className="bp-form-label">Email Address</label>
+                <div className="bp-readonly-field">
+                  <Mail size={13} className="bp-field-icon" />
+                  <input type="email" value={customer.email} readOnly className="bp-form-input bp-readonly" />
+                  <span className="bp-readonly-badge">Auto-filled</span>
                 </div>
               </div>
 
-              <div className="form-field">
-                <label className="form-label">Phone Number *</label>
-                <div className={`editable-field ${errors.phone ? 'field-error' : ''}`}>
-                  <Phone size={13} className="field-icon" />
+              <div className="bp-form-field">
+                <label className="bp-form-label">Phone Number *</label>
+                <div className={`bp-editable-field ${errors.phone ? 'bp-field-error' : ''}`}>
+                  <Phone size={13} className="bp-field-icon" />
                   <input
                     type="tel"
                     value={customer.phone}
                     onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-                    className="form-input"
+                    className="bp-form-input"
                     placeholder="09XXXXXXXXX"
                   />
                 </div>
-                {errors.phone && <p className="error-msg"><AlertCircle size={12} /> {errors.phone}</p>}
+                {errors.phone && <p className="bp-error-msg"><AlertCircle size={12} /> {errors.phone}</p>}
               </div>
 
-              <div className="form-field">
-                <label className="form-label">Complete Address *</label>
-                <div className={`editable-field ${errors.address ? 'field-error' : ''}`}>
-                  <MapPin size={13} className="field-icon" />
+              <div className="bp-form-field">
+                <label className="bp-form-label">Complete Address *</label>
+                <div className={`bp-editable-field ${errors.address ? 'bp-field-error' : ''}`}>
+                  <MapPin size={13} className="bp-field-icon" />
                   <textarea
                     value={customer.address}
                     onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
-                    className="form-textarea"
+                    className="bp-form-textarea"
                     rows={3}
                     placeholder="Street, Barangay, City, Province"
                   />
                 </div>
-                {errors.address && <p className="error-msg"><AlertCircle size={12} /> {errors.address}</p>}
+                {errors.address && <p className="bp-error-msg"><AlertCircle size={12} /> {errors.address}</p>}
               </div>
 
-              <div className="form-field">
-                <label className="form-label">Special Instructions / Engineering Notes (Optional)</label>
-                <div className="editable-field">
+              <div className="bp-form-field">
+                <label className="bp-form-label">Special Instructions / Engineering Notes (Optional)</label>
+                <div className="bp-editable-field">
                   <textarea
                     value={clientNotes}
                     onChange={(e) => setClientNotes(e.target.value)}
-                    className="form-textarea"
+                    className="bp-form-textarea"
                     rows={2}
                     placeholder="Add notes about structure elevations, framing colors, glass thickness preferences, etc."
                   />
@@ -335,31 +335,31 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
             </div>
 
             {/* ── Right: Order Summary ── */}
-            <div className="form-section order-summary-panel">
-              <p className="form-section-title">
+            <div className="bp-form-section bp-order-summary-panel">
+              <p className="bp-form-section-title">
                 <Package size={15} /> Order Summary
               </p>
 
-              <div className="order-product-card">
+              <div className="bp-order-product-card">
                 {product.images && product.images[0] && (
                   <img
                     src={`${product.images[0]}`}
                     alt={product.name}
-                    className="order-product-img"
+                    className="bp-order-product-img"
                   />
                 )}
-                <div className="order-product-info">
-                  <p className="op-name">{product.name}</p>
-                  <p className="op-meta">{product.type} · {product.category}</p>
-                  <span className="op-meta">₱{product.height} x ₱{product.width} {product.unit}</span>
-                  <p className="op-rate">₱{product.price.toLocaleString()} / sq ft</p>
+                <div className="bp-order-product-info">
+                  <p className="bp-op-name">{product.name}</p>
+                  <p className="bp-op-meta">{product.type} · {product.category}</p>
+                  <span className="bp-op-meta">₱{product.height} x ₱{product.width} {product.unit}</span>
+                  <p className="bp-op-rate">₱{product.price.toLocaleString()} / sq ft</p>
                 </div>
               </div>
 
               {hasMeas && (
-                <div className="order-meas-box">
-                  <p className="meas-label">Measurements</p>
-                  <div className="meas-grid">
+                <div className="bp-order-meas-box">
+                  <p className="bp-meas-label">Measurements</p>
+                  <div className="bp-meas-grid">
                     <span>W: <strong>{measurements.width} {measurements.unit}</strong></span>
                     <span>H: <strong>{measurements.height} {measurements.unit}</strong></span>
                     <span>Area: <strong>{area.toFixed(2)} sq ft</strong></span>
@@ -367,37 +367,37 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
                 </div>
               )}
 
-              <div className="order-price-breakdown">
-                <div className="pb-row">
+              <div className="bp-order-price-breakdown">
+                <div className="bp-pb-row">
                   <span>Rate</span>
                   <span>₱{product.price.toLocaleString()} / sq ft</span>
                 </div>
                 {hasMeas && (
-                  <div className="pb-row">
+                  <div className="bp-pb-row">
                     <span>Area</span>
                     <span>{area.toFixed(2)} sq ft</span>
                   </div>
                 )}
-                <div className="pb-row pb-total">
+                <div className="bp-pb-row bp-pb-total">
                   <span>Estimated Total</span>
                   <span>
                     ₱{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     {!hasMeas && ' *'}
                   </span>
                 </div>
-                <div className="pb-row pb-downpay">
+                <div className="bp-pb-row bp-pb-downpay">
                   <span>50% Downpayment</span>
                   <span>₱{downpay.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
 
               {!hasMeas && (
-                <p className="no-meas-note">
+                <p className="bp-no-meas-note">
                   * No measurements provided. Base rate shown.
                 </p>
               )}
 
-              <div className="order-inquiry">
+              <div className="bp-order-inquiry">
                 <Phone size={13} />
                 <span>Call for inquiries: <strong>09123456789</strong></span>
               </div>
@@ -405,8 +405,8 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
           </div>
 
           {/* Submit */}
-          <div className="form-submit-row">
-            <button className="btn-submit-order" onClick={handleSubmit}>
+          <div className="bp-form-submit-row">
+            <button className="bp-btn-submit-order" onClick={handleSubmit}>
               <Zap size={16} /> Submit Order Request
             </button>
           </div>

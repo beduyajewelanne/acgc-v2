@@ -247,6 +247,7 @@ productRoutes.post("/api/add_product", async (req, res) => {
                 mainImg: mainImgUrl,
                 angleImgs: angleImgUrls,
                 active: product.active !== undefined ? product.active : true,
+                isTopProduct: product.isTopProduct !== undefined ? product.isTopProduct : false,
                 archive: 0,
                 createdBy: userId,
                 createdAt: new Date()
@@ -333,6 +334,7 @@ productRoutes.post("/api/update_product", async (req, res) => {
                 mainImg: finalMainImg,
                 angleImgs: finalAngleImgs,
                 active: product.active !== undefined ? product.active : currentProduct.active,
+                isTopProduct: product.isTopProduct !== undefined ? product.isTopProduct : currentProduct.isTopProduct,
                 updatedAt: new Date()
             };
 
@@ -400,7 +402,8 @@ productRoutes.get("/api/featured_products", async (req, res) => {
     try {
         const result = await get_data_helper("products", [
             { $match: { active: true } },
-            { $sample: { size: 3 } }
+            { $sort: { isTopProduct: -1, createdAt: 1 } },
+            { $limit: 3 }
         ]);
         return res.status(200).json(result);
     } catch (err) {

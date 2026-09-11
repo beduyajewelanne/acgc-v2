@@ -154,9 +154,12 @@ const CustomerDashboard = ({ isLoggedIn }) => {
               Loading featured selections...
             </div>
           ) : (
-            featuredProducts.slice(0, 3).map((p) => (
-              <ProductCard key={p._id || p.id} product={p} />
-            ))
+            [...featuredProducts]
+              .sort((a, b) => (b.isTopProduct ? 1 : 0) - (a.isTopProduct ? 1 : 0))
+              .slice(0, 3)
+              .map((p) => (
+                <ProductCard key={p._id || p.id} product={p} />
+              ))
           )}
         </div>
       </section>

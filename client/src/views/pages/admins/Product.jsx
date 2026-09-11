@@ -44,6 +44,7 @@ const Icon = {
   Box:       () => <svg width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.3" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
   Check:     () => <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>,
   Tag:       () => <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+  Star:      ({ filled }) => <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
 };
 
 function ExpandableDropdown({ label, required, value, options, onChange, onAddNew, placeholder, error, addLabel }) {
@@ -82,66 +83,66 @@ function ExpandableDropdown({ label, required, value, options, onChange, onAddNe
   };
 
   return (
-    <div className="exdrop-wrap" ref={wrapRef}>
+    <div className="mp-exdrop-wrap" ref={wrapRef}>
       {label && (
-        <label className="field-label">
-          {label}{required && <span className="field-required"> *</span>}
+        <label className="mp-field-label">
+          {label}{required && <span className="mp-field-required"> *</span>}
         </label>
       )}
       <div
-        className={`exdrop-trigger${open ? ' open' : ''}${error ? ' error' : ''}`}
+        className={`mp-exdrop-trigger${open ? ' mp-open' : ''}${error ? ' mp-error' : ''}`}
         onClick={() => { setOpen(o => !o); setAdding(false); setNewValue(''); setAddError(''); }}
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
       >
-        <span className={value ? 'exdrop-value' : 'exdrop-placeholder'}>{value || placeholder || 'Select…'}</span>
-        <span className={`exdrop-chevron${open ? ' rotated' : ''}`}><Icon.ChevDown /></span>
+        <span className={value ? 'mp-exdrop-value' : 'mp-exdrop-placeholder'}>{value || placeholder || 'Select…'}</span>
+        <span className={`mp-exdrop-chevron${open ? ' mp-rotated' : ''}`}><Icon.ChevDown /></span>
       </div>
 
-      {error && <div className="field-error">⚠ {error}</div>}
+      {error && <div className="mp-field-error">⚠ {error}</div>}
 
       {open && (
-        <div className="exdrop-menu">
-          <div className="exdrop-list">
+        <div className="mp-exdrop-menu">
+          <div className="mp-exdrop-list">
             {options.map((opt) => (
               <div
                 key={opt}
-                className={`exdrop-item${opt === value ? ' selected' : ''}`}
+                className={`mp-exdrop-item${opt === value ? ' mp-selected' : ''}`}
                 onClick={() => handleSelect(opt)}
               >
-                {opt === value && <span className="exdrop-item-check"><Icon.Check /></span>}
+                {opt === value && <span className="mp-exdrop-item-check"><Icon.Check /></span>}
                 {opt}
               </div>
             ))}
           </div>
 
-          <div className="exdrop-divider" />
+          <div className="mp-exdrop-divider" />
 
           {!adding ? (
-            <div className="exdrop-add-btn" onClick={(e) => { e.stopPropagation(); setAdding(true); }}>
-              <span className="exdrop-add-icon"><Icon.SmallPlus /></span>
+            <div className="mp-exdrop-add-btn" onClick={(e) => { e.stopPropagation(); setAdding(true); }}>
+              <span className="mp-exdrop-add-icon"><Icon.SmallPlus /></span>
               {addLabel || 'Add new…'}
             </div>
           ) : (
-            <div className="exdrop-add-row" onClick={(e) => e.stopPropagation()}>
-              <div className="exdrop-add-input-wrap">
+            <div className="mp-exdrop-add-row" onClick={(e) => e.stopPropagation()}>
+              <div className="mp-exdrop-add-input-wrap">
                 <input
                   ref={inputRef}
-                  className={`exdrop-add-input${addError ? ' error' : ''}`}
+                  className={`mp-exdrop-add-input${addError ? ' mp-error' : ''}`}
                   type="text"
                   placeholder="Type name & press Enter"
                   value={newValue}
                   onChange={(e) => { setNewValue(e.target.value); setAddError(''); }}
                   onKeyDown={handleKeyDown}
                 />
-                <button type="button" className="exdrop-add-confirm" onClick={handleConfirmAdd} title="Add">
+                <button type="button" className="mp-exdrop-add-confirm" onClick={handleConfirmAdd} title="Add">
                   <Icon.Check />
                 </button>
-                <button type="button" className="exdrop-add-cancel" onClick={() => { setAdding(false); setNewValue(''); setAddError(''); }} title="Cancel">
+                <button type="button" className="mp-exdrop-add-cancel" onClick={() => { setAdding(false); setNewValue(''); setAddError(''); }} title="Cancel">
                   <Icon.Close />
                 </button>
               </div>
-              {addError && <div className="exdrop-add-error">⚠ {addError}</div>}
+              {addError && <div className="mp-exdrop-add-error">⚠ {addError}</div>}
             </div>
           )}
         </div>
@@ -179,7 +180,7 @@ function UploadCard({ label, hint, image, onChange, onRemove }) {
 
   return (
     <div
-      className={`upload-card${dragging ? ' dragging' : ''}${image ? ' has-image' : ''}`}
+      className={`mp-upload-card${dragging ? ' mp-dragging' : ''}${image ? ' mp-has-image' : ''}`}
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
@@ -187,14 +188,14 @@ function UploadCard({ label, hint, image, onChange, onRemove }) {
     >
       {image ? (
         <>
-          <img src={imgUrl} alt={label} className="upload-card__preview" />
-          <button type="button" className="upload-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>✕</button>
+          <img src={imgUrl} alt={label} className="mp-upload-card__preview" />
+          <button type="button" className="mp-upload-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>✕</button>
         </>
       ) : (
         <>
           <Icon.Upload />
-          <span className="upload-card__label">{label}</span>
-          {hint && <span className="upload-card__hint">{hint}</span>}
+          <span className="mp-upload-card__label">{label}</span>
+          {hint && <span className="mp-upload-card__hint">{hint}</span>}
           
           {/* ADD onClick STOP PROPAGATION HERE TO STOP DOUBLE DIALOGS */}
           <input 
@@ -212,16 +213,16 @@ function UploadCard({ label, hint, image, onChange, onRemove }) {
 
 function DeleteModal({ product, onConfirm, onCancel }) {
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="delete-modal__icon"><Icon.AlertTri /></div>
-        <div className="delete-modal__title">Delete Product?</div>
-        <div className="delete-modal__desc">
-          You are about to permanently delete <span className="delete-modal__name">"{product.name}"</span>. This action cannot be undone.
+    <div className="mp-modal-overlay" onClick={onCancel}>
+      <div className="mp-delete-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mp-delete-modal__icon"><Icon.AlertTri /></div>
+        <div className="mp-delete-modal__title">Delete Product?</div>
+        <div className="mp-delete-modal__desc">
+          You are about to permanently delete <span className="mp-delete-modal__name">"{product.name}"</span>. This action cannot be undone.
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-          <button type="button" className="btn-cancel" onClick={onCancel}>Cancel</button>
-          <button type="button" className="btn-danger" onClick={onConfirm}>Yes, Delete</button>
+          <button type="button" className="mp-btn-cancel" onClick={onCancel}>Cancel</button>
+          <button type="button" className="mp-btn-danger" onClick={onConfirm}>Yes, Delete</button>
         </div>
       </div>
     </div>
@@ -300,19 +301,19 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className="mp-modal-overlay" onClick={onClose}>
+      <div className="mp-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="mp-modal-header">
           <div>
-            <div className="modal-title">{isEdit ? 'Edit Product' : 'Add New Product'}</div>
-            <div className="modal-subtitle">{isEdit ? 'Update product details below.' : 'Fill in the details to create a new product.'}</div>
+            <div className="mp-modal-title">{isEdit ? 'Edit Product' : 'Add New Product'}</div>
+            <div className="mp-modal-subtitle">{isEdit ? 'Update product details below.' : 'Fill in the details to create a new product.'}</div>
           </div>
-          <button type="button" className="modal-close" onClick={onClose}><Icon.Close /></button>
+          <button type="button" className="mp-modal-close" onClick={onClose}><Icon.Close /></button>
         </div>
 
-        <div className="modal-body">
-          <div className="section-label">Product Information</div>
-          <div className="form-row">
+        <div className="mp-modal-body">
+          <div className="mp-section-label">Product Information</div>
+          <div className="mp-form-row">
             <ExpandableDropdown
               label="Product Type"
               required
@@ -335,16 +336,16 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
             />
           </div>
 
-          <div className="form-col">
-            <label className="field-label">Product Name <span className="field-required">*</span></label>
+          <div className="mp-form-col">
+            <label className="mp-field-label">Product Name <span className="mp-field-required">*</span></label>
             <input
-              className={`field-input${errors.name ? ' error' : ''}`}
+              className={`mp-field-input${errors.name ? ' mp-error' : ''}`}
               type="text"
               placeholder="e.g. Tempered Glass Sliding Door"
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
             />
-            {errors.name && <div className="field-error">⚠ {errors.name}</div>}
+            {errors.name && <div className="mp-field-error">⚠ {errors.name}</div>}
           </div>
 
           <ExpandableDropdown
@@ -359,71 +360,71 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
             addLabel={`Add new variant for "${form.type}"…`}
           />
        
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '-0.5rem', marginBottom: '0.85rem' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--mp-text-muted)', marginTop: '-0.5rem', marginBottom: '0.85rem' }}>
             <Icon.Tag /> Variants are scoped to the selected product type.
           </div>
 
-          <div className="form-col">
-            <label className="field-label">Description</label>
+          <div className="mp-form-col">
+            <label className="mp-field-label">Description</label>
             <textarea
-              className="field-textarea"
+              className="mp-field-textarea"
               placeholder="Describe this product — materials, use case, special features..."
               value={form.description || ''}
               onChange={(e) => update('description', e.target.value)}
             />
           </div>
 
-          <div className="section-label" style={{ marginTop: '0.75rem' }}>Measurements & Pricing</div>
-          <div className="measurements-row" style={{ marginBottom: '0.85rem' }}>
+          <div className="mp-section-label" style={{ marginTop: '0.75rem' }}>Measurements & Pricing</div>
+          <div className="mp-measurements-row" style={{ marginBottom: '0.85rem' }}>
             <div>
-              <label className="field-label">Width <span className="field-required">*</span></label>
-              <input className={`field-input${errors.width ? ' error' : ''}`} type="number" min="0" placeholder="0" value={form.width} onChange={(e) => update('width', e.target.value)} />
-              {errors.width && <div className="field-error">⚠ {errors.width}</div>}
+              <label className="mp-field-label">Width <span className="mp-field-required">*</span></label>
+              <input className={`mp-field-input${errors.width ? ' mp-error' : ''}`} type="number" min="0" placeholder="0" value={form.width} onChange={(e) => update('width', e.target.value)} />
+              {errors.width && <div className="mp-field-error">⚠ {errors.width}</div>}
             </div>
             <div>
-              <label className="field-label">Height <span className="field-required">*</span></label>
-              <input className={`field-input${errors.height ? ' error' : ''}`} type="number" min="0" placeholder="0" value={form.height} onChange={(e) => update('height', e.target.value)} />
-              {errors.height && <div className="field-error">⚠ {errors.height}</div>}
+              <label className="mp-field-label">Height <span className="mp-field-required">*</span></label>
+              <input className={`mp-field-input${errors.height ? ' mp-error' : ''}`} type="number" min="0" placeholder="0" value={form.height} onChange={(e) => update('height', e.target.value)} />
+              {errors.height && <div className="mp-field-error">⚠ {errors.height}</div>}
             </div>
             <div>
-              <label className="field-label">Unit</label>
-              <div className="field-select-wrap">
-                <select className="field-select" value={form.unit} onChange={(e) => update('unit', e.target.value)}>
+              <label className="mp-field-label">Unit</label>
+              <div className="mp-field-select-wrap">
+                <select className="mp-field-select" value={form.unit} onChange={(e) => update('unit', e.target.value)}>
                   {UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
                 </select>
               </div>
             </div>
           </div>
 
-          <div className="form-col">
-            <label className="field-label">Price Per Square Foot (₱) <span className="field-required">*</span></label>
-            <input className={`field-input${errors.pricePerSqFt ? ' error' : ''}`} type="number" min="0" step="0.01" placeholder="0.00" value={form.pricePerSqFt} onChange={(e) => update('pricePerSqFt', e.target.value)} />
-            {errors.pricePerSqFt && <div className="field-error">⚠ {errors.pricePerSqFt}</div>}
+          <div className="mp-form-col">
+            <label className="mp-field-label">Price Per Square Foot (₱) <span className="mp-field-required">*</span></label>
+            <input className={`mp-field-input${errors.pricePerSqFt ? ' mp-error' : ''}`} type="number" min="0" step="0.01" placeholder="0.00" value={form.pricePerSqFt} onChange={(e) => update('pricePerSqFt', e.target.value)} />
+            {errors.pricePerSqFt && <div className="mp-field-error">⚠ {errors.pricePerSqFt}</div>}
           </div>
 
-          <div className="cost-display">
+          <div className="mp-cost-display">
             <div>
-              <div className="cost-display__label">Estimated Cost</div>
-              <div className="cost-display__note">Auto-calculated · you can override below</div>
+              <div className="mp-cost-display__label">Estimated Cost</div>
+              <div className="mp-cost-display__note">Auto-calculated · you can override below</div>
             </div>
-            <div className="cost-display__value">
+            <div className="mp-cost-display__value">
               ₱{form.estimatedCost !== '' ? Number(form.estimatedCost).toLocaleString('en-PH', { minimumFractionDigits: 2 }) : '—'}
             </div>
           </div>
 
-          <div className="form-col">
-            <label className="field-label">Override Estimated Cost (₱)</label>
-            <input className="field-input" type="number" min="0" step="0.01" placeholder="Leave blank to use auto-calculated" value={form.estimatedCost} onChange={(e) => update('estimatedCost', e.target.value)} />
+          <div className="mp-form-col">
+            <label className="mp-field-label">Override Estimated Cost (₱)</label>
+            <input className="mp-field-input" type="number" min="0" step="0.01" placeholder="Leave blank to use auto-calculated" value={form.estimatedCost} onChange={(e) => update('estimatedCost', e.target.value)} />
           </div>
 
-          <div className="section-label" style={{ marginTop: '0.75rem' }}>Product Images</div>
-          <div className="upload-main-wrap" style={{ marginBottom: '0.75rem' }}>
-            <label className="field-label" style={{ marginBottom: '0.5rem' }}>Main Product Image</label>
+          <div className="mp-section-label" style={{ marginTop: '0.75rem' }}>Product Images</div>
+          <div className="mp-upload-main-wrap" style={{ marginBottom: '0.75rem' }}>
+            <label className="mp-field-label" style={{ marginBottom: '0.5rem' }}>Main Product Image</label>
             <UploadCard label="Main Image" hint="Drag & drop or click to upload" image={mainImg} onChange={setMainImg} onRemove={() => setMainImg(null)} />
           </div>
 
-          <label className="field-label" style={{ marginBottom: '0.5rem' }}>Viewing Angles</label>
-          <div className="upload-grid">
+          <label className="mp-field-label" style={{ marginBottom: '0.5rem' }}>Viewing Angles</label>
+          <div className="mp-upload-grid">
             {ANGLE_LABELS.map((lbl, i) => (
               <UploadCard
                 key={lbl}
@@ -435,21 +436,21 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
             ))}
           </div>
 
-          <div className="section-label" style={{ marginTop: '0.75rem' }}>Status</div>
-          <label className="toggle-row">
-            <div className="toggle-switch">
+          <div className="mp-section-label" style={{ marginTop: '0.75rem' }}>Status</div>
+          <label className="mp-toggle-row">
+            <div className="mp-toggle-switch">
               <input type="checkbox" checked={form.active} onChange={(e) => update('active', e.target.checked)} />
-              <div className="toggle-track"><div className="toggle-thumb" /></div>
+              <div className="mp-toggle-track"><div className="mp-toggle-thumb" /></div>
             </div>
-            <div className="toggle-info">
-              <div className="toggle-info__title">Active Product</div>
-              <div className="toggle-info__desc">{form.active ? 'This product is live and visible.' : 'This product is hidden from customers.'}</div>
+            <div className="mp-toggle-info">
+              <div className="mp-toggle-info__title">Active Product</div>
+              <div className="mp-toggle-info__desc">{form.active ? 'This product is live and visible.' : 'This product is hidden from customers.'}</div>
             </div>
           </label>
 
-          <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="button" className="btn-submit" onClick={handleSubmit}>
+          <div className="mp-modal-footer">
+            <button type="button" className="mp-btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="button" className="mp-btn-submit" onClick={handleSubmit}>
               <Icon.Check />
               {isEdit ? 'Save Changes' : 'Create Product'}
             </button>
@@ -460,47 +461,57 @@ function ProductModal({ initial, onSave, onClose, productTypes, setProductTypes,
   );
 }
 
-function ProductCard({ product, onEdit, onDelete, index }) {
+function ProductCard({ product, onEdit, onDelete, onToggleTop, index }) {
   const mainImgUrl = (product.mainImg && product.mainImg.startsWith('/uploads/')) 
     ? (window.base_api.replace('/api/', '') + product.mainImg) 
     : product.mainImg;
+  const isTop = !!product.isTopProduct;
 
   return (
-    <div className="product-card" style={{ animationDelay: `${index * 0.04}s` }}>
-      <div className="card-image">
+    <div className={`mp-product-card${isTop ? ' mp-top-product' : ''}`} style={{ animationDelay: `${index * 0.04}s` }}>
+      <div className="mp-card-image">
         {product.mainImg
           ? <img src={mainImgUrl} alt={product.name} />
-          : <div className="card-image__placeholder"><Icon.Image /><span>No Image</span></div>
+          : <div className="mp-card-image__placeholder"><Icon.Image /><span>No Image</span></div>
         }
-        <span className={`card-status-badge ${product.active ? 'active' : 'inactive'}`}>
+        <span className={`mp-card-status-badge ${product.active ? 'mp-active' : 'mp-inactive'}`}>
           {product.active ? 'Active' : 'Inactive'}
         </span>
-        <div className="card-actions">
-          <button type="button" className="card-action-btn edit" title="Edit" onClick={() => onEdit(product)}><Icon.Edit /></button>
-          <button type="button" className="card-action-btn delete" title="Delete" onClick={() => onDelete(product)}><Icon.Trash /></button>
+        {isTop && <span className="mp-card-top-badge"><Icon.Star filled /> Top Product</span>}
+        <div className="mp-card-actions">
+          <button
+            type="button"
+            className={`mp-card-action-btn mp-star${isTop ? ' mp-is-top' : ''}`}
+            title={isTop ? 'Remove from top products' : 'Mark as top product'}
+            onClick={() => onToggleTop(product)}
+          >
+            <Icon.Star filled={isTop} />
+          </button>
+          <button type="button" className="mp-card-action-btn mp-edit" title="Edit" onClick={() => onEdit(product)}><Icon.Edit /></button>
+          <button type="button" className="mp-card-action-btn mp-delete" title="Delete" onClick={() => onDelete(product)}><Icon.Trash /></button>
         </div>
       </div>
-      <div className="card-body">
-        <span className="card-type-badge">{product.type}</span>
-        <div className="card-name">{product.name}</div>
-        <div className="card-meta">
+      <div className="mp-card-body">
+        <span className="mp-card-type-badge">{product.type}</span>
+        <div className="mp-card-name">{product.name}</div>
+        <div className="mp-card-meta">
           <span>{product.category}</span>
-          <span className="dot" />
+          <span className="mp-dot" />
           <span>{product.variant}</span>
         </div>
         {product.description && (
-          <div style={{ fontSize: '0.77rem', color: 'var(--text-muted)', lineHeight: 1.5, marginTop: '0.2rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          <div style={{ fontSize: '0.77rem', color: 'var(--mp-text-muted)', lineHeight: 1.5, marginTop: '0.2rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {product.description}
           </div>
         )}
-        <div className="card-footer">
+        <div className="mp-card-footer">
           <div>
-            <div className="card-price-label">Est. Cost</div>
-            <div className="card-price">₱{product.estimatedCost ? Number(product.estimatedCost).toLocaleString('en-PH', { minimumFractionDigits: 2 }) : '—'}</div>
+            <div className="mp-card-price-label">Est. Cost</div>
+            <div className="mp-card-price">₱{product.estimatedCost ? Number(product.estimatedCost).toLocaleString('en-PH', { minimumFractionDigits: 2 }) : '—'}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div className="card-price-label">{product.width} × {product.height} {product.unit}</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>₱{product.pricePerSqFt || '—'}/sq ft</div>
+            <div className="mp-card-price-label">{product.width} × {product.height} {product.unit}</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--mp-text-muted)' }}>₱{product.pricePerSqFt || '—'}/sq ft</div>
           </div>
         </div>
       </div>
@@ -511,8 +522,8 @@ function ProductCard({ product, onEdit, onDelete, index }) {
 function Toast({ message, type, visible }) {
   if (!visible) return null;
   return (
-    <div className={`toast ${type}`}>
-      <span className="toast__icon">{type === 'success' ? '✓' : '✕'}</span>
+    <div className={`mp-toast ${type}`}>
+      <span className="mp-toast__icon">{type === 'success' ? '✓' : '✕'}</span>
       {message}
     </div>
   );
@@ -602,6 +613,42 @@ const Products = () => {
     });
   }, [user, showToast]);
 
+  const handleToggleTop = useCallback((product) => {
+    if (!user || !user.token) return;
+    const nextIsTop = !product.isTopProduct;
+    const targetId = product._id || product.id;
+    setProducts((prev) => prev.map((p) =>
+      (p._id || p.id) === targetId ? { ...p, isTopProduct: nextIsTop } : p
+    ));
+
+    const payload = {
+      token: user.token,
+      userId: user._id,
+      product: { ...product, isTopProduct: nextIsTop },
+      fullName: `${user.firstName} ${user.lastName}`,
+    };
+
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    };
+
+    CRUD(window.base_api + "update_product", requestOptions, (res) => {
+      console.log("update_product (toggle top) response:", res);
+      if (res.remarks === "success") {
+        _getProducts(user, setProducts); 
+        showToast(nextIsTop ? `${product.name} marked as top product.` : `${product.name} removed from top products.`, 'success');
+      } else {
+        setProducts((prev) => prev.map((p) =>
+          (p._id || p.id) === targetId ? { ...p, isTopProduct: !nextIsTop } : p
+        ));
+        console.error("Failed to update top product status:", res.message);
+        showToast("Error updating top product: " + (res.message || "Unknown error"), 'error');
+      }
+    });
+  }, [user, showToast]);
+
   const handleDelete = useCallback(() => {
     if (!deleteTarget || !user || !user.token) return;
     const targetId = deleteTarget._id || deleteTarget.id;
@@ -626,15 +673,17 @@ const Products = () => {
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    return products.filter((p) => {
-      const matchesCat = filterCat === 'All' || p.category === filterCat;
-      const matchesSearch = !q
-        || p.name?.toLowerCase().includes(q)
-        || p.category?.toLowerCase().includes(q)
-        || p.variant?.toLowerCase().includes(q)
-        || p.type?.toLowerCase().includes(q);
-      return matchesCat && matchesSearch;
-    });
+    return products
+      .filter((p) => {
+        const matchesCat = filterCat === 'All' || p.category === filterCat;
+        const matchesSearch = !q
+          || p.name?.toLowerCase().includes(q)
+          || p.category?.toLowerCase().includes(q)
+          || p.variant?.toLowerCase().includes(q)
+          || p.type?.toLowerCase().includes(q);
+        return matchesCat && matchesSearch;
+      })
+      .sort((a, b) => (b.isTopProduct ? 1 : 0) - (a.isTopProduct ? 1 : 0));
   }, [products, searchTerm, filterCat]);
 
   const stats = useMemo(() => ({
@@ -646,47 +695,47 @@ const Products = () => {
   const allFilterCats = ['All', ...categories];
 
   return (
-    <div className="pms-page">
-      <div className="pms-header">
+    <div className="mp-pms-page">
+      <div className="mp-pms-header">
         <div>
-          <div className="pms-header__title">Product Management</div>
-          <div className="pms-header__subtitle">Glass & Aluminum Business · Admin Panel</div>
+          <div className="mp-pms-header__title">Product Management</div>
+          <div className="mp-pms-header__subtitle">Glass & Aluminum Business · Admin Panel</div>
         </div>
-        <button type="button" className="btn-add" onClick={openAdd}>
+        <button type="button" className="mp-btn-add" onClick={openAdd}>
           <Icon.Plus /> Add New Product
         </button>
       </div>
 
       {products.length > 0 && (
-        <div className="pms-stats">
-          <div className="stat-card"><div className="stat-card__value">{stats.total}</div><div className="stat-card__label">Total Products</div></div>
-          <div className="stat-card"><div className="stat-card__value" style={{ color: 'var(--success)' }}>{stats.active}</div><div className="stat-card__label">Active</div></div>
-          <div className="stat-card"><div className="stat-card__value" style={{ color: 'var(--text-muted)' }}>{stats.inactive}</div><div className="stat-card__label">Inactive</div></div>
-          <div className="stat-card"><div className="stat-card__value">{filtered.length}</div><div className="stat-card__label">Showing</div></div>
+        <div className="mp-pms-stats">
+          <div className="mp-stat-card"><div className="mp-stat-card__value">{stats.total}</div><div className="mp-stat-card__label">Total Products</div></div>
+          <div className="mp-stat-card"><div className="mp-stat-card__value" style={{ color: 'var(--mp-success)' }}>{stats.active}</div><div className="mp-stat-card__label">Active</div></div>
+          <div className="mp-stat-card"><div className="mp-stat-card__value" style={{ color: 'var(--mp-text-muted)' }}>{stats.inactive}</div><div className="mp-stat-card__label">Inactive</div></div>
+          <div className="mp-stat-card"><div className="mp-stat-card__value">{filtered.length}</div><div className="mp-stat-card__label">Showing</div></div>
         </div>
       )}
 
-      <div className="pms-toolbar">
-        <div className="pms-search-wrap">
-          <span className="pms-search-icon"><Icon.Search /></span>
-          <input className="pms-search" type="text" placeholder="Search by name, category, variant, type…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+      <div className="mp-pms-toolbar">
+        <div className="mp-pms-search-wrap">
+          <span className="mp-pms-search-icon"><Icon.Search /></span>
+          <input className="mp-pms-search" type="text" placeholder="Search by name, category, variant, type…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
-        <div className="pms-filters">
+        <div className="mp-pms-filters">
           {allFilterCats.map((cat) => (
-            <button key={cat} type="button" className={`filter-chip${filterCat === cat ? ' active' : ''}`} onClick={() => setFilterCat(cat)}>{cat}</button>
+            <button key={cat} type="button" className={`mp-filter-chip${filterCat === cat ? ' mp-active' : ''}`} onClick={() => setFilterCat(cat)}>{cat}</button>
           ))}
         </div>
       </div>
 
-      <div className="pms-grid">
+      <div className="mp-pms-grid">
         {filtered.length === 0 ? (
-          <div className="pms-empty">
-            <div className="pms-empty__icon"><Icon.Box /></div>
-            <div className="pms-empty__title">{products.length === 0 ? 'No products yet' : 'No results found'}</div>
-            <div className="pms-empty__desc">{products.length === 0 ? 'Click "Add New Product" to get started.' : 'Try adjusting your search or filter.'}</div>
+          <div className="mp-pms-empty">
+            <div className="mp-pms-empty__icon"><Icon.Box /></div>
+            <div className="mp-pms-empty__title">{products.length === 0 ? 'No products yet' : 'No results found'}</div>
+            <div className="mp-pms-empty__desc">{products.length === 0 ? 'Click "Add New Product" to get started.' : 'Try adjusting your search or filter.'}</div>
           </div>
         ) : (
-          filtered.map((p, i) => <ProductCard key={p._id || p.id} product={p} index={i} onEdit={openEdit} onDelete={setDeleteTarget} />)
+          filtered.map((p, i) => <ProductCard key={p._id || p.id} product={p} index={i} onEdit={openEdit} onDelete={setDeleteTarget} onToggleTop={handleToggleTop} />)
         )}
       </div>
 

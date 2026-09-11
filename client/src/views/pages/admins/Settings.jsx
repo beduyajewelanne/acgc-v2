@@ -43,10 +43,10 @@ const INITIAL_BACKUPS = [
 // ─── Utility Components ───────────────────────────────────────────────────────
 
 const Toast = ({ message, type, onClose }) => (
-  <div className={`toast toast-${type}`}>
-    <span className="toast-icon">{type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
+  <div className={`settings-toast toast-${type}`}>
+    <span className="settings-toast-icon">{type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
     <span>{message}</span>
-    <button className="toast-close" onClick={onClose}>×</button>
+    <button className="settings-toast-close" onClick={onClose}>×</button>
   </div>
 );
 
@@ -55,44 +55,34 @@ const Toggle = ({ checked, onChange, disabled }) => (
     role="switch"
     aria-checked={checked}
     disabled={disabled}
-    className={`toggle-switch ${checked ? 'toggle-on' : 'toggle-off'} ${disabled ? 'toggle-disabled' : ''}`}
+    className={`settings-toggle-switch ${checked ? 'settings-toggle-on' : 'settings-toggle-off'} ${disabled ? 'settings-toggle-disabled' : ''}`}
     onClick={() => !disabled && onChange(!checked)}
   >
-    <span className="toggle-thumb" />
+    <span className="settings-toggle-thumb" />
   </button>
 );
 
 const Avatar = ({ initials, role }) => {
   const normalizedRole = role?.trim().toLowerCase();
-  const styleClass = normalizedRole === 'staff' || normalizedRole === 'admin' ? 'avatar-staff' : 'avatar-customer';
-  return <div className={`avatar ${styleClass}`}>{initials}</div>;
-};
-
-const StatusBadge = ({ status }) => {
-  const displayStatus = status || 'Active';
-  return (
-    <span className={`status-badge ${displayStatus === 'Active' ? 'status-active' : 'status-inactive'}`}>
-      <span className="status-dot" />
-      {displayStatus}
-    </span>
-  );
+  const styleClass = normalizedRole === 'staff' || normalizedRole === 'admin' ? 'settings-avatar-staff' : 'settings-avatar-customer';
+  return <div className={`settings-avatar ${styleClass}`}>{initials}</div>;
 };
 
 const RoleBadge = ({ role, subrole }) => (
-  <div className="role-cell">
-    <span className={`role-badge ${role?.toLowerCase() === 'client' || role?.toLowerCase() === 'customer' ? 'role-customer' : 'role-staff'}`}>{role}</span>
-    {subrole && <span className="subrole-badge">{subrole}</span>}
+  <div className="settings-role-cell">
+    <span className={`settings-role-badge ${role?.toLowerCase() === 'client' || role?.toLowerCase() === 'customer' ? 'settings-role-customer' : 'settings-role-staff'}`}>{role}</span>
+    {subrole && <span className="settings-subrole-badge">{subrole}</span>}
   </div>
 );
 
 const ConfirmDialog = ({ title, message, onConfirm, onCancel, confirmLabel = 'Confirm', danger = false }) => (
-  <div className="modal-overlay" onClick={onCancel}>
-    <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
-      <h3 className="confirm-title">{title}</h3>
-      <p className="confirm-message">{message}</p>
-      <div className="confirm-actions">
-        <button className="btn-ghost" onClick={onCancel}>Cancel</button>
-        <button className={danger ? 'btn-danger' : 'btn-primary'} onClick={onConfirm}>{confirmLabel}</button>
+  <div className="settings-modal-overlay" onClick={onCancel}>
+    <div className="settings-confirm-dialog" onClick={e => e.stopPropagation()}>
+      <h3 className="settings-confirm-title">{title}</h3>
+      <p className="settings-confirm-message">{message}</p>
+      <div className="settings-confirm-actions">
+        <button className="settings-btn-ghost" onClick={onCancel}>Cancel</button>
+        <button className={danger ? 'settings-btn-danger' : 'settings-btn-primary'} onClick={onConfirm}>{confirmLabel}</button>
       </div>
     </div>
   </div>
@@ -176,59 +166,59 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
 
   return (
     <div className="pm-overlay" onClick={onClose}>
-      <div className="pm-modal rbac-modal text-left" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px' }}>
+      <div className="pm-modal settings-rbac-modal text-left" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px' }}>
         <div className="pm-modal-header">
-          <div className="modal-user-info">
+          <div className="settings-modal-user-info">
             <Avatar initials={(user?.firstName?.charAt(0) || '') + (user?.lastName?.charAt(0) || '')} role={user?.role} />
             <div>
-              <h2 className="modal-title">Staff Access Control</h2>
-              <p className="modal-subtitle">{user?.firstName} {user?.lastName} · Permission Matrix</p>
+              <h2 className="settings-modal-title">Staff Access Control</h2>
+              <p className="settings-modal-subtitle">{user?.firstName} {user?.lastName} · Permission Matrix</p>
             </div>
           </div>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="settings-modal-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="modal-body">
-          <div className="modal-section">
-            <h3 className="section-label">Staff Subrole Designation</h3>
-            <div className="subrole-row">
-              <select className="styled-select" value={subrole} onChange={e => setSubrole(e.target.value)}>
+        <div className="settings-modal-body">
+          <div className="settings-modal-section">
+            <h3 className="settings-section-label">Staff Subrole Designation</h3>
+            <div className="settings-subrole-row">
+              <select className="settings-styled-select" value={subrole} onChange={e => setSubrole(e.target.value)}>
                 {allRoles.map(r => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
-              <div className="custom-role-input">
+              <div className="settings-custom-role-input">
                 <input
-                  className="text-input"
+                  className="settings-text-input"
                   placeholder="Add custom subrole..."
                   value={newRole}
                   onChange={e => setNewRole(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAddRole()}
                 />
-                <button type="button" className="btn-outline-sm" onClick={handleAddRole}>Add</button>
+                <button type="button" className="settings-btn-outline-sm" onClick={handleAddRole}>Add</button>
               </div>
             </div>
           </div>
 
-          <div className="modal-section">
-            <h3 className="section-label">Module System Permissions</h3>
-            <p className="section-desc">Click on a module block to configure individual CRUD / View action overrides.</p>
+          <div className="settings-modal-section">
+            <h3 className="settings-section-label">Module System Permissions</h3>
+            <p className="settings-section-desc">Click on a module block to configure individual CRUD / View action overrides.</p>
             
-            <div className="modules-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+            <div className="settings-modules-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
               {ALL_MODULES.map(mod => {
                 const isViewEnabled = modules[mod.id]?.View === 1;
                 const isExpanded = expandedModule === mod.id;
 
                 return (
-                  <div key={mod.id} className="module-item-container" style={{ border: '1px solid #eee', borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={mod.id} className="settings-module-item-container" style={{ border: '1px solid #eee', borderRadius: '6px', padding: '0.75rem' }}>
                     <div 
-                      className="module-main-row" 
+                      className="settings-module-main-row" 
                       style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                       onClick={() => setExpandedModule(isExpanded ? null : mod.id)}
                     >
-                      <div className="module-info" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span className="module-icon">{mod.icon}</span>
-                        <strong className="module-label">{mod.label}</strong>
+                      <div className="settings-module-info" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span className="settings-module-icon">{mod.icon}</span>
+                        <strong className="settings-module-label">{mod.label}</strong>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <span style={{ fontSize: '0.8rem', color: '#888' }}>
@@ -239,7 +229,7 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
                     </div>
 
                     {isExpanded && (
-                      <div className="module-actions-dropdown" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #eee', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                      <div className="settings-module-actions-dropdown" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #eee', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
                         {mod.actions.map(action => (
                           <div key={action} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.25rem 0.5rem', background: '#f9f9f9', borderRadius: '4px' }}>
                             <span style={{ fontSize: '0.85rem' }}>{action}</span>
@@ -258,13 +248,13 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
           </div>
         </div>
 
-        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-          <button className="btn-danger-outline" onClick={() => setConvertConfirm(true)}>
+        <div className="settings-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+          <button className="settings-btn-danger-outline" onClick={() => setConvertConfirm(true)}>
             ↓ Convert to Customer
           </button>
-          <div className="footer-right">
-            <button className="btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Settings</button>
+          <div className="settings-footer-right">
+            <button className="settings-btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="settings-btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Settings</button>
           </div>
         </div>
 
@@ -343,26 +333,26 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
     <div className="pm-overlay" onClick={onClose}>
       <div className="pm-modal pm-modal-lg animate-modal" onClick={e => e.stopPropagation()}>
         <div className="pm-modal-header">
-          <div className="modal-user-info">
+          <div className="settings-modal-user-info">
             <Avatar initials={(user?.firstName?.charAt(0) || '') + (user?.lastName?.charAt(0) || '')} role={user?.role} />
             <div>
-              <h2 className="modal-title">Customer Matrix Permissions</h2>
-              <p className="modal-subtitle">{user?.firstName} {user?.lastName} · Client Profile</p>
+              <h2 className="settings-modal-title">Customer Matrix Permissions</h2>
+              <p className="settings-modal-subtitle">{user?.firstName} {user?.lastName} · Client Profile</p>
             </div>
           </div>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="settings-modal-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="modal-body">
-          <p className="section-desc">Toggle specific baseline visibility rules for this customer portal view layout configuration.</p>
-          <div className="global-perms-grid" style={{ marginTop: '1rem' }}>
+        <div className="settings-modal-body">
+          <p className="settings-section-desc">Toggle specific baseline visibility rules for this customer portal view layout configuration.</p>
+          <div className="settings-global-perms-grid" style={{ marginTop: '1rem' }}>
             {CUSTOMER_PERMS.map(p => {
               const isEnabled = perms[p.id] === 1;
               return (
-                <div key={p.id} className={`global-perm-card ${isEnabled ? 'gperm-enabled' : 'gperm-disabled'}`}>
-                  <div className="perm-text">
-                    <span className="perm-label">{p.label}</span>
-                    <span className="perm-desc">{p.desc}</span>
+                <div key={p.id} className={`settings-global-perm-card ${isEnabled ? 'settings-gperm-enabled' : 'settings-gperm-disabled'}`}>
+                  <div className="settings-perm-text">
+                    <span className="settings-perm-label">{p.label}</span>
+                    <span className="settings-perm-desc">{p.desc}</span>
                   </div>
                   <Toggle checked={isEnabled} onChange={() => togglePerm(p.id)} />
                 </div>
@@ -371,13 +361,13 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
           </div>
         </div>
 
-        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-          <button className="btn-primary" style={{ background: '#28a745', borderColor: '#28a745' }} onClick={() => setUpgradeConfirm(true)}>
+        <div className="settings-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+          <button className="settings-btn-primary" style={{ background: '#28a745', borderColor: '#28a745' }} onClick={() => setUpgradeConfirm(true)}>
             ↑ Upgrade to Staff
           </button>
-          <div className="footer-right">
-            <button className="btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Matrix</button>
+          <div className="settings-footer-right">
+            <button className="settings-btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="settings-btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Matrix</button>
           </div>
         </div>
 
@@ -454,50 +444,50 @@ const GlobalCustomerPerms = ({ users, onApply, showToast }) => {
   };
 
   return (
-    <div className="global-perms-panel">
-      <div className="global-perms-header" onClick={() => setExpanded(v => !v)}>
-        <div className="global-perms-left">
-          <span className="global-perms-icon">&#9676;</span>
+    <div className="settings-global-perms-panel">
+      <div className="settings-global-perms-header" onClick={() => setExpanded(v => !v)}>
+        <div className="settings-global-perms-left">
+          <span className="settings-global-perms-icon">&#9676;</span>
           <div>
-            <span className="global-perms-title">Global Customer Permissions</span>
-            <span className="global-perms-sub">
+            <span className="settings-global-perms-title">Global Customer Permissions</span>
+            <span className="settings-global-perms-sub">
               Changes mirror the master <code>base_access_level</code> template and sync profiles
             </span>
           </div>
         </div>
-        <div className="global-perms-right">
-          <div className="global-perm-dots">
+        <div className="settings-global-perms-right">
+          <div className="settings-global-perm-dots">
             {CUSTOMER_PERMS.map(p => (
               <span
                 key={p.id}
-                className={`gperm-dot ${globalPerms[p.id] ? 'gperm-dot-on' : 'gperm-dot-off'}`}
+                className={`settings-gperm-dot ${globalPerms[p.id] ? 'settings-gperm-dot-on' : 'settings-gperm-dot-off'}`}
                 title={p.label}
               />
             ))}
           </div>
-          <span className="global-perms-cta">Manage All</span>
-          <span className={`expand-chevron ${expanded ? 'chevron-open' : ''}`}>&#8250;</span>
+          <span className="settings-global-perms-cta">Manage All</span>
+          <span className={`settings-expand-chevron ${expanded ? 'settings-chevron-open' : ''}`}>&#8250;</span>
         </div>
       </div>
 
       {expanded && (
-        <div className="global-perms-body">
-          <div className="global-perms-grid">
+        <div className="settings-global-perms-body">
+          <div className="settings-global-perms-grid">
             {CUSTOMER_PERMS.map(p => (
-              <div key={p.id} className={`global-perm-card ${globalPerms[p.id] ? 'gperm-enabled' : 'gperm-disabled'}`}>
-                <div className="perm-text">
-                  <span className="perm-label">{p.label}</span>
-                  <span className="perm-desc">{p.desc}</span>
+              <div key={p.id} className={`settings-global-perm-card ${globalPerms[p.id] ? 'settings-gperm-enabled' : 'settings-gperm-disabled'}`}>
+                <div className="settings-perm-text">
+                  <span className="settings-perm-label">{p.label}</span>
+                  <span className="settings-perm-desc">{p.desc}</span>
                 </div>
                 <Toggle checked={globalPerms[p.id]} onChange={() => toggleGlobal(p.id)} />
               </div>
             ))}
           </div>
-          <div className="global-perms-actions">
-            <span className="global-perms-hint">
+          <div className="settings-global-perms-actions">
+            <span className="settings-global-perms-hint">
               &#9888; This updates your baseline reference layout and pushes the changes instantly.
             </span>
-            <button className="btn-apply-global" onClick={() => setConfirmOpen(true)}>
+            <button className="settings-btn-apply-global" onClick={() => setConfirmOpen(true)}>
               Apply & Save Master Template
             </button>
           </div>
@@ -647,62 +637,61 @@ const UserManagement = ({ showToast }) => {
   };
 
   return (
-    <div className="section-container">
-      <div className="section-header">
+    <div className="settings-section-container">
+      <div className="settings-section-header">
         <div>
-          <h2 className="section-title">User Management</h2>
-          <p className="section-subtitle">Manage dynamic security levels and permissions across administrative profiles.</p>
+          <h2 className="settings-section-title">User Management</h2>
+          <p className="settings-section-subtitle">Manage dynamic security levels and permissions across administrative profiles.</p>
         </div>
-        <div className="user-stats">
-          <div className="stat-pill"><span className="stat-num">{counts.all}</span> Total</div>
-          <div className="stat-pill stat-staff"><span className="stat-num">{counts.Staff}</span> Staff</div>
-          <div className="stat-pill stat-customer"><span className="stat-num">{counts.Customer}</span> Customers</div>
+        <div className="settings-user-stats">
+          <div className="settings-stat-pill"><span className="settings-stat-num">{counts.all}</span> Total</div>
+          <div className="settings-stat-pill settings-stat-staff"><span className="settings-stat-num">{counts.Staff}</span> Staff</div>
+          <div className="settings-stat-pill settings-stat-customer"><span className="settings-stat-num">{counts.Customer}</span> Customers</div>
         </div>
       </div>
 
       <GlobalCustomerPerms users={users} onApply={handleGlobalCustomerApply} showToast={showToast} />
 
-      <div className="filter-tabs">
+      <div className="settings-filter-tabs">
         {FILTER_OPTIONS.map(opt => (
           <button
             key={opt.value}
-            className={`filter-tab ${filter === opt.value ? 'filter-tab-active' : ''}`}
+            className={`settings-filter-tab ${filter === opt.value ? 'settings-filter-tab-active' : ''}`}
             onClick={() => setFilter(opt.value)}
           >
             {opt.label}
-            <span className="filter-count">{counts[opt.value] ?? 0}</span>
+            <span className="settings-filter-count">{counts[opt.value] ?? 0}</span>
           </button>
         ))}
       </div>
 
-      <div className="search-row">
-        <div className="search-wrap">
-          <span className="search-icon">⌕</span>
+      <div className="settings-search-row">
+        <div className="settings-search-wrap">
+          <span className="settings-search-icon">⌕</span>
           <input
-            className="search-input"
+            className="settings-search-input"
             placeholder="Search by name or email..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          {search && <button className="search-clear" onClick={() => setSearch('')}>×</button>}
+          {search && <button className="settings-search-clear" onClick={() => setSearch('')}>×</button>}
         </div>
-        <span className="result-count">{filtered.length} user{filtered.length !== 1 ? 's' : ''} found</span>
+        <span className="settings-result-count">{filtered.length} user{filtered.length !== 1 ? 's' : ''} found</span>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">◈</div>
+        <div className="settings-empty-state">
+          <div className="settings-empty-icon">◈</div>
           <h3>No records found</h3>
           <p>Modify search criteria or filters to expand your search query.</p>
         </div>
       ) : (
-        <div className="table-wrap">
-          <table className="data-table">
+        <div className="settings-table-wrap">
+          <table className="settings-data-table">
             <thead>
               <tr>
                 <th>User</th>
                 <th>Role</th>
-                <th>Status</th>
                 <th>Module Access</th>
                 <th>Actions</th>
               </tr>
@@ -711,13 +700,13 @@ const UserManagement = ({ showToast }) => {
               {filtered.map(u => {
                 const isStaffTier = u?.role?.toLowerCase() === 'staff' || u?.role?.toLowerCase() === 'admin';
                 return (
-                  <tr key={u._id} className="table-row">
+                  <tr key={u._id} className="settings-table-row">
                     <td>
-                      <div className="user-cell">
+                      <div className="settings-user-cell">
                         <Avatar initials={(u?.firstName?.charAt(0) || '') + (u?.lastName?.charAt(0) || '')} role={u?.role} />
-                        <div className="user-info">
-                          <span className="user-name">{u?.firstName} {u?.lastName}</span>
-                          <span className="user-email">{u?.email}</span>
+                        <div className="settings-user-info">
+                          <span className="settings-user-name">{u?.firstName} {u?.lastName}</span>
+                          <span className="settings-user-email">{u?.email}</span>
                         </div>
                       </div>
                     </td>
@@ -727,27 +716,26 @@ const UserManagement = ({ showToast }) => {
                         subrole={u?.subrole?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                       />
                     </td>
-                    <td><StatusBadge status={u?.status} /></td>
                     <td>
                       {isStaffTier ? (
-                        <div className="module-dots">
+                        <div className="settings-module-dots">
                           {ALL_MODULES.map(m => {
                             const isAccessible = u?.modules?.[m.id]?.View === 1;
                             return (
                               <span
                                 key={m.id}
-                                className={`module-dot ${isAccessible ? 'dot-on' : 'dot-off'}`}
+                                className={`settings-module-dot ${isAccessible ? 'settings-dot-on' : 'settings-dot-off'}`}
                                 title={`${m.label}: ${isAccessible ? 'Accessible' : 'Blocked'}`}
                               />
                             );
                           })}
                         </div>
                       ) : (
-                        <span className="portal-access">Customer Portal Matrix</span>
+                        <span className="settings-portal-access">Customer Portal Matrix</span>
                       )}
                     </td>
                     <td>
-                      <button className="btn-manage" onClick={() => handleManage(u)}>
+                      <button className="settings-btn-manage" onClick={() => handleManage(u)}>
                         {isStaffTier ? 'Manage Access' : 'View Permissions'}
                       </button>
                     </td>
@@ -893,81 +881,81 @@ const BackupRecovery = ({ showToast }) => {
   };
 
   return (
-    <div className="section-container">
-      <div className="section-header">
+    <div className="settings-section-container">
+      <div className="settings-section-header">
         <div>
-          <h2 className="section-title">Backup & Recovery</h2>
-          <p className="section-subtitle">Manage system backups, schedules, and data restoration snapshots.</p>
+          <h2 className="settings-section-title">Backup & Recovery</h2>
+          <p className="settings-section-subtitle">Manage system backups, schedules, and data restoration snapshots.</p>
         </div>
       </div>
 
-      <div className="backup-summary">
-        <div className="summary-card">
-          <span className="summary-icon">◷</span>
+      <div className="settings-backup-summary">
+        <div className="settings-summary-card">
+          <span className="settings-summary-icon">◷</span>
           <div>
-            <span className="summary-label">Last Backup</span>
-            <strong className="summary-value">
+            <span className="settings-summary-label">Last Backup</span>
+            <strong className="settings-summary-value">
               {metrics.lastBackup !== "Never" && metrics.lastBackup !== "—"
                 ? new Date(metrics.lastBackup).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                 : metrics.lastBackup}
             </strong>
           </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-icon">◎</span>
+        <div className="settings-summary-card">
+          <span className="settings-summary-icon">◎</span>
           <div>
-            <span className="summary-label">Backup Status</span>
-            <strong className={`summary-value ${metrics.backupStatus === 'Success' ? 'value-green' : 'value-red'}`}>{metrics.backupStatus}</strong>
+            <span className="settings-summary-label">Backup Status</span>
+            <strong className={`settings-summary-value ${metrics.backupStatus === 'Success' ? 'settings-value-green' : 'settings-value-red'}`}>{metrics.backupStatus}</strong>
           </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-icon">▦</span>
+        <div className="settings-summary-card">
+          <span className="settings-summary-icon">▦</span>
           <div>
-            <span className="summary-label">Total Records</span>
-            <strong className="summary-value">{metrics.totalRecords} backups</strong>
+            <span className="settings-summary-label">Total Records</span>
+            <strong className="settings-summary-value">{metrics.totalRecords} backups</strong>
           </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-icon">⬕</span>
+        <div className="settings-summary-card">
+          <span className="settings-summary-icon">⬕</span>
           <div>
-            <span className="summary-label">Success Rate</span>
-            <strong className="summary-value value-green">{metrics.successRate}</strong>
+            <span className="settings-summary-label">Success Rate</span>
+            <strong className="settings-summary-value settings-value-green">{metrics.successRate}</strong>
           </div>
         </div>
       </div>
 
-      <div className="backup-panel">
-        <h3 className="panel-title">Backup Schedule</h3>
-        <div className="schedule-grid">
+      <div className="settings-backup-panel">
+        <h3 className="settings-panel-title">Backup Schedule</h3>
+        <div className="settings-schedule-grid">
           {SCHEDULE_OPTIONS.map(opt => (
             <div
               key={opt.id}
-              className={`schedule-card ${schedule === opt.id ? 'schedule-selected' : ''}`}
+              className={`settings-schedule-card ${schedule === opt.id ? 'settings-schedule-selected' : ''}`}
               onClick={() => handleScheduleChange(opt.id)}
             >
-              <span className="schedule-icon">{opt.icon}</span>
+              <span className="settings-schedule-icon">{opt.icon}</span>
               <div>
-                <strong className="schedule-label">{opt.label}</strong>
-                <span className="schedule-desc">{opt.desc}</span>
+                <strong className="settings-schedule-label">{opt.label}</strong>
+                <span className="settings-schedule-desc">{opt.desc}</span>
               </div>
-              <div className="schedule-radio">
-                {schedule === opt.id && <div className="radio-dot" />}
+              <div className="settings-schedule-radio">
+                {schedule === opt.id && <div className="settings-radio-dot" />}
               </div>
             </div>
           ))}
         </div>
 
-        <div className="backup-actions">
-          <button className={`btn-backup-now ${isLoading ? 'btn-loading' : ''}`} onClick={handleBackupNow} disabled={isLoading}>
-            {isLoading ? <><span className="spinner" /> Processing...</> : <> ▶ Backup Now</>}
+        <div className="settings-backup-actions">
+          <button className={`settings-btn-backup-now ${isLoading ? 'settings-btn-loading' : ''}`} onClick={handleBackupNow} disabled={isLoading}>
+            {isLoading ? <><span className="settings-spinner" /> Processing...</> : <> ▶ Backup Now</>}
           </button>
         </div>
       </div>
 
-      <div className="backup-panel">
-        <h3 className="panel-title">Backup History</h3>
-        <div className="table-wrap">
-          <table className="data-table">
+      <div className="settings-backup-panel">
+        <h3 className="settings-panel-title">Backup History</h3>
+        <div className="settings-table-wrap">
+          <table className="settings-data-table">
             <thead>
               <tr>
                 <th>Backup Name</th>
@@ -980,23 +968,23 @@ const BackupRecovery = ({ showToast }) => {
             </thead>
             <tbody>
               {backups.map(b => (
-                <tr key={b._id || b.id} className="table-row">
-                  <td><span className="backup-name">{b.backupName || b.name}</span></td>
-                  <td className="text-muted">
+                <tr key={b._id || b.id} className="settings-table-row">
+                  <td><span className="settings-backup-name">{b.backupName || b.name}</span></td>
+                  <td className="settings-text-muted">
                     {b.date ? new Date(b.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                   </td>
-                  <td><span className="type-badge">{b.type}</span></td>
-                  <td className="text-muted">{b.size}</td>
+                  <td><span className="settings-type-badge">{b.type}</span></td>
+                  <td className="settings-text-muted">{b.size}</td>
                   <td>
-                    <span className={`backup-status ${b.status === 'Success' ? 'backup-success' : b.status === 'In Progress' ? 'backup-pending' : 'backup-failed'}`}>
+                    <span className={`settings-backup-status ${b.status === 'Success' ? 'settings-backup-success' : b.status === 'In Progress' ? 'settings-backup-pending' : 'settings-backup-failed'}`}>
                       {b.status === 'Success' ? '✓' : b.status === 'In Progress' ? '○' : '✕'} {b.status}
                     </span>
                   </td>
                   <td>
-                    <div className="backup-row-actions">
-                      <button className="action-btn" title="Restore" onClick={() => setRestoreConfirm(b)}>↺</button>
-                      <button className="action-btn" title="Download" onClick={() => handleDownload(b)}>↓</button>
-                      <button className="action-btn" title="Delete" onClick={() => setDeleteConfirm(b)}>✕</button>
+                    <div className="settings-backup-row-actions">
+                      <button className="settings-action-btn" title="Restore" onClick={() => setRestoreConfirm(b)}>↺</button>
+                      <button className="settings-action-btn" title="Download" onClick={() => handleDownload(b)}>↓</button>
+                      <button className="settings-action-btn" title="Delete" onClick={() => setDeleteConfirm(b)}>✕</button>
                     </div>
                   </td>
                 </tr>
@@ -1050,19 +1038,19 @@ const Settings = () => {
 
   return (
     <div className="settings-root">
-      <div className="page-header">
+      <div className="settings-page-header">
         <div className="page-header-left">
-          <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">Glass & Aluminum Business Management System</p>
+          <h1 className="settings-page-title">Settings</h1>
+          <p className="settings-page-subtitle">Glass & Aluminum Business Management System</p>
         </div>
       </div>
 
-      <div className="tab-nav">
-        <button className={`tab-btn ${activeTab === 'users' ? 'tab-active' : ''}`} onClick={() => setActiveTab('users')}>
-          <span className="tab-icon">◎</span> User Management
+      <div className="settings-tab-nav">
+        <button className={`settings-tab-btn ${activeTab === 'users' ? 'settings-tab-active' : ''}`} onClick={() => setActiveTab('users')}>
+          <span className="settings-tab-icon">◎</span> User Management
         </button>
-        <button className={`tab-btn ${activeTab === 'backup' ? 'tab-active' : ''}`} onClick={() => setActiveTab('backup')}>
-          <span className="tab-icon">▦</span> Backup & Recovery
+        <button className={`settings-tab-btn ${activeTab === 'backup' ? 'settings-tab-active' : ''}`} onClick={() => setActiveTab('backup')}>
+          <span className="settings-tab-icon">▦</span> Backup & Recovery
         </button>
       </div>
 
@@ -1071,7 +1059,7 @@ const Settings = () => {
         {activeTab === 'backup' && <BackupRecovery showToast={showToast} />}
       </div>
 
-      <div className="toast-container">
+      <div className="settings-toast-container">
         {toasts.map(t => (
           <Toast key={t.id} message={t.message} type={t.type} onClose={() => setToasts(prev => prev.filter(x => x.id !== t.id))} />
         ))}

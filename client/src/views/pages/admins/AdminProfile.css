@@ -3,10 +3,10 @@
 
 /* ── Tokens ───────────────────────────────────────────────────────────────── */
 :root {
-  --ap-blue:    #3b82f6;
-  --ap-blue-d:  #2563eb;
-  --ap-blue-bg: #eff6ff;
-  --ap-blue-b:  #dbeafe;
+  --ap-blue:    #7a1420;
+  --ap-blue-d:  #56101a;
+  --ap-blue-bg: #fbebec;
+  --ap-blue-b:  #f3d9db;
 
   --ap-s50:  #f8fafc;
   --ap-s100: #f1f5f9;
@@ -71,7 +71,7 @@
 }
 .ap-btn--primary:hover:not(:disabled) {
   background: var(--ap-blue-d); border-color: var(--ap-blue-d);
-  box-shadow: 0 4px 14px rgba(59,130,246,.35); transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(122, 20, 32,.35); transform: translateY(-1px);
 }
 .ap-btn--ghost {
   background: transparent; color: var(--ap-s600); border-color: var(--ap-s200);
@@ -98,7 +98,7 @@
 }
 .ap-card__accent {
   position: absolute; top: 0; left: 0; right: 0; height: 4px;
-  background: linear-gradient(90deg,var(--ap-blue),#8b5cf6,#06b6d4);
+  background: linear-gradient(90deg,var(--ap-blue),#b8532c);
 }
 @media (max-width: 860px) { .ap-card { grid-template-columns: 1fr; } }
 
@@ -108,10 +108,10 @@
 }
 .ap-avatar {
   position: relative; width: 76px; height: 76px; border-radius: 50%;
-  background: linear-gradient(135deg,var(--ap-blue),#8b5cf6);
+  background: linear-gradient(135deg,var(--ap-blue),#b8532c);
   display: flex; align-items: center; justify-content: center;
   font-size: 1.3rem; font-weight: 700; color: #fff; letter-spacing: .04em;
-  box-shadow: 0 0 0 4px var(--ap-blue-bg), 0 4px 14px rgba(59,130,246,.28);
+  box-shadow: 0 0 0 4px var(--ap-blue-bg), 0 4px 14px rgba(122, 20, 32,.28);
   flex-shrink: 0;
 }
 .ap-avatar__dot {
@@ -375,7 +375,7 @@
   outline: none; transition: all var(--ap-trans); padding: 0 13px;
 }
 .ap-input--ico { padding-left: 36px; padding-right: 36px; }
-.ap-input:focus { border-color: var(--ap-blue); background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,.11); }
+.ap-input:focus { border-color: var(--ap-blue); background: #fff; box-shadow: 0 0 0 3px rgba(122, 20, 32,.11); }
 .ap-input--err { border-color: #ef4444; background: #fff5f5; }
 .ap-input--err:focus { box-shadow: 0 0 0 3px rgba(239,68,68,.09); }
 .ap-err-msg { font-size: .73rem; color: #ef4444; font-weight: 500; }

@@ -237,7 +237,7 @@ const ViewModal = ({ project, onClose }) => {
 
   return (
     <div className="pm-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="pm-modal pm-modal-lg animate-modal">
+      <div className="pm-modal pm-modal-lg pm-animate-modal">
 
         <div className="pm-modal-header">
           <div>
@@ -443,7 +443,7 @@ const EditModal = ({ project, onClose, onSave }) => {
 
   return (
     <div className="pm-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="pm-modal pm-modal-sm animate-modal">
+      <div className="pm-modal pm-modal-sm pm-animate-modal">
 
         <div className="pm-modal-header">
           <div>

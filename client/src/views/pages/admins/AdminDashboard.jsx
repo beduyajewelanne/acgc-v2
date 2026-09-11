@@ -25,9 +25,9 @@ const TRANSACTIONS = [
 ];
 
 const statusColor = (s) => {
-  if (s === 'Paid') return 'badge-success';
-  if (s === 'Partial') return 'badge-warning';
-  return 'badge-info';
+  if (s === 'Paid') return 'ad-badge-success';
+  if (s === 'Partial') return 'ad-badge-warning';
+  return 'ad-badge-info';
 };
 
 export default function AdminDashboard() {
@@ -89,84 +89,84 @@ export default function AdminDashboard() {
   }, []);
 
   return (
-    <div className="adm-dash">
+    <div className="ad-dash">
 
       {/* ── Header ── */}
-      <div className="adm-header">
+      <div className="ad-header">
         <div>
-          <h1 className="adm-title">Dashboard</h1>
-          <p className="adm-subtitle">Welcome back! Here's an overview of your business.</p>
+          <h1 className="ad-title">Dashboard</h1>
+          <p className="ad-subtitle">Welcome back! Here's an overview of your business.</p>
         </div>
-        <div className="adm-date">{new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+        <div className="ad-date">{new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="adm-kpi-grid">
-        <button className="adm-kpi-card adm-kpi-blue" onClick={() => scrollTo(projectsRef, 'projects')}>
-          <div className="kpi-icon"><i className="ti ti-briefcase" aria-hidden="true"></i></div>
-          <div className="kpi-body">
-            <span className="kpi-label">Active Projects</span>
-            <span className="kpi-value">{projects.length}</span>
+      <div className="ad-kpi-grid">
+        <button className="ad-kpi-card ad-kpi-blue" onClick={() => scrollTo(projectsRef, 'projects')}>
+          <div className="ad-kpi-icon"><i className="ti ti-briefcase" aria-hidden="true"></i></div>
+          <div className="ad-kpi-body">
+            <span className="ad-kpi-label">Active Projects</span>
+            <span className="ad-kpi-value">{projects.length}</span>
           </div>
-          <i className="ti ti-arrow-right kpi-arrow" aria-hidden="true"></i>
+          <i className="ti ti-arrow-right ad-kpi-arrow" aria-hidden="true"></i>
         </button>
 
-        <button className="adm-kpi-card adm-kpi-green" onClick={() => scrollTo(warrantiesRef, 'warranties')}>
-          <div className="kpi-icon"><i className="ti ti-shield-check" aria-hidden="true"></i></div>
-          <div className="kpi-body">
-            <span className="kpi-label">Active Warranties</span>
-            <span className="kpi-value">{warranties.length}</span>
+        <button className="ad-kpi-card ad-kpi-green" onClick={() => scrollTo(warrantiesRef, 'warranties')}>
+          <div className="ad-kpi-icon"><i className="ti ti-shield-check" aria-hidden="true"></i></div>
+          <div className="ad-kpi-body">
+            <span className="ad-kpi-label">Active Warranties</span>
+            <span className="ad-kpi-value">{warranties.length}</span>
           </div>
-          <i className="ti ti-arrow-right kpi-arrow" aria-hidden="true"></i>
+          <i className="ti ti-arrow-right ad-kpi-arrow" aria-hidden="true"></i>
         </button>
 
-        <button className="adm-kpi-card adm-kpi-amber" onClick={() => navigate('/admin/site-inspections', { state: { filter: 'pending' } })}>
-          <div className="kpi-icon"><i className="ti ti-clipboard-list" aria-hidden="true"></i></div>
-          <div className="kpi-body">
-            <span className="kpi-label">Pending Inspections</span>
-            <span className="kpi-value">{transactions.length}</span>
+        <button className="ad-kpi-card ad-kpi-amber" onClick={() => navigate('/admin/site-inspections', { state: { filter: 'pending' } })}>
+          <div className="ad-kpi-icon"><i className="ti ti-clipboard-list" aria-hidden="true"></i></div>
+          <div className="ad-kpi-body">
+            <span className="ad-kpi-label">Pending Inspections</span>
+            <span className="ad-kpi-value">{transactions.length}</span>
           </div>
-          <i className="ti ti-arrow-right kpi-arrow" aria-hidden="true"></i>
+          <i className="ti ti-arrow-right ad-kpi-arrow" aria-hidden="true"></i>
         </button>
       </div>
 
       {/* ── Recent Transactions ── */}
-      <div className="adm-section-card">
-        <div className="adm-section-header">
+      <div className="ad-section-card">
+        <div className="ad-section-header">
           <div>
-            <h2 className="adm-section-title">Recent Transactions</h2>
-            <p className="adm-section-desc">Recent activity in the Customer Website</p>
+            <h2 className="ad-section-title">Recent Transactions</h2>
+            <p className="ad-section-desc">Recent activity in the Customer Website</p>
           </div>
-          <Link to="/admin/site-inspections" state={{ view: "recent-orders" }} className="adm-viewall-btn" >
+          <Link to="/admin/site-inspections" state={{ view: "recent-orders" }} className="ad-viewall-btn" >
             View all <i className="ti ti-arrow-right" aria-hidden="true"></i>
             </Link>
         </div>
 
-        <div className="adm-table-wrap">
-          <table className="adm-table">
+        <div className="ad-table-wrap">
+          <table className="ad-table">
             <thead>
               <tr>
                 <th>Project</th>
                 <th>Client</th>
                 {/* <th>Type</th> */}
                 <th>Date</th>
-                <th className="text-right">Amount</th>
-                <th className="text-right">Status</th>
+                <th className="ad-text-right">Amount</th>
+                <th className="ad-text-right">Status</th>
               </tr>
             </thead>
             <tbody>
               {transactions.slice(0, 5).map(txn => (
-                <tr key={txn._id} className="adm-table-row" onClick={() => navigate('/admin/site-inspections', { state: { inspection: txn, type: 'view' } })}>
-                  <td className="td-primary">
+                <tr key={txn._id} className="ad-table-row" onClick={() => navigate('/admin/site-inspections', { state: { inspection: txn, type: 'view' } })}>
+                  <td className="ad-td-primary">
                     {txn.measurements && txn.measurements.length > 0
                       ? txn.measurements.map(item => item.product).join(", ")
                       : "—"}
                   </td>
-                  <td className="td-muted">{txn.clientName}</td>
-                  {/* <td><span className="type-chip">{txn.status == "Pending" ? "To Call" : txn.status}</span></td> */}
-                  <td className="td-muted">{txn.dateCreated}</td>
-                  <td className="text-right td-amount">{txn.estimatedTotal.toFixed(2)}</td>
-                  <td className="text-right"><span className={`badge ${statusColor(txn.status)}`}>{txn.status}</span></td>
+                  <td className="ad-td-muted">{txn.clientName}</td>
+                  {/* <td><span className="ad-type-chip">{txn.status == "Pending" ? "To Call" : txn.status}</span></td> */}
+                  <td className="ad-td-muted">{txn.dateCreated}</td>
+                  <td className="ad-text-right ad-td-amount">{txn.estimatedTotal.toFixed(2)}</td>
+                  <td className="ad-text-right"><span className={`ad-badge ${statusColor(txn.status)}`}>{txn.status}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -175,59 +175,59 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Bottom Grid ── */}
-      <div className="adm-bottom-grid">
+      <div className="ad-bottom-grid">
 
         {/* Active Projects */}
-        <div ref={projectsRef} className={`adm-section-card ${highlightSection === 'projects' ? 'highlight-pulse' : ''}`}>
-          <div className="adm-section-header">
+        <div ref={projectsRef} className={`ad-section-card ${highlightSection === 'projects' ? 'ad-highlight-pulse' : ''}`}>
+          <div className="ad-section-header">
             <div>
-              <h2 className="adm-section-title">Active Projects</h2>
-              <p className="adm-section-desc">{projects.length} projects currently in progress</p>
+              <h2 className="ad-section-title">Active Projects</h2>
+              <p className="ad-section-desc">{projects.length} projects currently in progress</p>
             </div>
-            <button className="adm-viewall-btn" onClick={() => navigate('/admin/monitor')}>
+            <button className="ad-viewall-btn" onClick={() => navigate('/admin/monitor')}>
               View all <i className="ti ti-arrow-right" aria-hidden="true"></i>
             </button>
           </div>
 
-          <div className="adm-list">
+          <div className="ad-list">
             {projects.slice(0,5).map((proj, i) => (
-              <button key={proj._id} className="adm-list-item" style={{ animationDelay: `${i * 60}ms` }} onClick={() => navigate('/admin/monitor', { state: { project: proj } })}>
-                <div className="list-avatar list-avatar-blue">{proj.clientName.charAt(0)}</div>
-                <div className="list-body">
-                  <span className="list-name">{proj.itemDetails.name}</span>
-                  <span className="list-sub">{proj.client} · {proj.contractUpdatedAt} – {proj.estimatedInstallationDate}</span>
+              <button key={proj._id} className="ad-list-item" style={{ animationDelay: `${i * 60}ms` }} onClick={() => navigate('/admin/monitor', { state: { project: proj } })}>
+                <div className="ad-list-avatar ad-list-avatar-blue">{proj.clientName.charAt(0)}</div>
+                <div className="ad-list-body">
+                  <span className="ad-list-name">{proj.itemDetails.name}</span>
+                  <span className="ad-list-sub">{proj.client} · {proj.contractUpdatedAt} – {proj.estimatedInstallationDate}</span>
                 </div>
-                <span className="badge badge-progress">{proj.progressStatus}</span>
+                <span className="ad-badge ad-badge-progress">{proj.progressStatus}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Active Warranties */}
-        <div ref={warrantiesRef} className={`adm-section-card ${highlightSection === 'warranties' ? 'highlight-pulse' : ''}`}>
-          <div className="adm-section-header">
+        <div ref={warrantiesRef} className={`ad-section-card ${highlightSection === 'warranties' ? 'ad-highlight-pulse' : ''}`}>
+          <div className="ad-section-header">
             <div>
-              <h2 className="adm-section-title">Active Warranties</h2>
-              <p className="adm-section-desc">{warranties.length} warranties currently active</p>
+              <h2 className="ad-section-title">Active Warranties</h2>
+              <p className="ad-section-desc">{warranties.length} warranties currently active</p>
             </div>
-            <button className="adm-viewall-btn" onClick={() => navigate('/admin/transactions', { state: { view: 'warranties' } })}>
+            <button className="ad-viewall-btn" onClick={() => navigate('/admin/transactions', { state: { view: 'warranties' } })}>
               View all <i className="ti ti-arrow-right" aria-hidden="true"></i>
             </button>
           </div>
 
-          <div className="adm-list">
+          <div className="ad-list">
             {warranties.slice(0,5).map((war, i) => (
-              <button key={war.id} className="adm-list-item" style={{ animationDelay: `${i * 60}ms` }} onClick={() => navigate('/admin/transactions', { state: { tx: war } })}>
-                <div className="list-avatar list-avatar-green">{war.clientName.charAt(0)}</div>
-                <div className="list-body">
-                  <td className="td-primary">
+              <button key={war.id} className="ad-list-item" style={{ animationDelay: `${i * 60}ms` }} onClick={() => navigate('/admin/transactions', { state: { tx: war } })}>
+                <div className="ad-list-avatar ad-list-avatar-green">{war.clientName.charAt(0)}</div>
+                <div className="ad-list-body">
+                  <td className="ad-td-primary">
                     {war.measurements && war.measurements.length > 0
                       ? war.measurements.map(item => item.product).join(", ")
                       : "—"}
                   </td>
-                  <span className="list-sub">{war.clientName}</span>
+                  <span className="ad-list-sub">{war.clientName}</span>
                 </div>
-                <span className="warranty-expiry">
+                <span className="ad-warranty-expiry">
                   Expires {
                     new Date(
                       new Date(war.estimatedInstallationDate).setDate(
@@ -244,27 +244,27 @@ export default function AdminDashboard() {
 
       {/* ── Modal ── */}
       {modal && (
-        <div className="modal-backdrop" onClick={closeModal}>
-          <div className="modal-box" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
-            <button className="modal-close" onClick={closeModal} aria-label="Close"><i className="ti ti-x"></i></button>
+        <div className="ad-modal-backdrop" onClick={closeModal}>
+          <div className="ad-modal-box" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+            <button className="ad-modal-close" onClick={closeModal} aria-label="Close"><i className="ti ti-x"></i></button>
 
             {modal.type === 'project' && (
               <>
-                <div className="modal-header-bar modal-bar-blue">
+                <div className="ad-modal-header-bar ad-modal-bar-blue">
                   <i className="ti ti-briefcase" aria-hidden="true"></i>
                   <span>Project Details</span>
                 </div>
-                <div className="modal-body">
-                  <h3 className="modal-title">{modal.data.name}</h3>
-                  <p className="modal-desc">{modal.data.description}</p>
-                  <div className="modal-grid">
-                    <div className="modal-field"><span className="mf-label">Client</span><span className="mf-value">{modal.data.client}</span></div>
-                    <div className="modal-field"><span className="mf-label">Status</span><span className="badge badge-progress">{modal.data.status}</span></div>
-                    <div className="modal-field"><span className="mf-label">Start Date</span><span className="mf-value">{modal.data.startDate}</span></div>
-                    <div className="modal-field"><span className="mf-label">End Date</span><span className="mf-value">{modal.data.endDate}</span></div>
-                    <div className="modal-field"><span className="mf-label">Contract Value</span><span className="mf-value mf-strong">{modal.data.value}</span></div>
+                <div className="ad-modal-body">
+                  <h3 className="ad-modal-title">{modal.data.name}</h3>
+                  <p className="ad-modal-desc">{modal.data.description}</p>
+                  <div className="ad-modal-grid">
+                    <div className="ad-modal-field"><span className="ad-mf-label">Client</span><span className="ad-mf-value">{modal.data.client}</span></div>
+                    <div className="ad-modal-field"><span className="ad-mf-label">Status</span><span className="ad-badge ad-badge-progress">{modal.data.status}</span></div>
+                    <div className="ad-modal-field"><span className="ad-mf-label">Start Date</span><span className="ad-mf-value">{modal.data.startDate}</span></div>
+                    <div className="ad-modal-field"><span className="ad-mf-label">End Date</span><span className="ad-mf-value">{modal.data.endDate}</span></div>
+                    <div className="ad-modal-field"><span className="ad-mf-label">Contract Value</span><span className="ad-mf-value ad-mf-strong">{modal.data.value}</span></div>
                   </div>
-                  <button className="modal-action-btn" onClick={() => { closeModal(); navigate('/admin/monitor', { state: { projectId: modal.data.id } }); }}>
+                  <button className="ad-modal-action-btn" onClick={() => { closeModal(); navigate('/admin/monitor', { state: { projectId: modal.data.id } }); }}>
                     Open in Project Monitor <i className="ti ti-arrow-right" aria-hidden="true"></i>
                   </button>
                 </div>
@@ -273,19 +273,19 @@ export default function AdminDashboard() {
 
             {modal.type === 'warranty' && (
               <>
-                <div className="modal-header-bar modal-bar-green">
+                <div className="ad-modal-header-bar ad-modal-bar-green">
                   <i className="ti ti-shield-check" aria-hidden="true"></i>
                   <span>Warranty Details</span>
                 </div>
-                <div className="modal-body">
-                  <h3 className="modal-title">{modal.data.name}</h3>
-                  <div className="modal-grid">
-                    <div className="modal-field"><span className="mf-label">Client</span><span className="mf-value">{modal.data.client}</span></div>
-                    <div className="modal-field"><span className="mf-label">Expires</span><span className="mf-value">{modal.data.expires}</span></div>
-                    <div className="modal-field modal-field-full"><span className="mf-label">Coverage</span><span className="mf-value">{modal.data.coverage}</span></div>
-                    <div className="modal-field"><span className="mf-label">Project Value</span><span className="mf-value mf-strong">{modal.data.value}</span></div>
+                <div className="ad-modal-body">
+                  <h3 className="ad-modal-title">{modal.data.name}</h3>
+                  <div className="ad-modal-grid">
+                    <div className="ad-modal-field"><span className="ad-mf-label">Client</span><span className="ad-mf-value">{modal.data.client}</span></div>
+                    <div className="ad-modal-field"><span className="ad-mf-label">Expires</span><span className="ad-mf-value">{modal.data.expires}</span></div>
+                    <div className="ad-modal-field ad-modal-field-full"><span className="ad-mf-label">Coverage</span><span className="ad-mf-value">{modal.data.coverage}</span></div>
+                    <div className="ad-modal-field"><span className="ad-mf-label">Project Value</span><span className="ad-mf-value ad-mf-strong">{modal.data.value}</span></div>
                   </div>
-                  <button className="modal-action-btn modal-action-green" onClick={() => { closeModal(); navigate('/admin/transactions', { state: { view: 'warranties', warrantyId: modal.data.id } }); }}>
+                  <button className="ad-modal-action-btn ad-modal-action-green" onClick={() => { closeModal(); navigate('/admin/transactions', { state: { view: 'warranties', warrantyId: modal.data.id } }); }}>
                     View in Transactions <i className="ti ti-arrow-right" aria-hidden="true"></i>
                   </button>
                 </div>

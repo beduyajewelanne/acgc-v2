@@ -285,35 +285,50 @@ const downloadContract = (tx, accepted = false) => {
 const StatusBadge = ({ paid, total }) => {
   const status = deriveStatus(paid, total);
   return status === 'Paid' ? (
-    <span className="badge-paid">✓ Fully Paid</span>
+    <span className="transaction-badge-paid">✓ Fully Paid</span>
   ) : (
-    <span className="badge-pending">⏳ Pending</span>
+    <span className="transaction-badge-pending">⏳ Pending</span>
   );
 };
 
 const CategoryBadge = ({ category }) => {
   const map = {
-    'Completed Project': 'cat-completed',
-    'Completed': 'cat-completed',
-    'Contract': 'cat-contract',
-    'Warranty': 'cat-warranty',
-    'In Progress': 'cat-contract'
+    'Completed Project': 'transaction-cat-completed',
+    'Completed': 'transaction-cat-completed',
+    'Contract': 'transaction-cat-contract',
+    'Warranty': 'transaction-cat-warranty',
+    'In Progress': 'transaction-cat-contract'
   };
-  return <span className={`cat-badge ${map[category] || ''}`}>{category}</span>;
+  return <span className={`transaction-cat-badge ${map[category] || ''}`}>{category}</span>;
 };
 
 const SummaryCard = ({ icon, label, value, color }) => (
-  <div className={`summary-card summary-${color}`}>
-    <div className="summary-icon-wrap">{icon}</div>
+  <div className={`transaction-summary-card transaction-summary-${color}`}>
+    <div className="transaction-summary-icon-wrap">{icon}</div>
     <div>
-      <p className="summary-label">{label}</p>
-      <p className="summary-value">{value}</p>
+      <p className="transaction-summary-label">{label}</p>
+      <p className="transaction-summary-value">{value}</p>
     </div>
   </div>
 );
 
 const Avatar = ({ name }) => (
-  <div className="avatar">{(name || 'U').charAt(0).toUpperCase()}</div>
+  <div className="transaction-avatar">{(name || 'U').charAt(0).toUpperCase()}</div>
+);
+
+const ConfirmDialog = ({ title, message, onConfirm, onCancel, confirmLabel = 'Confirm', danger = false }) => (
+  <div className="transaction-modal-overlay" onClick={onCancel}>
+    <div className="transaction-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+      <h3 className="transaction-confirm-title">{title}</h3>
+      <p className="transaction-confirm-message">{message}</p>
+      <div className="transaction-confirm-actions">
+        <button className="transaction-btn-ghost" onClick={onCancel}>Cancel</button>
+        <button className={danger ? 'transaction-btn-danger' : 'transaction-btn-save'} onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+      </div>
+    </div>
+  </div>
 );
 
 // ─── Contract Modal ──────────────────────────────────────────────────────────
@@ -323,20 +338,20 @@ const ContractModal = ({ tx, onClose }) => {
   const accepted = deriveStatus(paidVal, totalVal) === 'Fully Paid';
   if (!tx) return null;
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box contract-modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-header-left">
-            <p className="modal-eyebrow">Contract Document</p>
-            <h2 className="modal-title">{tx.contractId || tx.id}</h2>
-            <p className="modal-sub">{tx.clientName} — {tx.measurements?.[0]?.product || 'Glass Project'}</p>
+    <div className="transaction-modal-overlay" onClick={onClose}>
+      <div className="transaction-modal-box transaction-contract-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="transaction-modal-header">
+          <div className="transaction-modal-header-left">
+            <p className="transaction-modal-eyebrow">Contract Document</p>
+            <h2 className="transaction-modal-title">{tx.contractId || tx.id}</h2>
+            <p className="transaction-modal-sub">{tx.clientName} — {tx.measurements?.[0]?.product || 'Glass Project'}</p>
           </div>
           {accepted && (
-            <span className="contract-accepted-badge">✓ Accepted</span>
+            <span className="transaction-contract-accepted-badge">✓ Accepted</span>
           )}
-          <button className="modal-close-btn" onClick={onClose}>✕</button>
+          <button className="transaction-modal-close-btn" onClick={onClose}>✕</button>
         </div>
-        <div className="contract-iframe-wrap" style={{ width: '100%', height: '100%', position: 'relative' }}>
+        <div className="transaction-contract-iframe-wrap" style={{ width: '100%', height: '100%', position: 'relative' }}>
           {(() => {
             // 1. Construct the absolute link cleanly
             const fileUrl = window.base_api.replace('/api/', '') + tx.contractLink;
@@ -349,7 +364,7 @@ const ContractModal = ({ tx, onClose }) => {
                 <img
                   src={fileUrl}
                   alt={`Contract ${tx.contractId || tx.id}`}
-                  className="contract-iframe" // Inherits your existing modal dimensions perfectly
+                  className="transaction-contract-iframe" // Inherits your existing modal dimensions perfectly
                   style={{ 
                     width: '100%', 
                     height: '100%', 
@@ -364,7 +379,7 @@ const ContractModal = ({ tx, onClose }) => {
                 <object
                   data={fileUrl}
                   type="application/pdf"
-                  className="contract-iframe"
+                  className="transaction-contract-iframe"
                   style={{ 
                     width: '100%', 
                     height: '100%', 
@@ -379,7 +394,7 @@ const ContractModal = ({ tx, onClose }) => {
                       href={fileUrl} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="btn-download"
+                      className="transaction-btn-download"
                       style={{ display: 'inline-flex', textDecoration: 'none', padding: '8px 16px' }}
                     >
                       Open PDF in New Tab
@@ -390,9 +405,9 @@ const ContractModal = ({ tx, onClose }) => {
             }
           })()}
         </div>
-        <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Close</button>
-          {/* <button className="btn-download" onClick={() => downloadContract(tx, accepted)}>
+        <div className="transaction-modal-footer">
+          <button className="transaction-btn-ghost" onClick={onClose}>Close</button>
+          {/* <button className="transaction-btn-download" onClick={() => downloadContract(tx, accepted)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download Contract
           </button> */}
@@ -419,28 +434,28 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
     : "Glass Fitting";
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-header-left">
-            <p className="modal-eyebrow">Transaction Details</p>
-            <h2 className="modal-title">{tx.clientName}</h2>
-            <p className="modal-sub">{tx.contractId || tx.id}</p>
+    <div className="transaction-modal-overlay" onClick={onClose}>
+      <div className="transaction-modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+        <div className="transaction-modal-header">
+          <div className="transaction-modal-header-left">
+            <p className="transaction-modal-eyebrow">Transaction Details</p>
+            <h2 className="transaction-modal-title">{tx.clientName}</h2>
+            <p className="transaction-modal-sub">{tx.contractId || tx.id}</p>
           </div>
-          <button className="modal-close-btn" onClick={onClose}>✕</button>
+          <button className="transaction-modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
-        <div className="modal-body">
-          <div className="view-status-row">
+        <div className="transaction-modal-body">
+          <div className="transaction-view-status-row">
             {tx.status == "Paid" ?
-            <span className="badge-paid">✓ Fully Paid</span> :
-            <span className="badge-pending">⏳ Pending</span>
+            <span className="transaction-badge-paid">✓ Fully Paid</span> :
+            <span className="transaction-badge-pending">⏳ Pending</span>
             }
             <CategoryBadge category={tx.category} />
-            <span className="type-chip">{tx.customerHasAccount ? '🌐 Website Order' : '🚶 Walk-in'}</span>
+            <span className="transaction-type-chip">{tx.customerHasAccount ? '🌐 Website Order' : '🚶 Walk-in'}</span>
           </div>
 
-          <div className="view-grid-1">
+          <div className="transaction-view-grid-1">
             <InfoSection title="Client Information">
               <InfoRow label="Full Name" value={tx.clientName} />
               <InfoRow label="Email" value={tx.customerEmail} />
@@ -469,17 +484,17 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
           )}
 
           <InfoSection title="Payment Breakdown">
-            <div className="payment-rows">
+            <div className="transaction-payment-rows">
               <PayRow label="Total Project Amount" value={fmt(totalVal)} />
               <PayRow label="Amount Paid" value={fmt(paidVal)} color="green" />
-              <div className="pay-divider" />
+              <div className="transaction-pay-divider" />
               <PayRow label="Remaining Balance" value={fmt(remaining)} color={remaining > 0 ? 'red' : 'green'} bold />
             </div>
-            <div className="progress-wrap">
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: `${Math.min((paidVal / (totalVal || 1)) * 100, 100)}%` }} />
+            <div className="transaction-progress-wrap">
+              <div className="transaction-progress-track">
+                <div className="transaction-progress-fill" style={{ width: `${Math.min((paidVal / (totalVal || 1)) * 100, 100)}%` }} />
               </div>
-              <span className="progress-pct">{Math.round((paidVal / (totalVal || 1)) * 100)}% paid</span>
+              <span className="transaction-progress-pct">{Math.round((paidVal / (totalVal || 1)) * 100)}% paid</span>
             </div>
           </InfoSection>
 
@@ -514,8 +529,8 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
                 )}
               />
 
-              <div className="warranty-days-row">
-                <span className="info-label">Remaining Warranty Days</span>
+              <div className="transaction-warranty-days-row">
+                <span className="transaction-info-label">Remaining Warranty Days</span>
 
                 {tx.estimatedInstallationDate ? (
                   (() => {
@@ -529,30 +544,30 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
                     );
 
                     return days < 0 ? (
-                      <span className="warranty-expired">
+                      <span className="transaction-warranty-expired">
                         Expired ({Math.abs(days)} days ago)
                       </span>
                     ) : (
-                      <span className="warranty-active">
+                      <span className="transaction-warranty-active">
                         {days} days remaining
                       </span>
                     );
                   })()
                 ) : (
-                  <span className="info-value">—</span>
+                  <span className="transaction-info-value">—</span>
                 )}
               </div>
             </InfoSection>
           )}
         </div>
 
-        <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Close</button>
-          <button className="btn-contract-view" onClick={() => { onClose(); onViewContract(tx); }}>
+        <div className="transaction-modal-footer">
+          <button className="transaction-btn-ghost" onClick={onClose}>Close</button>
+          <button className="transaction-btn-contract-view" onClick={() => { onClose(); onViewContract(tx); }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             View Contract
           </button>
-          {/* <button className="btn-download" onClick={() => downloadContract(tx)}>
+          {/* <button className="transaction-btn-download" onClick={() => downloadContract(tx)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download
           </button> */}
@@ -572,18 +587,18 @@ const FeedbackSummaryModal = ({ tx, onClose }) => {
     : tx.productName || "Glass & Aluminum Project";
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-header-left">
-            <p className="modal-eyebrow">Customer Feedback Summary</p>
-            <h2 className="modal-title">{tx.clientName || 'Customer'}</h2>
-            <p className="modal-sub">{tx.contractId || tx.id}</p>
+    <div className="transaction-modal-overlay" onClick={onClose}>
+      <div className="transaction-modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+        <div className="transaction-modal-header">
+          <div className="transaction-modal-header-left">
+            <p className="transaction-modal-eyebrow">Customer Feedback Summary</p>
+            <h2 className="transaction-modal-title">{tx.clientName || 'Customer'}</h2>
+            <p className="transaction-modal-sub">{tx.contractId || tx.id}</p>
           </div>
-          <button className="modal-close-btn" onClick={onClose}>✕</button>
+          <button className="transaction-modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
-        <div className="modal-body">
+        <div className="transaction-modal-body">
           {/* 1. Rating & Feedback Box */}
           <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -598,38 +613,38 @@ const FeedbackSummaryModal = ({ tx, onClose }) => {
           </div>
 
           {/* 2. Customer Context */}
-          <div className="info-section">
-            <p className="info-section-title">Customer Info</p>
-            <div className="info-row">
-              <span className="info-label">Full Name</span>
-              <span className="info-value">{tx.clientName || '—'}</span>
+          <div className="transaction-info-section">
+            <p className="transaction-info-section-title">Customer Info</p>
+            <div className="transaction-info-row">
+              <span className="transaction-info-label">Full Name</span>
+              <span className="transaction-info-value">{tx.clientName || '—'}</span>
             </div>
-            <div className="info-row">
-              <span className="info-label">Email / Contact</span>
-              <span className="info-value">{tx.customerEmail || tx.clientNumber || '—'}</span>
+            <div className="transaction-info-row">
+              <span className="transaction-info-label">Email / Contact</span>
+              <span className="transaction-info-value">{tx.customerEmail || tx.clientNumber || '—'}</span>
             </div>
           </div>
 
           {/* 3. Project Context */}
-          <div className="info-section">
-            <p className="info-section-title">Project Summary</p>
-            <div className="info-row">
-              <span className="info-label">Product / Project</span>
-              <span className="info-value" style={{ fontWeight: '600' }}>{productName}</span>
+          <div className="transaction-info-section">
+            <p className="transaction-info-section-title">Project Summary</p>
+            <div className="transaction-info-row">
+              <span className="transaction-info-label">Product / Project</span>
+              <span className="transaction-info-value" style={{ fontWeight: '600' }}>{productName}</span>
             </div>
-            <div className="info-row">
-              <span className="info-label">Category</span>
-              <span className="info-value">{tx.category || tx.productCategory || 'Completed Project'}</span>
+            <div className="transaction-info-row">
+              <span className="transaction-info-label">Category</span>
+              <span className="transaction-info-value">{tx.category || tx.productCategory || 'Completed Project'}</span>
             </div>
-            <div className="info-row">
-              <span className="info-label">Total Amount</span>
-              <span className="info-value mono">₱{Number(tx.manualOverride || tx.estimatedTotal || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+            <div className="transaction-info-row">
+              <span className="transaction-info-label">Total Amount</span>
+              <span className="transaction-info-value transaction-mono">₱{Number(tx.manualOverride || tx.estimatedTotal || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
             </div>
           </div>
         </div>
 
-        <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Close</button>
+        <div className="transaction-modal-footer">
+          <button className="transaction-btn-ghost" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>
@@ -637,23 +652,23 @@ const FeedbackSummaryModal = ({ tx, onClose }) => {
 };
 
 const InfoSection = ({ title, children }) => (
-  <div className="info-section">
-    <p className="info-section-title">{title}</p>
+  <div className="transaction-info-section">
+    <p className="transaction-info-section-title">{title}</p>
     {children}
   </div>
 );
 
 const InfoRow = ({ label, value, mono, color }) => (
-  <div className="info-row">
-    <span className="info-label">{label}</span>
-    <span className={`info-value ${mono ? 'mono' : ''} ${color ? `color-${color}` : ''}`}>{value || '—'}</span>
+  <div className="transaction-info-row">
+    <span className="transaction-info-label">{label}</span>
+    <span className={`transaction-info-value ${mono ? 'transaction-mono' : ''} ${color ? `transaction-color-${color}` : ''}`}>{value || '—'}</span>
   </div>
 );
 
 const PayRow = ({ label, value, color, bold }) => (
-  <div className={`pay-row ${bold ? 'pay-row-bold' : ''}`}>
-    <span className="pay-label">{label}</span>
-    <span className={`pay-value ${color ? `color-${color}` : ''}`}>{value}</span>
+  <div className={`transaction-pay-row ${bold ? 'transaction-pay-row-bold' : ''}`}>
+    <span className="transaction-pay-label">{label}</span>
+    <span className={`transaction-pay-value ${color ? `transaction-color-${color}` : ''}`}>{value}</span>
   </div>
 );
 
@@ -695,54 +710,54 @@ const EditModal = ({ tx, onClose, onSave }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-header-left">
-            <p className="modal-eyebrow">Edit Payment</p>
-            <h2 className="modal-title">{tx.clientName}</h2>
-            <p className="modal-sub">{tx.measurements?.[0]?.product || 'Glass Project'}</p>
+    <div className="transaction-modal-overlay" onClick={onClose}>
+      <div className="transaction-modal-box" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+        <div className="transaction-modal-header">
+          <div className="transaction-modal-header-left">
+            <p className="transaction-modal-eyebrow">Edit Payment</p>
+            <h2 className="transaction-modal-title">{tx.clientName}</h2>
+            <p className="transaction-modal-sub">{tx.measurements?.[0]?.product || 'Glass Project'}</p>
           </div>
-          <button className="modal-close-btn" onClick={onClose}>✕</button>
+          <button className="transaction-modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
-        <div className="modal-body">
+        <div className="transaction-modal-body">
           {isLocked ? (
-            <div className="locked-notice">
-              <span className="lock-icon">🔒</span>
+            <div className="transaction-locked-notice">
+              <span className="transaction-lock-icon">🔒</span>
               <div>
-                <p className="locked-title">Transaction Locked</p>
-                <p className="locked-desc">This transaction is fully paid and cannot be modified.</p>
+                <p className="transaction-locked-title">Transaction Locked</p>
+                <p className="transaction-locked-desc">This transaction is fully paid and cannot be modified.</p>
               </div>
             </div>
           ) : (
             <>
-              <div className="edit-notice">
+              <div className="transaction-edit-notice">
                 <span>ℹ️</span>
                 <p>You may update the amount paid, payment method, and transaction number.</p>
               </div>
 
-              {error && <div className="edit-error">⚠️ {error}</div>}
+              {error && <div className="transaction-edit-error">⚠️ {error}</div>}
 
-              <div className="field-group">
-                <label className="field-label">Amount Paid (₱)</label>
+              <div className="transaction-field-group">
+                <label className="transaction-field-label">Amount Paid (₱)</label>
                 <input
                   type="number"
-                  className="field-input"
+                  className="transaction-field-input"
                   value={paid}
                   min="0"
                   max={totalVal}
                   onChange={(e) => { setPaid(e.target.value); setError(''); }}
                   placeholder="0.00"
                 />
-                <p className="field-hint">Total project amount: {fmt(totalVal)}</p>
+                <p className="transaction-field-hint">Total project amount: {fmt(totalVal)}</p>
               </div>
 
-              <div className="field-group">
-                <label className="field-label">Payment Method</label>
-                <div className="radio-row">
+              <div className="transaction-field-group">
+                <label className="transaction-field-label">Payment Method</label>
+                <div className="transaction-radio-row">
                   {['Cash', 'Online'].map((opt) => (
-                    <label key={opt} className={`radio-card ${method === opt ? 'radio-active' : ''}`}>
+                    <label key={opt} className={`transaction-radio-card ${method === opt ? 'transaction-radio-active' : ''}`}>
                       <input type="radio" name="method" value={opt} checked={method === opt} onChange={() => setMethod(opt)} />
                       <span>{opt === 'Cash' ? '💵' : '💳'}</span>
                       <span>{opt}</span>
@@ -752,11 +767,11 @@ const EditModal = ({ tx, onClose, onSave }) => {
               </div>
 
               {method === 'Online' && (
-                <div className="field-group field-animate">
-                  <label className="field-label">Transaction Number <span className="optional-tag">Optional</span></label>
+                <div className="transaction-field-group transaction-field-animate">
+                  <label className="transaction-field-label">Transaction Number <span className="transaction-optional-tag">Optional</span></label>
                   <input
                     type="text"
-                    className="field-input mono"
+                    className="transaction-field-input transaction-mono"
                     value={txnNum}
                     onChange={(e) => setTxnNum(e.target.value)}
                     placeholder="e.g. TXN-20240101-0001"
@@ -764,17 +779,17 @@ const EditModal = ({ tx, onClose, onSave }) => {
                 </div>
               )}
 
-              <div className="status-preview">
-                <span className="status-preview-label">Payment Status Preview</span>
+              <div className="transaction-status-preview">
+                <span className="transaction-status-preview-label">Payment Status Preview</span>
                 {tx.status == "Paid" ?
-                <span className="badge-paid">✓ Fully Paid</span> :
-                <span className="badge-pending">⏳ Pending</span>
+                <span className="transaction-badge-paid">✓ Fully Paid</span> :
+                <span className="transaction-badge-pending">⏳ Pending</span>
                 }
               </div>
 
-              <div className="balance-preview">
+              <div className="transaction-balance-preview">
                 <span>Remaining Balance</span>
-                <strong className={(totalVal - (Number(paid) || 0)) > 0 ? 'color-red' : 'color-green'}>
+                <strong className={(totalVal - (Number(paid) || 0)) > 0 ? 'transaction-color-red' : 'transaction-color-green'}>
                   {fmt(totalVal - (Number(paid) || 0))}
                 </strong>
               </div>
@@ -782,11 +797,11 @@ const EditModal = ({ tx, onClose, onSave }) => {
           )}
         </div>
 
-        <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+        <div className="transaction-modal-footer">
+          <button className="transaction-btn-ghost" onClick={onClose}>Cancel</button>
           {!isLocked && (
-            <button className="btn-save" onClick={handleSave} disabled={saving}>
-              {saving ? <span className="spinner" /> : null}
+            <button className="transaction-btn-save" onClick={handleSave} disabled={saving}>
+              {saving ? <span className="transaction-spinner" /> : null}
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
           )}
@@ -808,6 +823,7 @@ const Transactions = () => {
   const [viewTx, setViewTx] = useState(null);
   const [editTx, setEditTx] = useState(null);
   const [contractTx, setContractTx] = useState(null);
+  const [deleteFeedbackTarget, setDeleteFeedbackTarget] = useState(null);
 
   useEffect(() => {
     if (user && user.token !== "") {
@@ -983,17 +999,17 @@ const handleSave = (id, updates, onSuccess, onError) => {
   const FILTERS = ['All', 'Completed Projects', 'Contract & Warranties','Customer Feedbacks'];
 
   return (
-    <div className="page-root">
-      <div className="page-header">
+    <div className="transaction-page-root">
+      <div className="transaction-page-header">
         <div>
-          <h1 className="page-title">Transaction Management</h1>
-          <p className="page-sub">
+          <h1 className="transaction-page-title">Transaction Management</h1>
+          <p className="transaction-page-sub">
             Financial records are auto-generated from Site Inspection &amp; Progress Monitoring modules.
           </p>
         </div>
       </div>
 
-      <div className="summary-grid">
+      <div className="transaction-summary-grid">
         <SummaryCard icon="💰" label="Total Revenue" value={fmt(summary.revenue)} color="blue" />
         <SummaryCard icon="✅" label="Total Collected" value={fmt(summary.collected)} color="green" />
         <SummaryCard icon="⏳" label="Pending Balance" value={fmt(summary.pending)} color="amber" />
@@ -1006,10 +1022,10 @@ const handleSave = (id, updates, onSuccess, onError) => {
         />
       </div>
 
-      <div className="controls-bar">
-        <div className="filter-group">
+      <div className="transaction-controls-bar">
+        <div className="transaction-filter-group">
           {FILTERS.map((f) => (
-            <button key={f} className={`filter-btn ${filter === f ? 'filter-active' : ''}`} onClick={() => setFilter(f)}>
+            <button key={f} className={`transaction-filter-btn ${filter === f ? 'transaction-filter-active' : ''}`} onClick={() => setFilter(f)}>
               {f}
             </button>
           ))}
@@ -1021,7 +1037,7 @@ const handleSave = (id, updates, onSuccess, onError) => {
             <select 
               value={feedbackCategory} 
               onChange={(e) => setFeedbackCategory(e.target.value)}
-              className="search-input"
+              className="transaction-search-input"
               style={{ padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}
             >
               <option value="All">All Categories</option>
@@ -1035,7 +1051,7 @@ const handleSave = (id, updates, onSuccess, onError) => {
             <select 
               value={feedbackSortDate} 
               onChange={(e) => setFeedbackSortDate(e.target.value)}
-              className="search-input"
+              className="transaction-search-input"
               style={{ padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}
             >
               <option value="newest">Sort: Newest First</option>
@@ -1044,10 +1060,10 @@ const handleSave = (id, updates, onSuccess, onError) => {
           </div>
         )}
 
-        <div className="search-box">
-          <span className="search-ico">🔍</span>
+        <div className="transaction-search-box">
+          <span className="transaction-search-ico">🔍</span>
           <input
-            className="search-input"
+            className="transaction-search-input"
             placeholder="Search client, product, contract…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -1055,11 +1071,11 @@ const handleSave = (id, updates, onSuccess, onError) => {
         </div>
       </div>
 
-      <p className="record-count">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>
+      <p className="transaction-record-count">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>
 
-      <div className="table-card">
-        <div className="table-scroll">
-          <table className="data-table">
+      <div className="transaction-table-card">
+        <div className="transaction-table-scroll">
+          <table className="transaction-data-table">
             {filter === 'Customer Feedbacks' ? (
                 <thead>
                   <tr>
@@ -1092,9 +1108,9 @@ const handleSave = (id, updates, onSuccess, onError) => {
             <tbody>
         {filtered.length === 0 ? (
           <tr>
-            <td colSpan={filter === 'Customer Feedbacks' ? 8 : 10} className="empty-cell">
-              <div className="empty-state">
-                <span className="empty-icon"></span>
+            <td colSpan={filter === 'Customer Feedbacks' ? 8 : 10} className="transaction-empty-cell">
+              <div className="transaction-empty-state">
+                <span className="transaction-empty-icon"></span>
                 <p>
                   {filter === 'Customer Feedbacks' 
                     ? "No feedbacks yet." 
@@ -1113,23 +1129,23 @@ const handleSave = (id, updates, onSuccess, onError) => {
             const ratingScore = t.rating || 5;
 
             return (
-              <tr key={t.id || i} className="data-row">
-                <td className="col-num">{i + 1}</td>
+              <tr key={t.id || i} className="transaction-data-row">
+                <td className="transaction-col-num">{i + 1}</td>
                 <td>
-                  <div className="client-cell">
+                  <div className="transaction-client-cell">
                     <Avatar name={t.clientName} />
                     <div>
-                      <p className="client-name">{t.clientName || '-'}</p>
-                      <p className="client-email">{t.customerEmail || '-'}</p>
+                      <p className="transaction-client-name">{t.clientName || '-'}</p>
+                      <p className="transaction-client-email">{t.customerEmail || '-'}</p>
                     </div>
                   </div>
                 </td>
                 <td>
-                  <p className="product-name">{productDisplay}</p>
-                  <p className="contract-num">{t.contractId || t.id}</p>
+                  <p className="transaction-product-name">{productDisplay}</p>
+                  <p className="transaction-contract-num">{t.contractId || t.id}</p>
                 </td>
                 <td><CategoryBadge category={t.category} /></td>
-                <td className="col-date">{fmtDate(t.dateCreated || t.paymentDate)}</td>
+                <td className="transaction-col-date">{fmtDate(t.dateCreated || t.paymentDate)}</td>
                 <td>
                   <span style={{ color: '#f59e0b', fontSize: '14px' }}>
                     {'★'.repeat(ratingScore)}{'☆'.repeat(5 - ratingScore)}
@@ -1140,9 +1156,9 @@ const handleSave = (id, updates, onSuccess, onError) => {
                 </td>
                 <td>
        
-              <div className="action-group">             
+              <div className="transaction-action-group">             
                 <button 
-                  className="action-btn btn-edit" 
+                  className="transaction-action-btn transaction-btn-edit" 
                   onClick={() => setViewTx(t)} 
                   title="View Feedback Summary"
                 >
@@ -1154,13 +1170,9 @@ const handleSave = (id, updates, onSuccess, onError) => {
 
                 {/* Delete Feedback Button */}
                 <button 
-                  className="action-btn" 
+                  className="transaction-action-btn" 
                   style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }}
-                  onClick={() => {
-                    if (window.confirm("Are you sure you want to delete this customer feedback?")) {
-                      handleDeleteFeedback(t.id || t._id);
-                    }
-                  }} 
+                  onClick={() => setDeleteFeedbackTarget(t)} 
                   title="Delete Feedback"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1184,48 +1196,48 @@ const handleSave = (id, updates, onSuccess, onError) => {
               : "Glass Fitting";
 
             return (
-              <tr key={t.id} className="data-row">
-                <td className="col-num">{i + 1}</td>
+              <tr key={t.id} className="transaction-data-row">
+                <td className="transaction-col-num">{i + 1}</td>
                 <td>
-                  <div className="client-cell">
+                  <div className="transaction-client-cell">
                     <Avatar name={t.clientName} />
                     <div>
-                      <p className="client-name">{t.clientName || '-'}</p>
-                      <p className="client-email">{t.customerEmail || '-'}</p>
+                      <p className="transaction-client-name">{t.clientName || '-'}</p>
+                      <p className="transaction-client-email">{t.customerEmail || '-'}</p>
                     </div>
                   </div>
                 </td>
                 <td>
-                  <p className="product-name">{productDisplay}</p>
-                  <p className="contract-num">{t.contractId || t.id}</p>
+                  <p className="transaction-product-name">{productDisplay}</p>
+                  <p className="transaction-contract-num">{t.contractId || t.id}</p>
                 </td>
                 <td>
-                  <p className="col-paid">{fmt(paidAmount)}</p>
-                  <p className="col-total">of {fmt(totalAmount)}</p>
+                  <p className="transaction-col-paid">{fmt(paidAmount)}</p>
+                  <p className="transaction-col-total">of {fmt(totalAmount)}</p>
                 </td>
                 <td>
-                  <span className={`method-chip ${t.paymentMethod === 'Online' ? 'chip-online' : 'chip-cash'}`}>
+                  <span className={`transaction-method-chip ${t.paymentMethod === 'Online' ? 'transaction-chip-online' : 'transaction-chip-cash'}`}>
                     {t.paymentMethod === 'Online' ? 'Online' : 'Cash'}
                   </span>
                 </td>
                 <td>
-                  <span className="type-chip">
+                  <span className="transaction-type-chip">
                     {t.customerHasAccount ? 'Website Order' : 'Walk-in'}
                   </span>
                 </td>
-                <td className="col-date">{fmtDate(t.estimatedInstallationDate)}</td>
+                <td className="transaction-col-date">{fmtDate(t.estimatedInstallationDate)}</td>
                 <td><CategoryBadge category={t.category} /></td>
                 <td>
                   {t.status === "Paid" ? (
-                    <span className="badge-paid">Fully Paid</span>
+                    <span className="transaction-badge-paid">Fully Paid</span>
                   ) : (
-                    <span className="badge-pending">Pending</span>
+                    <span className="transaction-badge-pending">Pending</span>
                   )}
                 </td>
                 <td>
-                  <div className="action-group">
+                  <div className="transaction-action-group">
                     <button 
-                      className="action-btn btn-edit" 
+                      className="transaction-action-btn transaction-btn-edit" 
                       onClick={() => setViewTx(t)} 
                       title="View Details"
                       hidden={permissions?.modules?.["Transactions"]?.["View Details"] !== 1}
@@ -1236,7 +1248,7 @@ const handleSave = (id, updates, onSuccess, onError) => {
                       </svg>
                     </button>
                     <button
-                      className={`action-btn btn-edit ${isFullyPaid ? 'btn-locked' : ''}`}
+                      className={`transaction-action-btn transaction-btn-edit ${isFullyPaid ? 'transaction-btn-locked' : ''}`}
                       onClick={() => !isFullyPaid && setEditTx(t)}
                       disabled={isFullyPaid}
                       title={isFullyPaid ? 'Locked fully paid' : 'Edit Payment'}
@@ -1248,7 +1260,7 @@ const handleSave = (id, updates, onSuccess, onError) => {
                       )}
                     </button>
                     <button 
-                      className="action-btn btn-contract" 
+                      className="transaction-action-btn transaction-btn-contract" 
                       onClick={() => setContractTx(t)} 
                       title="View/Download Contract"
                       hidden={permissions?.modules?.["Transactions"]?.["Edit"] !== 1}
@@ -1272,6 +1284,19 @@ const handleSave = (id, updates, onSuccess, onError) => {
       ) : null}
       {editTx && <EditModal tx={editTx} onClose={() => setEditTx(null)} onSave={handleSave} />}
       {contractTx && <ContractModal tx={contractTx} onClose={() => setContractTx(null)} />}
+      {deleteFeedbackTarget && (
+        <ConfirmDialog
+          title="Delete Customer Feedback?"
+          message={`This will permanently remove ${deleteFeedbackTarget.clientName ? `${deleteFeedbackTarget.clientName}'s` : 'this'} feedback. This action cannot be undone.`}
+          onConfirm={() => {
+            handleDeleteFeedback(deleteFeedbackTarget.id || deleteFeedbackTarget._id);
+            setDeleteFeedbackTarget(null);
+          }}
+          onCancel={() => setDeleteFeedbackTarget(null)}
+          confirmLabel="Delete"
+          danger
+        />
+      )}
     </div>
   );
 };

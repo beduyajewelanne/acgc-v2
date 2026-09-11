@@ -30,42 +30,42 @@ const PriceEstimator = ({ product, measurements, onMeasurementsChange }) => {
   const hasValues = parseFloat(width) > 0 && parseFloat(height) > 0;
 
   return (
-    <div className="estimator-box">
-      <div className="estimator-header">
+    <div className="bp-estimator-box">
+      <div className="bp-estimator-header">
         <Calculator size={16} />
         <span>Price Estimator</span>
       </div>
 
-      <div className="estimator-inputs">
-        <div className="input-group">
-          <label className="input-label">Width</label>
+      <div className="bp-estimator-inputs">
+        <div className="bp-input-group">
+          <label className="bp-input-label">Width</label>
           <input
             type="number"
             min="0"
             placeholder="0"
             value={width}
             onChange={(e) => onMeasurementsChange({ ...measurements, width: e.target.value })}
-            className="meas-input"
+            className="bp-meas-input"
           />
         </div>
-        <span className="times-sign">×</span>
-        <div className="input-group">
-          <label className="input-label">Height</label>
+        <span className="bp-times-sign">×</span>
+        <div className="bp-input-group">
+          <label className="bp-input-label">Height</label>
           <input
             type="number"
             min="0"
             placeholder="0"
             value={height}
             onChange={(e) => onMeasurementsChange({ ...measurements, height: e.target.value })}
-            className="meas-input"
+            className="bp-meas-input"
           />
         </div>
-        <div className="input-group unit-group">
-          <label className="input-label">Unit</label>
+        <div className="bp-input-group bp-unit-group">
+          <label className="bp-input-label">Unit</label>
           <select
             value={unit}
             onChange={(e) => onMeasurementsChange({ ...measurements, unit: e.target.value })}
-            className="unit-select"
+            className="bp-unit-select"
           >
             <option value="ft">ft</option>
             <option value="m">m</option>
@@ -76,37 +76,37 @@ const PriceEstimator = ({ product, measurements, onMeasurementsChange }) => {
       </div>
 
       {hasValues ? (
-        <div className="estimator-results">
-          <div className="result-row">
-            <span className="result-label">
+        <div className="bp-estimator-results">
+          <div className="bp-result-row">
+            <span className="bp-result-label">
               <Ruler size={13} /> Area
             </span>
-            <span className="result-value">{area.toFixed(2)} sq ft</span>
+            <span className="bp-result-value">{area.toFixed(2)} sq ft</span>
           </div>
-          <div className="result-row">
-            <span className="result-label">Base Rate</span>
-            <span className="result-value">₱{product.price.toLocaleString()} / sq ft</span>
+          <div className="bp-result-row">
+            <span className="bp-result-label">Base Rate</span>
+            <span className="bp-result-value">₱{product.price.toLocaleString()} / sq ft</span>
           </div>
-          <div className="result-row total-row">
-            <span className="result-label">Estimated Total</span>
-            <span className="result-value result-total">
+          <div className="bp-result-row bp-total-row">
+            <span className="bp-result-label">Estimated Total</span>
+            <span className="bp-result-value bp-result-total">
               ₱{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <div className="result-row downpay-row">
-            <span className="result-label">50% Downpayment</span>
-            <span className="result-value result-downpay">
+          <div className="bp-result-row bp-downpay-row">
+            <span className="bp-result-label">50% Downpayment</span>
+            <span className="bp-result-value bp-result-downpay">
               ₱{downpayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
         </div>
       ) : (
-        <div className="estimator-placeholder">
+        <div className="bp-estimator-placeholder">
           <p>Enter width &amp; height to calculate your estimate.</p>
         </div>
       )}
 
-      <div className="estimator-note">
+      <div className="bp-estimator-note">
         <Info size={12} />
         <span>
           Final pricing is subject to negotiation during shop discussion or on-site inspection.
@@ -310,54 +310,54 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
   }
 
   return (
-    <div className="modal-overlay" ref={overlayRef} onClick={handleOverlayClick}>
-      <div className="modal-container" role="dialog" aria-modal="true">
+    <div className="bp-modal-overlay" ref={overlayRef} onClick={handleOverlayClick}>
+      <div className="bp-modal-container" role="dialog" aria-modal="true">
 
         {/* Close */}
-        <button className="modal-close" onClick={onClose} aria-label="Close modal">
+        <button className="bp-modal-close" onClick={onClose} aria-label="Close modal">
           <X size={18} />
         </button>
 
         {/* Back */}
-        <button className="modal-back" onClick={onClose}>
+        <button className="bp-modal-back" onClick={onClose}>
           <ArrowLeft size={15} /> Back to Products
         </button>
 
-        <div className="modal-body">
+        <div className="bp-modal-body">
           {/* ── Left: Image Carousel ── */}
-          <div className="modal-gallery">
-            <div className="gallery-main">
+          <div className="bp-modal-gallery">
+            <div className="bp-gallery-main">
               <img
                 src={images[imgIndex]}
                 alt={`${product.name} view ${imgIndex + 1}`}
-                className="gallery-image"
+                className="bp-gallery-image"
               />
               {images.length > 1 && (
                 <>
-                  <button className="gallery-prev" onClick={prevImg} aria-label="Previous image">
+                  <button className="bp-gallery-prev" onClick={prevImg} aria-label="Previous image">
                     <ChevronLeft size={20} />
                   </button>
-                  <button className="gallery-next" onClick={nextImg} aria-label="Next image">
+                  <button className="bp-gallery-next" onClick={nextImg} aria-label="Next image">
                     <ChevronRight size={20} />
                   </button>
                 </>
               )}
-              <div className="gallery-dots">
+              <div className="bp-gallery-dots">
                 {images.map((_, i) => (
                   <button
                     key={i}
-                    className={`gallery-dot ${i === imgIndex ? 'active' : ''}`}
+                    className={`bp-gallery-dot ${i === imgIndex ? 'bp-active' : ''}`}
                     onClick={() => setImgIndex(i)}
                     aria-label={`View image ${i + 1}`}
                   />
                 ))}
               </div>
             </div>
-            <div className="gallery-thumbs">
+            <div className="bp-gallery-thumbs">
               {images.map((src, i) => (
                 <button
                   key={i}
-                  className={`thumb-btn ${i === imgIndex ? 'active' : ''}`}
+                  className={`bp-thumb-btn ${i === imgIndex ? 'bp-active' : ''}`}
                   onClick={() => setImgIndex(i)}
                 >
                   <img src={src} alt={`Thumbnail ${i + 1}`} />
@@ -367,20 +367,20 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
           </div>
 
           {/* ── Right: Details ── */}
-          <div className="modal-details">
-            <div className="detail-meta">
-              <span className="detail-type">{product.type}</span>
-              <span className="detail-category">{product.category}</span>
+          <div className="bp-modal-details">
+            <div className="bp-detail-meta">
+              <span className="bp-detail-type">{product.type}</span>
+              <span className="bp-detail-category">{product.category}</span>
             </div>
-            <h2 className="detail-name">{product.name}</h2>
-            <p className="detail-rate">
+            <h2 className="bp-detail-name">{product.name}</h2>
+            <p className="bp-detail-rate">
               ₱{product.price.toLocaleString()}
-              <span className="detail-unit"> / sq ft</span>
+              <span className="bp-detail-unit"> / sq ft</span>
             </p>
-            <p className="detail-description">{product.height} x {product.width} {product.unit}</p>
-            <p className="detail-description">{product.description}</p>
+            <p className="bp-detail-description">{product.height} x {product.width} {product.unit}</p>
+            <p className="bp-detail-description">{product.description}</p>
 
-            <hr className="detail-divider" />
+            <hr className="bp-detail-divider" />
 
             {/* Price Estimator */}
             {permissions?.modules?.[ "Client" ]?.["Estimate Pricing"] == 1 && (
@@ -392,9 +392,9 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
             )}
 
             {/* CTA Buttons */}
-            <div className="modal-cta">
+            <div className="bp-modal-cta">
               <button 
-                className="cta-order" 
+                className="bp-cta-order" 
                 onClick={() => {
                   if (user && user.token) {
                     if (permissions?.modules?.["Client"]?.["Request Orders"] === 1) {
@@ -410,7 +410,7 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
               </button>
               
               <button 
-                className="cta-cart" 
+                className="bp-cta-cart" 
                 onClick={() => {
                   if (user && user.token) {
                     if (permissions?.modules?.["Client"]?.["Request Orders"] === 1) {
@@ -427,7 +427,7 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
             </div>
 
             {/* Inquiry */}
-            <div className="modal-inquiry">
+            <div className="bp-modal-inquiry">
               <Phone size={14} />
               <span>Call for inquiries: <strong>09123456789</strong></span>
             </div>
@@ -435,7 +435,7 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
             {/* Feedback */}
             {!isFeedbackAllowed ? (
               <div style={{ marginTop: '12px' }}>
-                <div className="cf-custom-container">
+                <div className="bp-cf-custom-container">
                   <CheckCircle2 size={14} />
                   <span>Customer feedback and reviews will be available soon.</span>
                 </div>
@@ -466,7 +466,7 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
                 if (matchedFeedbacks.length === 0) {
                   return (
                     <div style={{ marginTop: '12px' }}>
-                      <div className="cf-custom-container">
+                      <div className="bp-cf-custom-container">
                         <MessageSquareOff size={14} />
                         <span>No customer feedback for this product yet.</span>
                       </div>
@@ -475,8 +475,8 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
                 }
 
                 return (
-                  <div className="cf-custom-wrapper" style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                    <div className="cf-custom-title" style={{ fontWeight: '700', fontSize: '14px', marginBottom: '8px', color: '#1e293b' }}>
+                  <div className="bp-cf-custom-wrapper" style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                    <div className="bp-cf-custom-title" style={{ fontWeight: '700', fontSize: '14px', marginBottom: '8px', color: '#1e293b' }}>
                       Customer Reviews ({matchedFeedbacks.length})
                     </div>
                     
@@ -484,12 +484,12 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
                       {matchedFeedbacks.map((item, idx) => {
                         const rScore = parseInt(item.rating) || 5;
                         return (
-                          <div key={item._id || item.id || idx} className="cf-custom-card" style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                            <div className="cf-custom-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                              <span className="cf-custom-author" style={{ fontWeight: '600', fontSize: '12px', color: '#0f172a' }}>
+                          <div key={item._id || item.id || idx} className="bp-cf-custom-card" style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                            <div className="bp-cf-custom-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                              <span className="bp-cf-custom-author" style={{ fontWeight: '600', fontSize: '12px', color: '#0f172a' }}>
                                 {item.userName || item.author || 'Verified Buyer'}
                               </span>
-                              <div className="cf-custom-stars" style={{ display: 'flex', gap: '2px' }}>
+                              <div className="bp-cf-custom-stars" style={{ display: 'flex', gap: '2px' }}>
                                 {[...Array(5)].map((_, starIndex) => (
                                   <Star
                                     key={starIndex}
@@ -500,7 +500,7 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
                                 ))}
                               </div>
                             </div>
-                            <p className="cf-custom-comment" style={{ fontSize: '12px', color: '#334155', margin: 0, lineHeight: '1.4' }}>
+                            <p className="bp-cf-custom-comment" style={{ fontSize: '12px', color: '#334155', margin: 0, lineHeight: '1.4' }}>
                               {item.comment || item.feedback || 'No written review.'}
                             </p>
                           </div>

@@ -122,16 +122,16 @@ const TrackProducts = () => {
 
   // Maps backend status variants into corresponding lower-case CSS utility tokens
   const getPillClass = (statusStr) => {
-    if (!statusStr) return 'status-pending';
-    return `status-${statusStr.toLowerCase().replace(/\s+/g, '-')}`;
+    if (!statusStr) return 'tp-status-pending';
+    return `tp-status-${statusStr.toLowerCase().replace(/\s+/g, '-')}`;
   };
 
   return (
-    <div className="track-page">
-      <div className="track-hero">
+    <div className="tp-page">
+      <div className="tp-hero">
         <h1>Track Your Project</h1>
         <p>Enter your tracking code to see real-time updates on your glass installation.</p>
-        <form onSubmit={handleTrack} className="search-box">
+        <form onSubmit={handleTrack} className="tp-search-box">
           <input 
             type="text" 
             placeholder="e.g. TRK-2024-001" 
@@ -143,20 +143,20 @@ const TrackProducts = () => {
       </div>
 
       {errorMessage && (
-        <div className="error-message-panel" style={{ textAlign: 'center', marginTop: '20px', color: '#dc3545' }}>
+        <div className="tp-error-message-panel" style={{ textAlign: 'center', marginTop: '20px', color: '#dc3545' }}>
           <p>{errorMessage}</p>
         </div>
       )}
 
       {order && (
-        <div className="result-container" style={{ marginTop: '30px' }}>
+        <div className="tp-result-container" style={{ marginTop: '30px' }}>
           <h2>Order Details: {order.code}</h2>
           
           {order.status !== "Cancelled" ? (
-            <div className="progress-bar" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', margin: '30px 0' }}>
+            <div className="tp-progress-bar" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', margin: '30px 0' }}>
               {order.steps.map((step, index) => (
-                <div key={index} className={`step ${index <= order.currentStep ? 'active' : ''}`} style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <div className="circle" style={{
+                <div key={index} className={`tp-step ${index <= order.currentStep ? 'tp-active' : ''}`} style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div className="tp-circle" style={{
                     width: '30px', height: '30px', borderRadius: '50%', lineHeight: '30px', margin: '0 auto 10px',
                     background: index <= order.currentStep ? '#28a745' : '#ccc', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center'
                   }}>
@@ -167,25 +167,25 @@ const TrackProducts = () => {
               ))}
             </div>
           ) : (
-            <div className="cancelled-notice-banner" style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '15px', borderRadius: '4px', margin: '20px 0', textAlign: 'center', fontWeight: 'bold' }}>
+            <div className="tp-cancelled-notice-banner" style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '15px', borderRadius: '4px', margin: '20px 0', textAlign: 'center', fontWeight: 'bold' }}>
               This project request has been Cancelled.
             </div>
           )}
 
-          <div className="order-card expanded" style={{ marginTop: '20px', border: '1px solid #ddd', borderRadius: '8px', padding: '20px', background: '#fff' }}>
-            <div className="order-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '15px', marginBottom: '15px' }}>
+          <div className="tp-order-card tp-expanded" style={{ marginTop: '20px', border: '1px solid #ddd', borderRadius: '8px', padding: '20px', background: '#fff' }}>
+            <div className="tp-order-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '15px', marginBottom: '15px' }}>
               <div>
                 <h3 style={{ margin: '0 0 5px 0' }}>{order.name}</h3>
                 <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Project ID: {order.code} • {order.date}</p>
               </div>
               {/* Contextual Status Pill Capsule */}
-              <span className={`status-pill ${getPillClass(order.status)}`}>
+              <span className={`tp-status-pill ${getPillClass(order.status)}`}>
                 {order.status}
               </span>
             </div>
 
             {/* --- Products Manifest Section --- */}
-            <div className="tracking-products-manifest" style={{ marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+            <div className="tp-tracking-products-manifest" style={{ marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
               <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>Products inside this Tracked Request:</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {order.items && order.items.map((prod, pIdx) => (
@@ -203,8 +203,8 @@ const TrackProducts = () => {
               </div>
             </div>
 
-            <div className="order-details">
-              <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '5px' }}>
+            <div className="tp-order-details">
+              <div className="tp-detail-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '5px' }}>
                 <div>
                   <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Grand Total Price:</label>
                   <p style={{ margin: 0, fontWeight: 'bold', color: '#28a745', fontSize: '16px' }}>{order.price}</p>
@@ -221,7 +221,7 @@ const TrackProducts = () => {
                   <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Site Inspection:</label>
                   <div style={{ marginTop: '2px' }}>
                     {/* Aligned Site Inspection Pill Container */}
-                    <span className={`status-pill ${getPillClass(order.status)}`}>
+                    <span className={`tp-status-pill ${getPillClass(order.status)}`}>
                       {order.status}
                     </span>
                   </div>

@@ -1,21 +1,106 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  ClipboardCheck,
+  Activity,
+  Package,
+  Receipt,
+  Settings as SettingsIcon,
+  UserCircle,
+  LogOut,
+  ChevronLeft,
+} from 'lucide-react';
 import { UserContext } from '../../../App'; // Adjust this import path to point to your App.js
-import './AdminLayout.css'; 
+import './AdminLayout.css';
+
+// Single source of truth for the sidebar links: icon, destination, and the
+// permission key used by hasViewAccess. Add/remove modules here only.
+const NAV_ITEMS = [
+  {
+    key: 'Dashboard',
+    to: '/admin',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    isActive: (path) => path === '/admin' || path === '/admin/dashboard',
+  },
+  {
+    key: 'Site Inspection',
+    to: '/admin/site-inspections',
+    label: 'Site Inspection',
+    icon: ClipboardCheck,
+    isActive: (path) => path.includes('inspections'),
+  },
+  {
+    key: 'Progress Monitor',
+    to: '/admin/monitor',
+    label: 'Progress Monitor',
+    icon: Activity,
+    isActive: (path) => path.includes('monitor'),
+  },
+  {
+    key: 'Products',
+    to: '/admin/products',
+    label: 'Products',
+    icon: Package,
+    isActive: (path) => path.includes('products'),
+  },
+  {
+    key: 'Transactions',
+    to: '/admin/transactions',
+    label: 'Transactions',
+    icon: Receipt,
+    isActive: (path) => path.includes('transactions'),
+  },
+  {
+    key: 'Settings',
+    to: '/admin/settings',
+    label: 'Settings',
+    icon: SettingsIcon,
+    isActive: (path) => path.includes('settings'),
+  },
+  {
+    key: 'Profile',
+    to: '/admin/profile',
+    label: 'Profile',
+    icon: UserCircle,
+    isActive: (path) => path.includes('profile'),
+  },
+];
+
+const SIDEBAR_COLLAPSE_KEY = 'acgc-admin-sidebar-collapsed';
 
 const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, permissions, permissionsLoaded } = useContext(UserContext);
 
+  // Foldable sidebar state, remembered across visits/refreshes.
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0');
+    } catch {
+      // ignore storage failures (e.g. private browsing)
+    }
+  }, [collapsed]);
+
   const handleLogout = () => {
-  localStorage.clear();
-  navigate('/login');
-};
+    localStorage.clear();
+    navigate('/login');
+  };
 
   useEffect(() => {
     console.log(permissions);
   }, [permissions]);
+
   // Fallback while system checks clearances
   if (!permissionsLoaded) {
     return <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading navigation panel...</div>;
@@ -28,49 +113,58 @@ const AdminLayout = () => {
   const hasViewAccess = (moduleKey) => {
     // Full Admins automatically see all sidebar links
     // if (roleNormalized === 'admin') return true;
-    
+
     // Staff must have the module present and explicit View access set to 1
     return assignedModules?.[moduleKey] && assignedModules[moduleKey]["View"] == 1;
   };
 
   return (
     <div className="admin-layout">
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <h2>ACGC<span>Glass & Aluminum Services</span></h2>
+      <aside className={`admin-sidebar${collapsed ? ' admin-sidebar--collapsed' : ''}`}>
+        <button
+          type="button"
+          className="admin-sidebar-toggle"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <ChevronLeft size={14} strokeWidth={2.5} />
+        </button>
+
+        <div className="admin-sidebar-header">
+          <Link to="/admin" className="admin-sidebar-brand">
+            <span className="admin-sidebar-logo">
+              <img src="/images/acgc-logo.png" alt="ACGC logo" />
+            </span>
+            <span className="admin-sidebar-title">
+              <span className="admin-sidebar-title-main">ACGC</span>
+              <span className="admin-sidebar-title-sub">Glass &amp; Aluminum Services</span>
+            </span>
+          </Link>
         </div>
-        <nav className="nav-links">
-          {hasViewAccess('Dashboard') && (
-            <Link to="/admin" className={location.pathname === '/admin' || location.pathname === '/admin/dashboard' ? 'active' : ''}>Dashboard</Link>
-          )}
-          
-          {hasViewAccess('Site Inspection') && (
-            <Link to="/admin/site-inspections" className={location.pathname.includes('inspections') ? 'active' : ''}>Site Inspection</Link>
-          )}
-          
-          {hasViewAccess('Progress Monitor') && (
-            <Link to="/admin/monitor" className={location.pathname.includes('monitor') ? 'active' : ''}>Progress Monitor</Link>
-          )}
-          
-          {hasViewAccess('Products') && (
-            <Link to="/admin/products" className={location.pathname.includes('products') ? 'active' : ''}>Products</Link>
-          )}
-          
-          {hasViewAccess('Transactions') && (
-            <Link to="/admin/transactions" className={location.pathname.includes('transactions') ? 'active' : ''}>Transactions</Link>
-          )}
-          
-          {hasViewAccess('Settings') && (
-            <Link to="/admin/settings" className={location.pathname.includes('settings') ? 'active' : ''}>Settings</Link>
-          )}
-          
-          {hasViewAccess('Profile') && (
-            <Link to="/admin/profile" className={location.pathname.includes('profile') ? 'active' : ''}>Profile</Link>
-          )}
-          <button onClick={handleLogout} className="admin-logout-btn"> Logout </button>
+
+        <nav className="admin-sidebar-nav">
+          {NAV_ITEMS.map(({ key, to, label, icon: Icon, isActive }) => (
+            hasViewAccess(key) && (
+              <Link
+                key={key}
+                to={to}
+                className={`admin-sidebar-link${isActive(location.pathname) ? ' admin-sidebar-link--active' : ''}`}
+                data-tooltip={label}
+              >
+                <span className="admin-sidebar-link-icon"><Icon size={18} strokeWidth={2} /></span>
+                <span className="admin-sidebar-link-label">{label}</span>
+              </Link>
+            )
+          ))}
         </nav>
+
+        <button type="button" onClick={handleLogout} className="admin-sidebar-logout" data-tooltip="Logout">
+          <span className="admin-sidebar-link-icon"><LogOut size={18} strokeWidth={2} /></span>
+          <span className="admin-sidebar-link-label">Logout</span>
+        </button>
       </aside>
-      <main className="content">
+      <main className="admin-layout-content">
         <Outlet />
       </main>
     </div>

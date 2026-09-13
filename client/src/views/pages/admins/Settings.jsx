@@ -1,21 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import './Settings.css';
 import { UserContext } from '../../../App'; 
 import { CRUD } from '../../../services/data.services'; 
 
-// ─── Map Frontend Layout Fields to Backend Matrix JSON Keys ─────────────────
 const ALL_MODULES = [
   { id: 'Dashboard', label: 'Dashboard', icon: '▦', actions: ['View'] },
   { id: 'Products', label: 'Product Management', icon: '⬡', actions: ['View', 'Add', 'Edit', 'Delete'] },
   { id: 'Site Inspection', label: 'Site Inspection', icon: '◈', actions: ['View', 'Add', 'View Details', 'Edit', 'Cancel', 'Generate Contract', 'Send Email', 'Download Contract', 'Manual Approve'] },
   { id: 'Progress Monitor', label: 'Progress Monitoring', icon: '◎', actions: ['View', 'View Details', 'Edit'] },
   { id: 'Transactions', label: 'Transactions', icon: '⬕', actions: ['View', 'View Details', 'Edit', 'View Contract', 'Download Contract', 'Send Email'] },
-  { id: 'Settings', label: 'Settings', icon: '⚙', actions: ['View'] },
+  { id: 'Settings', label: 'Settings', icon: '⚙', actions: ['View', 'Manage Access', 'Back Up'] },
   { id: 'Profile', label: 'Profile', icon: '👤', actions: ['View', 'Edit'] },
 ];
 
 const BASE_TEMPLATE = {
-  "Client": { "Request Orders": 0, "View Only": 0, "Track Project Progress": 0, "Request Site Inspection": 0, "Estimate Pricing": 0 },
+  "Client": { "Request Orders": 0, "View Only": 0, "Track Project Progress": 0, "Can Track Products": 0, "Estimate Pricing": 0, "Can upload feedback": 0, "Show Ratings Homepage": 0 },
   "Dashboard": { "View": 0 },
   "Site Inspection": { "View": 0, "Add": 0, "View Details": 0, "Edit": 0, "Cancel": 0, "Generate Contract": 0 },
   "Progress Monitor": { "View": 0, "View Details": 0, "Edit": 0 },
@@ -29,18 +28,12 @@ const CUSTOMER_PERMS = [
   { id: 'Request Orders', label: 'Can Request Orders', desc: 'Submit new glass/aluminum orders' },
   { id: 'Estimate Pricing', label: 'Can Estimate Pricing', desc: 'Access the pricing estimator tool' },
   { id: 'View Only', label: 'View Only Access', desc: 'Read-only access to their account' },
-  { id: 'Request Site Inspection', label: 'Can Request Site Inspection', desc: 'Schedule on-site inspections' },
-  { id: 'Track Project Progress', label: 'Can Track Project Progress', desc: 'Monitor active project status' },
+  { id: 'Can Track Products', label: 'Can Track Products', desc: 'Look up order status using a tracking code' },
   { id: 'Can upload feedback', label: 'Can Upload/View Feedback', desc: 'Allow customers to view product feedbacks' },
   { id: 'Show Ratings Homepage', label: 'Show Ratings on Homepage', desc: 'Display average customer ratings section on homepage' }
 ];
 
-const INITIAL_BACKUPS = [
-  { id: 1, name: 'FULL_BACKUP_2026-05-25', date: 'May 25, 2026', type: 'Full System', size: '142.3 MB', status: 'Success' },
-  { id: 2, name: 'WEEKLY_BACKUP_2026-05-18', date: 'May 18, 2026', type: 'Weekly', size: '98.7 MB', status: 'Success' },
-];
-
-// ─── Utility Components ───────────────────────────────────────────────────────
+const VIEW_ONLY_CONFLICT_PERMS = ['Request Orders', 'Track Project Progress', 'Can Track Products', 'Can upload feedback'];
 
 const Toast = ({ message, type, onClose }) => (
   <div className={`settings-toast toast-${type}`}>
@@ -88,9 +81,14 @@ const ConfirmDialog = ({ title, message, onConfirm, onCancel, confirmLabel = 'Co
   </div>
 );
 
-// ─── RBAC Modal (Staff & Admins Fine-Grained Controls) ─────────────────────────
+const RBACModal = ({ user, currentUser, canManage, onClose, onSave, showToast }) => {
+  const isEditingSelf = currentUser?._id === user?._id;
+  // Read-only whenever this is the viewer's own account (self-lockout guard) OR the
+  // viewer doesn't actually hold Settings edit / Manage Access rights. Previously only
+  // isEditingSelf was checked here, which meant a staff member with view-only Settings
+  // access could still toggle and save permissions for every OTHER staff account.
+  const isReadOnly = isEditingSelf || !canManage;
 
-const RBACModal = ({ user, onClose, onSave, showToast }) => {
   const [modules, setModules] = useState(() => {
     const merged = JSON.parse(JSON.stringify(BASE_TEMPLATE));
     const userModules = user?.modules || {};
@@ -108,15 +106,15 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
   const [expandedModule, setExpandedModule] = useState(null);
 
   const toggleActionPermission = (moduleId, actionKey) => {
+    if (isReadOnly) return;
+
     setModules(prev => {
       const currentVal = prev[moduleId]?.[actionKey] === 1 ? 0 : 1;
       const updatedModule = { ...prev[moduleId], [actionKey]: currentVal };
       
-      // Safety rule: If an operational action is allowed, View must also be enabled
       if (actionKey !== 'View' && currentVal === 1) {
         updatedModule.View = 1;
       }
-      // Safety rule: If View is unchecked, turn off all sub-actions
       if (actionKey === 'View' && currentVal === 0) {
         Object.keys(updatedModule).forEach(k => { updatedModule[k] = 0; });
       }
@@ -126,6 +124,7 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
   };
 
   const handleAddRole = () => {
+    if (isReadOnly) return;
     const trimmed = newRole.trim();
     if (trimmed && !customRoles.includes(trimmed)) {
       setCustomRoles(prev => [...prev, trimmed]);
@@ -134,6 +133,15 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
   };
 
   const handleSave = () => {
+    if (isEditingSelf) {
+      showToast("You cannot edit permissions for your own active account.", 'error');
+      return;
+    }
+    if (!canManage) {
+      showToast("You don't have permission to edit staff access.", 'error');
+      return;
+    }
+
     const updatedPayload = {
       role: 'staff',
       subrole: subrole,
@@ -147,6 +155,15 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
   };
 
   const handleConvert = () => {
+    if (isEditingSelf) {
+      showToast("You cannot edit permissions for your own active account.", 'error');
+      return;
+    }
+    if (!canManage) {
+      showToast("You don't have permission to edit staff access.", 'error');
+      return;
+    }
+
     const clientDefault = {};
     CUSTOMER_PERMS.forEach(p => { clientDefault[p.id] = 1; });
 
@@ -165,9 +182,9 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
   const allRoles = ['Helper', 'Skilled Worker', ...customRoles];
 
   return (
-    <div className="pm-overlay" onClick={onClose}>
-      <div className="pm-modal settings-rbac-modal text-left" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px' }}>
-        <div className="pm-modal-header">
+    <div className="settings-modal-overlay" onClick={onClose}>
+      <div className="settings-modal settings-rbac-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px' }}>
+        <div className="settings-modal-header">
           <div className="settings-modal-user-info">
             <Avatar initials={(user?.firstName?.charAt(0) || '') + (user?.lastName?.charAt(0) || '')} role={user?.role} />
             <div>
@@ -179,10 +196,21 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
         </div>
 
         <div className="settings-modal-body">
+          {isEditingSelf && (
+            <div style={{ padding: '12px 16px', background: '#fffbe3', borderBottom: '1px solid #fde68a', color: '#854d0e', fontSize: '12.5px', fontWeight: '500' }}>
+              ⚠️ You are currently viewing your own profile. Modifying your own permissions is disabled to prevent accidental lockout.
+            </div>
+          )}
+          {!isEditingSelf && !canManage && (
+            <div style={{ padding: '12px 16px', background: '#eef2ff', borderBottom: '1px solid #c7d2fe', color: '#3730a3', fontSize: '12.5px', fontWeight: '500' }}>
+              👁 View-only access. You don't have Manage Access rights on Settings, so changes here can't be saved.
+            </div>
+          )}
+
           <div className="settings-modal-section">
             <h3 className="settings-section-label">Staff Subrole Designation</h3>
             <div className="settings-subrole-row">
-              <select className="settings-styled-select" value={subrole} onChange={e => setSubrole(e.target.value)}>
+              <select className="settings-styled-select" value={subrole} onChange={e => setSubrole(e.target.value)} disabled={isReadOnly}>
                 {allRoles.map(r => (
                   <option key={r} value={r}>{r}</option>
                 ))}
@@ -194,8 +222,9 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
                   value={newRole}
                   onChange={e => setNewRole(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAddRole()}
+                  disabled={isReadOnly}
                 />
-                <button type="button" className="settings-btn-outline-sm" onClick={handleAddRole}>Add</button>
+                <button type="button" className="settings-btn-outline-sm" onClick={handleAddRole} disabled={isReadOnly}>Add</button>
               </div>
             </div>
           </div>
@@ -224,7 +253,7 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
                         <span style={{ fontSize: '0.8rem', color: '#888' }}>
                           {isExpanded ? '▲ Hide Sub-actions' : '▼ Manage Sub-actions'}
                         </span>
-                        <Toggle checked={isViewEnabled} onChange={() => toggleActionPermission(mod.id, 'View')} />
+                        <Toggle checked={isViewEnabled} onChange={() => toggleActionPermission(mod.id, 'View')} disabled={isReadOnly} />
                       </div>
                     </div>
 
@@ -236,6 +265,7 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
                             <Toggle 
                               checked={modules[mod.id]?.[action] === 1} 
                               onChange={() => toggleActionPermission(mod.id, action)} 
+                              disabled={isReadOnly}
                             />
                           </div>
                         ))}
@@ -249,12 +279,14 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
         </div>
 
         <div className="settings-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-          <button className="settings-btn-danger-outline" onClick={() => setConvertConfirm(true)}>
+          <button className="settings-btn-danger-outline" onClick={() => setConvertConfirm(true)} disabled={isReadOnly}>
             ↓ Convert to Customer
           </button>
           <div className="settings-footer-right">
-            <button className="settings-btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="settings-btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Settings</button>
+            <button className="settings-btn-ghost" onClick={onClose}>Close</button>
+            {!isReadOnly && (
+              <button className="settings-btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Settings</button>
+            )}
           </div>
         </div>
 
@@ -273,23 +305,25 @@ const RBACModal = ({ user, onClose, onSave, showToast }) => {
   );
 };
 
-// ─── Customer Permissions Modal (Individual Customer Settings & Upgrading) ───
-
-const CustomerModal = ({ user, onClose, onSave, showToast }) => {
+const CustomerModal = ({ user, canManage, onClose, onSave, showToast }) => {
   const [perms, setPerms] = useState(() => {
     const baseClient = BASE_TEMPLATE.Client || {};
     const userClient = user?.modules?.Client || {};
-    console.log(userClient, baseClient)
     return { ...baseClient, ...userClient };
   });
 
   const [upgradeConfirm, setUpgradeConfirm] = useState(false);
 
   const togglePerm = (id) => {
+    if (!canManage) return;
     setPerms(prev => ({ ...prev, [id]: prev[id] === 1 ? 0 : 1 }));
   };
 
   const handleSave = () => {
+    if (!canManage) {
+      showToast("You don't have permission to edit customer access.", 'error');
+      return;
+    }
     const updatedPayload = {
       role: 'client',
       subrole: null,
@@ -303,7 +337,10 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
   };
 
   const handleUpgrade = () => {
-    // Setup fallback view permissions when upgrading a client to base operational staff
+    if (!canManage) {
+      showToast("You don't have permission to edit customer access.", 'error');
+      return;
+    }
     const staffBaseModules = {};
     ALL_MODULES.forEach(module => {
       staffBaseModules[module.id] = {};
@@ -330,9 +367,9 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
   };
 
   return (
-    <div className="pm-overlay" onClick={onClose}>
-      <div className="pm-modal pm-modal-lg animate-modal" onClick={e => e.stopPropagation()}>
-        <div className="pm-modal-header">
+    <div className="settings-modal-overlay" onClick={onClose}>
+      <div className="settings-modal" onClick={e => e.stopPropagation()}>
+        <div className="settings-modal-header">
           <div className="settings-modal-user-info">
             <Avatar initials={(user?.firstName?.charAt(0) || '') + (user?.lastName?.charAt(0) || '')} role={user?.role} />
             <div>
@@ -344,6 +381,11 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
         </div>
 
         <div className="settings-modal-body">
+          {!canManage && (
+            <div style={{ padding: '12px 16px', marginBottom: '1rem', background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: '6px', color: '#3730a3', fontSize: '12.5px', fontWeight: '500' }}>
+              👁 View-only access. You don't have Manage Access rights on Settings, so changes here can't be saved.
+            </div>
+          )}
           <p className="settings-section-desc">Toggle specific baseline visibility rules for this customer portal view layout configuration.</p>
           <div className="settings-global-perms-grid" style={{ marginTop: '1rem' }}>
             {CUSTOMER_PERMS.map(p => {
@@ -354,7 +396,7 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
                     <span className="settings-perm-label">{p.label}</span>
                     <span className="settings-perm-desc">{p.desc}</span>
                   </div>
-                  <Toggle checked={isEnabled} onChange={() => togglePerm(p.id)} />
+                  <Toggle checked={isEnabled} onChange={() => togglePerm(p.id)} disabled={!canManage} />
                 </div>
               );
             })}
@@ -362,12 +404,16 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
         </div>
 
         <div className="settings-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-          <button className="settings-btn-primary" style={{ background: '#28a745', borderColor: '#28a745' }} onClick={() => setUpgradeConfirm(true)}>
-            ↑ Upgrade to Staff
-          </button>
+          {canManage ? (
+            <button className="settings-btn-primary" style={{ background: '#28a745', borderColor: '#28a745' }} onClick={() => setUpgradeConfirm(true)}>
+              ↑ Upgrade to Staff
+            </button>
+          ) : <span />}
           <div className="settings-footer-right">
             <button className="settings-btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="settings-btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Matrix</button>
+            {canManage && (
+              <button className="settings-btn-primary" style={{ marginLeft: '0.5rem' }} onClick={handleSave}>Save Matrix</button>
+            )}
           </div>
         </div>
 
@@ -385,16 +431,13 @@ const CustomerModal = ({ user, onClose, onSave, showToast }) => {
   );
 };
 
-// ─── Global Customer Permissions Helpers ─────────────────────────────────────
-
 const GlobalCustomerPerms = ({ users, onApply, showToast }) => {
-  const { user } = React.useContext(UserContext);
-  const [globalPerms, setGlobalPerms] = useState({
-    "Request Orders": false,
-    "View Only": false,
-    "Track Project Progress": false,
-    "Request Site Inspection": false,
-    "Estimate Pricing": false
+  const { user } = useContext(UserContext);
+  const [globalPerms, setGlobalPerms] = useState(() => {
+    const initial = {};
+    CUSTOMER_PERMS.forEach(p => { initial[p.id] = false; });
+    initial["View Only"] = true;
+    return initial;
   });
   const [expanded, setExpanded] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -428,7 +471,22 @@ const GlobalCustomerPerms = ({ users, onApply, showToast }) => {
   }, [userToken, userId]);
 
   const toggleGlobal = (id) => {
-    setGlobalPerms(prev => ({ ...prev, [id]: !prev[id] }));
+    setGlobalPerms(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+
+      if (id === "View Only" && next["View Only"]) {
+        VIEW_ONLY_CONFLICT_PERMS.forEach(k => { next[k] = false; });
+      } else if (VIEW_ONLY_CONFLICT_PERMS.includes(id) && next[id]) {
+        next["View Only"] = false;
+      }
+
+      const anyPermOn = CUSTOMER_PERMS.some(p => next[p.id]);
+      if (!anyPermOn) {
+        next["View Only"] = true;
+      }
+
+      return next;
+    });
   };
 
   const handleApply = () => {
@@ -473,15 +531,18 @@ const GlobalCustomerPerms = ({ users, onApply, showToast }) => {
       {expanded && (
         <div className="settings-global-perms-body">
           <div className="settings-global-perms-grid">
-            {CUSTOMER_PERMS.map(p => (
-              <div key={p.id} className={`settings-global-perm-card ${globalPerms[p.id] ? 'settings-gperm-enabled' : 'settings-gperm-disabled'}`}>
-                <div className="settings-perm-text">
-                  <span className="settings-perm-label">{p.label}</span>
-                  <span className="settings-perm-desc">{p.desc}</span>
+            {CUSTOMER_PERMS.map(p => {
+              const lockedByViewOnly = globalPerms["View Only"] && VIEW_ONLY_CONFLICT_PERMS.includes(p.id);
+              return (
+                <div key={p.id} className={`settings-global-perm-card ${globalPerms[p.id] ? 'settings-gperm-enabled' : 'settings-gperm-disabled'}`}>
+                  <div className="settings-perm-text">
+                    <span className="settings-perm-label">{p.label}</span>
+                    <span className="settings-perm-desc">{p.desc}</span>
+                  </div>
+                  <Toggle checked={globalPerms[p.id]} onChange={() => toggleGlobal(p.id)} disabled={lockedByViewOnly} />
                 </div>
-                <Toggle checked={globalPerms[p.id]} onChange={() => toggleGlobal(p.id)} />
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="settings-global-perms-actions">
             <span className="settings-global-perms-hint">
@@ -507,8 +568,6 @@ const GlobalCustomerPerms = ({ users, onApply, showToast }) => {
   );
 };
 
-// ─── User Management Section ──────────────────────────────────────────────────
-
 const FILTER_OPTIONS = [
   { value: 'all', label: 'All Users' },
   { value: 'Customer', label: 'Customers' },
@@ -518,7 +577,10 @@ const FILTER_OPTIONS = [
 ];
 
 const UserManagement = ({ showToast }) => {
-  const { user } = React.useContext(UserContext);
+  const { user, permissions } = useContext(UserContext);
+  const isFullAdmin = user?.role?.trim().toLowerCase() === 'admin';
+  const canEditSettings = isFullAdmin || permissions?.modules?.["Settings"]?.["Edit"] === 1 || permissions?.modules?.["Settings"]?.["Manage Access"] === 1;
+
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -712,7 +774,7 @@ const UserManagement = ({ showToast }) => {
                     </td>
                     <td>
                       <RoleBadge
-                        role={u?.role?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                        role={u?.isSuperAdmin ? "Super Admin" : u?.role?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                         subrole={u?.subrole?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                       />
                     </td>
@@ -720,7 +782,7 @@ const UserManagement = ({ showToast }) => {
                       {isStaffTier ? (
                         <div className="settings-module-dots">
                           {ALL_MODULES.map(m => {
-                            const isAccessible = u?.modules?.[m.id]?.View === 1;
+                            const isAccessible = u?.isSuperAdmin ? true : u?.modules?.[m.id]?.View === 1;
                             return (
                               <span
                                 key={m.id}
@@ -735,9 +797,31 @@ const UserManagement = ({ showToast }) => {
                       )}
                     </td>
                     <td>
-                      <button className="settings-btn-manage" onClick={() => handleManage(u)}>
-                        {isStaffTier ? 'Manage Access' : 'View Permissions'}
-                      </button>
+                      {u?.isSuperAdmin ? (
+                        <span
+                          title="The Super Admin account always has full access across every module and can't be restricted or edited"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.4rem 0.75rem',
+                            borderRadius: '6px',
+                            background: '#d1fae5',
+                            color: '#065f46',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✓ Full Access
+                        </span>
+                      ) : (
+                        <button 
+                          className="settings-btn-manage" 
+                          onClick={() => handleManage(u)}
+                        >
+                          {canEditSettings ? (isStaffTier ? 'Manage Access' : 'View Permissions') : 'View Permissions'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -748,16 +832,14 @@ const UserManagement = ({ showToast }) => {
       )}
 
       {selectedUser && modalType === 'rbac' && (
-        <RBACModal user={selectedUser} onClose={() => { setSelectedUser(null); setModalType(null); }} onSave={handleSaveUserAccess} showToast={showToast} />
+        <RBACModal user={selectedUser} currentUser={user} canManage={canEditSettings} onClose={() => { setSelectedUser(null); setModalType(null); }} onSave={handleSaveUserAccess} showToast={showToast} />
       )}
       {selectedUser && modalType === 'client' && (
-        <CustomerModal user={selectedUser} onClose={() => { setSelectedUser(null); setModalType(null); }} onSave={handleSaveUserAccess} showToast={showToast} />
+        <CustomerModal user={selectedUser} canManage={canEditSettings} onClose={() => { setSelectedUser(null); setModalType(null); }} onSave={handleSaveUserAccess} showToast={showToast} />
       )}
     </div>
   );
 };
-
-// ─── Backup & Recovery Section ───────────────────────────────────────────────
 
 const SCHEDULE_OPTIONS = [
   { id: 'weekly', label: 'Weekly', icon: '◷', desc: 'Every Sunday at midnight' },
@@ -767,7 +849,7 @@ const SCHEDULE_OPTIONS = [
 ];
 
 const BackupRecovery = ({ showToast }) => {
-  const { user } = React.useContext(UserContext);
+  const { user } = useContext(UserContext);
   const [backups, setBackups] = useState([]);
   const [schedule, setSchedule] = useState('weekly');
   const [metrics, setMetrics] = useState({
@@ -783,7 +865,6 @@ const BackupRecovery = ({ showToast }) => {
   const userToken = user?.token;
   const userId = user?._id;
 
-  // Fetch Dashboard Meta Metrics and Historical Records list from database on Mount
   const fetchBackupDashboardData = () => {
     const api_url = window.base_api + "backup/dashboard";
     const requestOptions = {
@@ -809,7 +890,6 @@ const BackupRecovery = ({ showToast }) => {
     fetchBackupDashboardData();
   }, [userToken, userId]);
 
-  // Handle Radio Input configuration modifications
   const handleScheduleChange = (targetScheduleId) => {
     setSchedule(targetScheduleId);
     
@@ -834,7 +914,6 @@ const BackupRecovery = ({ showToast }) => {
     });
   };
 
-  // Run instant manual snapshot compilation backup sequence
   const handleBackupNow = () => {
     setIsLoading(true);
     const api_url = window.base_api + "backup/run-manual";
@@ -859,7 +938,6 @@ const BackupRecovery = ({ showToast }) => {
   };
 
   const handleDelete = (id) => {
-    // Optional implementation depending on your filesystem cleanup route structure
     setDeleteConfirm(null);
     showToast('Backup feature clearance command transmitted.', 'success');
   };
@@ -868,7 +946,6 @@ const BackupRecovery = ({ showToast }) => {
     setIsLoading(true);
     setRestoreConfirm(null);
     
-    // Simulating system restoration block safely
     setTimeout(() => {
       setIsLoading(false);
       showToast(`System variables rolled back to target ${backup.backupName}`, 'success');

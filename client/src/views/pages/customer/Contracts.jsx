@@ -1,12 +1,42 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useLocation } from 'react-router-dom';
 import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
+import './Contracts.css';
 
 const Contracts = () => {
+  const location = useLocation();
   const { user } = useContext(UserContext);
   const [contracts, setContracts] = useState([]);
   const [processingId, setProcessingId] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);// { item, action }
+  const [toast, setToast] = useState(null); 
+  const [highlightId, setHighlightId] = useState(null);
+  useEffect(() => {
+    if (location.state?.highlightOrderId) {
+      const id = location.state.highlightOrderId;
+      setHighlightId(id);
+
+      const scrollTimer = setTimeout(() => {
+        document
+          .querySelector(`[data-order-row="${id}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+      const clearTimer = setTimeout(() => setHighlightId(null), 4000);
+
+      return () => {
+        clearTimeout(scrollTimer);
+        clearTimeout(clearTimer);
+      };
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const fetchContracts = () => {
     if (!user || !user.token) return;
@@ -30,7 +60,7 @@ const Contracts = () => {
 
   const handlePreviewContract = (contractLink) => {
     if (!contractLink || contractLink === '#') {
-      alert("No physical file associated with this contract row reference yet.");
+      setToast({ type: 'error', message: 'No physical file associated with this contract yet.' });
       return;
     }
     const cleanBase = (window.base_api || "http://localhost:5000").replace('/api', '').replace(/\/$/, '');
@@ -38,9 +68,7 @@ const Contracts = () => {
   };
 
   const processContractOverlay = async (item, action) => {
-    const actionLabel = action === 'Approve' ? 'DIGITALLY SIGN & APPROVE' : 'REJECT & DECLINE';
-    if (!window.confirm(`Are you sure you want to ${actionLabel} this contract file asset directly?`)) return;
-
+    setConfirmAction(null);
     setProcessingId(item.orderId);
 
     try {
@@ -171,15 +199,15 @@ const Contracts = () => {
       const data = await uploadResponse.json();
 
       if (data.remarks === 'success') {
-        alert(`Success! The original physical contract PDF has been modified and updated to [${action}].`);
+        setToast({ type: 'success', message: `Contract has been ${action === 'Approve' ? 'signed and accepted' : 'declined'} successfully.` });
         fetchContracts(); // Refresh dashboard states dynamically
       } else {
-        alert(data.message || "Failed to update target file payload metrics.");
+        setToast({ type: 'error', message: data.message || "Failed to update target file payload metrics." });
       }
 
     } catch (err) {
       console.error("PDF Canvas processor exception:", err);
-      alert(`Asset modification engine error: ${err.message}`);
+      setToast({ type: 'error', message: `Asset modification engine error: ${err.message}` });
     } finally {
       setProcessingId(null);
     }
@@ -194,7 +222,18 @@ const Contracts = () => {
           const isPending = item.contractApproved !== 1 && item.status !== "Cancelled" && item.status !== "Completed";
 
           return (
-            <div className="contract-card" key={item.orderId} style={{ border: '1px solid #e2e8f0', padding: '20px', borderRadius: '8px', background: '#fff' }}>
+            <div
+              className="contract-card"
+              key={item.orderId}
+              data-order-row={item.orderId}
+              style={{
+                border: '1px solid #e2e8f0',
+                padding: '20px',
+                borderRadius: '8px',
+                background: item.orderId === highlightId ? '#fef9c3' : '#fff',
+                transition: 'background-color 1s ease',
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h3 style={{ margin: '0 0 6px 0', fontSize: '16px' }}>{item.clientName || "Project Order Request"}</h3>
@@ -222,10 +261,10 @@ const Contracts = () => {
                   
                   {isPending && (
                     <>
-                      <button style={{ padding: '10px 18px', background: '#2f855a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }} disabled={processingId !== null} onClick={() => processContractOverlay(item, 'Approve')}>
-                        {processingId === item.orderId ? '⏳ Modifying File...' : '✒️ Sign & Accept'}
+                      <button style={{ padding: '10px 18px', background: '#2f855a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }} disabled={processingId !== null} onClick={() => setConfirmAction({ item, action: 'Approve' })}>
+                        {processingId === item.orderId ? '⏳ Modifying File...' : ' Sign & Accept'}
                       </button>
-                      <button style={{ padding: '10px 18px', background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }} disabled={processingId !== null} onClick={() => processContractOverlay(item, 'Decline')}>
+                      <button style={{ padding: '10px 18px', background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }} disabled={processingId !== null} onClick={() => setConfirmAction({ item, action: 'Decline' })}>
                         Reject / Decline
                       </button>
                     </>
@@ -236,6 +275,39 @@ const Contracts = () => {
           );
         })}
       </div>
+
+      {confirmAction && (
+        <div className="contract-confirm-overlay" onClick={() => setConfirmAction(null)}>
+          <div className="contract-confirm-box" onClick={(e) => e.stopPropagation()}>
+            <div className="contract-confirm-icon">{confirmAction.action === 'Approve' ? '' : ''}</div>
+            <h3 className="contract-confirm-title">
+              {confirmAction.action === 'Approve' ? 'Sign & Accept this contract?' : 'Reject this contract?'}
+            </h3>
+            <p className="contract-confirm-message">
+              {confirmAction.action === 'Approve'
+                ? "This will digitally sign and approve the contract on your behalf. This action can't be undone."
+                : "This will decline the contract. This action can't be undone."}
+            </p>
+            <div className="contract-confirm-actions">
+              <button className="btn btn-view" onClick={() => setConfirmAction(null)}>Cancel</button>
+              <button
+                className={confirmAction.action === 'Approve' ? 'btn btn-approve' : 'btn btn-decline'}
+                onClick={() => processContractOverlay(confirmAction.item, confirmAction.action)}
+              >
+                {confirmAction.action === 'Approve' ? 'Yes, Sign & Accept' : 'Yes, Decline'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`contract-toast ${toast.type === 'success' ? 'contract-toast-success' : 'contract-toast-error'}`}>
+          <span>{toast.type === 'success' ? '✓' : '⚠️'}</span>
+          <span>{toast.message}</span>
+          <button className="contract-toast-close" onClick={() => setToast(null)}>✕</button>
+        </div>
+      )}
     </div>
   );
 };

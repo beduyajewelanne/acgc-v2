@@ -28,6 +28,24 @@ const calcExactLineTotal = (details, docQty) => {
 
   return area * rate * qty;
 };
+const PRESET_STAGE_NAMES = ['Cutting', 'Fabrication', 'Installation'];
+const stageCompletionRatio = (stages) => {
+  if (!Array.isArray(stages) || stages.length === 0) return 0;
+  const doneCount = stages.filter((s) => s.done).length;
+  return doneCount / stages.length;
+};
+const pickBottleneckDoc = (rawList) => {
+  return rawList.reduce((worst, doc) => (
+    stageCompletionRatio(doc.stages) < stageCompletionRatio(worst.stages) ? doc : worst
+  ), rawList[0]);
+};
+
+const buildSteps = (stages) => {
+  if (Array.isArray(stages) && stages.length > 0) {
+    return stages.map((s) => ({ name: s.name, done: !!s.done }));
+  }
+  return PRESET_STAGE_NAMES.map((name) => ({ name, done: false }));
+};
 
 const TrackProducts = () => {
   const [trackingCode, setTrackingCode] = useState('');
@@ -51,10 +69,10 @@ const TrackProducts = () => {
       },
       (res) => {
         const rawList = res?.payload || res || [];
-        
+
         if (Array.isArray(rawList) && rawList.length > 0) {
           const baselineDoc = rawList[0];
-          
+
           let processedTotalCost = 0;
           const normalizedItems = [];
 
@@ -71,7 +89,9 @@ const TrackProducts = () => {
               price: parseFloat(details.ratePerSqFt || details.price || 0),
               quantity: qty,
               lineTotal: computedLineTotal,
-              dimensions: `${details.width}${details.unit || 'in'} x ${details.height}${details.unit || 'in'}`
+              dimensions: `${details.width}${details.unit || 'in'} x ${details.height}${details.unit || 'in'}`,
+              progressStatus: doc.progressStatus || 'Pending',
+              steps: buildSteps(doc.stages)
             });
           });
 
@@ -80,50 +100,49 @@ const TrackProducts = () => {
             return;
           }
 
-          const finalGrandTotal = parseFloat(baselineDoc.estimatedTotal) || processedTotalCost;
+          const finalGrandTotal = parseFloat(baselineDoc.manualOverride || baselineDoc.estimatedTotal) || processedTotalCost;
           const requiredDpAmount = finalGrandTotal * 0.5;
-          const paidDpAmount = parseFloat(baselineDoc.downpaymentPaid) || 0;
+          const paidAmount = parseFloat(baselineDoc.totalPayment || baselineDoc.downpaymentPaid || 0);
+          const isFullyPaid = finalGrandTotal > 0 && paidAmount >= finalGrandTotal;
+          const balanceRemaining = Math.max(finalGrandTotal - paidAmount, 0);
+          const bottleneckDoc = pickBottleneckDoc(rawList);
+          const activeSteps = buildSteps(bottleneckDoc.stages);
+          const progressStatus = bottleneckDoc.progressStatus || 'Pending';
+          const isDelayed = progressStatus === 'Delayed';
 
-          const trackingStatus = baselineDoc.status || "Pending";
-          const stepsArr = ["Pending Inspection", "Downpayment Verification", "In Fabrication", "Ready for Install", "Completed"];
-
-          let matchedStepIndex = stepsArr.findIndex(step => step.toLowerCase() === trackingStatus.toLowerCase());
-          if (trackingStatus === "Pending") matchedStepIndex = 0;
-          if (matchedStepIndex === -1) matchedStepIndex = trackingStatus === "Cancelled" ? -1 : 1;
-
-          // Align Site Inspection status tracking directly from baseline fields
-          const derivedInspectionStatus = baselineDoc.inspectionDate 
-            ? "Done" 
-            : (baselineDoc.siteInspection || ((trackingStatus === "Pending Inspection" || trackingStatus === "Pending") ? "Pending" : "Done"));
+          const derivedInspectionStatus = baselineDoc.inspectionDate
+            ? "Done"
+            : (baselineDoc.siteInspection || "Pending");
 
           setOrder({
             code: baselineDoc.orderId || trackingCode,
             name: normalizedItems.length > 1 ? `Batch Order (${normalizedItems.length} Products)` : normalizedItems[0].name,
+            isBatch: normalizedItems.length > 1,
             date: baselineDoc.createdAt ? new Date(baselineDoc.createdAt).toLocaleDateString('en-US', {
               year: 'numeric', month: 'long', day: 'numeric'
             }) : "Date Unspecified",
-            status: trackingStatus,
+            paymentStatus: baselineDoc.status || "Pending",
+            progressStatus,
+            isDelayed,
             price: `₱ ${finalGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-            downpayment: `₱ ${paidDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            downpayment: `₱ ${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             requiredDownpayment: `₱ ${requiredDpAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            balance: `₱ ${balanceRemaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            isFullyPaid: isFullyPaid,
             siteInspection: derivedInspectionStatus,
-            contractLink: baselineDoc.contractLink || "#",
-            receiptLink: baselineDoc.receiptLink || "#",
-            steps: stepsArr,
-            currentStep: matchedStepIndex,
+            steps: activeSteps,
             items: normalizedItems
           });
         } else {
-          setErrorMessage("No matching project tracking code discovered record match.");
+          setErrorMessage("No matching project tracking code discovered.");
         }
       }
     );
   };
 
-  // Maps backend status variants into corresponding lower-case CSS utility tokens
   const getPillClass = (statusStr) => {
-    if (!statusStr) return 'tp-status-pending';
-    return `tp-status-${statusStr.toLowerCase().replace(/\s+/g, '-')}`;
+    if (!statusStr) return 'tp-pending';
+    return `tp-${statusStr.toLowerCase().replace(/\s+/g, '-')}`;
   };
 
   return (
@@ -151,25 +170,37 @@ const TrackProducts = () => {
       {order && (
         <div className="tp-result-container" style={{ marginTop: '30px' }}>
           <h2>Order Details: {order.code}</h2>
-          
-          {order.status !== "Cancelled" ? (
-            <div className="tp-progress-bar" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', margin: '30px 0' }}>
-              {order.steps.map((step, index) => (
-                <div key={index} className={`tp-step ${index <= order.currentStep ? 'tp-active' : ''}`} style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <div className="tp-circle" style={{
-                    width: '30px', height: '30px', borderRadius: '50%', lineHeight: '30px', margin: '0 auto 10px',
-                    background: index <= order.currentStep ? '#28a745' : '#ccc', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center'
-                  }}>
-                    {index + 1}
-                  </div>
-                  <span style={{ fontSize: '12px', fontWeight: index === order.currentStep ? 'bold' : 'normal', display: 'block', maxWidth: '90px', wordWrap: 'break-word' }}>{step}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
+
+          {order.paymentStatus === "Cancelled" ? (
             <div className="tp-cancelled-notice-banner" style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '15px', borderRadius: '4px', margin: '20px 0', textAlign: 'center', fontWeight: 'bold' }}>
               This project request has been Cancelled.
             </div>
+          ) : (
+            <>
+              {order.isDelayed && (
+                <div className="tp-delayed-notice-banner">
+                  ⚠ This project is currently running behind its estimated installation date.
+                </div>
+              )}
+              {!order.isBatch && (
+                <div className="tp-progress-bar" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', margin: '30px 0' }}>
+                  {order.steps.map((step, index) => {
+                    const isCurrent = !step.done && order.steps.slice(0, index).every(s => s.done);
+                    return (
+                      <div key={index} className={`tp-step ${step.done ? 'tp-active' : ''}`} style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div className="tp-circle" style={{
+                          width: '30px', height: '30px', borderRadius: '50%', lineHeight: '30px', margin: '0 auto 10px',
+                          background: step.done ? '#28a745' : '#ccc', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center'
+                        }}>
+                          {step.done ? '✓' : index + 1}
+                        </div>
+                        <span style={{ fontSize: '12px', fontWeight: isCurrent ? 'bold' : 'normal', display: 'block', maxWidth: '90px', wordWrap: 'break-word' }}>{step.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
 
           <div className="tp-order-card tp-expanded" style={{ marginTop: '20px', border: '1px solid #ddd', borderRadius: '8px', padding: '20px', background: '#fff' }}>
@@ -178,26 +209,40 @@ const TrackProducts = () => {
                 <h3 style={{ margin: '0 0 5px 0' }}>{order.name}</h3>
                 <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Project ID: {order.code} • {order.date}</p>
               </div>
-              {/* Contextual Status Pill Capsule */}
-              <span className={`tp-status-pill ${getPillClass(order.status)}`}>
-                {order.status}
+              <span className={`tp-badge ${getPillClass(order.progressStatus)}`}>
+                {order.progressStatus}
               </span>
             </div>
 
-            {/* --- Products Manifest Section --- */}
             <div className="tp-tracking-products-manifest" style={{ marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
-              <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>Products inside this Tracked Request:</p>
+              <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>Products Ordered:</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {order.items && order.items.map((prod, pIdx) => (
-                  <div key={pIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', background: '#f9f9f9', padding: '8px 12px', borderRadius: '6px' }}>
-                    <div>
-                      <span style={{ fontWeight: '600', color: '#333' }}>{prod.name}</span>
-                      <span style={{ color: '#888', marginLeft: '6px', fontWeight: '500' }}>x{prod.quantity}</span>
-                      <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Size: {prod.dimensions}</div>
+                  <div key={pIdx} style={{ background: '#f9f9f9', padding: '10px 12px', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                      <div>
+                        <span style={{ fontWeight: '600', color: '#333' }}>{prod.name}</span>
+                        <span style={{ color: '#888', marginLeft: '6px', fontWeight: '500' }}>x{prod.quantity}</span>
+                        <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Size: {prod.dimensions}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className={`tp-badge tp-badge-sm ${getPillClass(prod.progressStatus)}`}>{prod.progressStatus}</span>
+                        <span style={{ fontWeight: '600', color: '#333' }}>
+                          ₱ {prod.lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
                     </div>
-                    <span style={{ fontWeight: '600', color: '#333' }}>
-                      ₱ {prod.lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
+
+                    {order.isBatch && (
+                      <div className="tp-mini-progress">
+                        {prod.steps.map((step, sIdx) => (
+                          <div key={sIdx} className={`tp-mini-step ${step.done ? 'tp-active' : ''}`}>
+                            <div className="tp-mini-circle">{step.done ? '✓' : sIdx + 1}</div>
+                            <span className="tp-mini-label">{step.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -210,19 +255,26 @@ const TrackProducts = () => {
                   <p style={{ margin: 0, fontWeight: 'bold', color: '#28a745', fontSize: '16px' }}>{order.price}</p>
                 </div>
                 <div>
-                  <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Downpayment Paid:</label>
+                  <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Total Amount Paid:</label>
                   <p style={{ margin: 0, fontWeight: 'bold' }}>{order.downpayment}</p>
                 </div>
                 <div>
-                  <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Required DP (50%):</label>
-                  <p style={{ margin: 0, fontWeight: 'bold' }}>{order.requiredDownpayment}</p>
+                  <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Balance Remaining:</label>
+                  <p style={{ margin: 0, fontWeight: 'bold', color: order.isFullyPaid ? '#28a745' : '#d97706' }}>
+                    {order.isFullyPaid ? '₱ 0.00' : order.balance}
+                  </p>
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Payment Status:</label>
+                  <p style={{ margin: 0, fontWeight: 'bold', color: order.isFullyPaid ? '#28a745' : '#d97706' }}>
+                    {order.isFullyPaid ? '✅ Fully Paid' : `Required DP: ${order.requiredDownpayment}`}
+                  </p>
                 </div>
                 <div>
                   <label style={{ display: 'block', color: '#888', fontSize: '12px', marginBottom: '4px' }}>Site Inspection:</label>
                   <div style={{ marginTop: '2px' }}>
-                    {/* Aligned Site Inspection Pill Container */}
-                    <span className={`tp-status-pill ${getPillClass(order.status)}`}>
-                      {order.status}
+                    <span className={`tp-badge tp-badge-sm ${order.siteInspection === 'Done' ? 'tp-completed' : 'tp-pending'}`}>
+                      {order.siteInspection}
                     </span>
                   </div>
                 </div>

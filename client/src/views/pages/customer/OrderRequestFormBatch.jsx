@@ -8,7 +8,7 @@ import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
 
 /* ─── Order Summary Modal ────────────────────────────────────────────────── */
-const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
+const OrderSummaryModal = ({ order, onCancel, onProceed, isSubmitting }) => {
   const { items, customer } = order;
 
   // 1. Corrected grand total calculation to multiply price by quantity
@@ -76,9 +76,9 @@ const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
         </div>
 
         <div className="bp-summary-actions">
-          <button className="bp-sum-cancel" onClick={onCancel}>Cancel</button>
-          <button className="bp-sum-proceed" onClick={onProceed}>
-            <Zap size={15} /> Proceed
+          <button className="bp-sum-cancel" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
+          <button className="bp-sum-proceed" onClick={onProceed} disabled={isSubmitting}>
+            <Zap size={15} /> {isSubmitting ? 'Submitting…' : 'Proceed'}
           </button>
         </div>
       </div>
@@ -123,6 +123,7 @@ const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
   const [showSummary, setShowSummary] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Dynamic Grand aggregation
   const grandTotal = items.reduce((sum, item) => sum + item.price, 0);
@@ -163,6 +164,9 @@ const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
   };
 
   const handleProceed = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const token = user?.token;
     const userId = user?._id;
 
@@ -190,6 +194,7 @@ const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       }, (res) => {
+        setIsSubmitting(false);
         if (res && res.remarks === "success") {
           setShowSummary(false);
           setShowSuccess(true);
@@ -200,6 +205,7 @@ const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
     } catch (error) {
       console.error("Failed to submit order request:", error);
       alert("A network or configuration error occurred. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
@@ -208,8 +214,8 @@ const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
   }
 
   return (
-    <div className="bp-modal-overlay" style={{ position: 'relative', top: 0, left: 0, zIndex: 999 }}>
-      <div className="bp-modal-container bp-order-form-container" style={{ maxWidth: '950px' }} role="dialog" aria-modal="true">
+    <div className="bp-modal-overlay">
+      <div className="bp-modal-container bp-order-form-container" role="dialog" aria-modal="true">
 
         <button className="bp-modal-close" onClick={onClose} aria-label="Close">
           <X size={18} />
@@ -347,6 +353,7 @@ const OrderRequestFormBatch = ({ items = [], onBack, onClose }) => {
             order={{ items, customer }}
             onCancel={() => setShowSummary(false)}
             onProceed={handleProceed}
+            isSubmitting={isSubmitting}
           />
         )}
       </div>

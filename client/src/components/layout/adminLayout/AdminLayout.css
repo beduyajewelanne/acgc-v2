@@ -42,6 +42,11 @@
   flex-direction: column;
   overflow: visible;
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Without this, anything that pops out of the sidebar (like the
+     notification dropdown) renders BEHIND .admin-layout-content,
+     because a plain "position: sticky" with no z-index doesn't win
+     against a later sibling in the stacking order. */
+  z-index: 30;
 }
 
 .admin-sidebar::before {
@@ -93,11 +98,20 @@
   padding: 28px 20px 22px;
 }
 
+/* Row that holds the brand (logo+title) and the notification bell side by side */
+.admin-sidebar-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .admin-sidebar-brand {
   display: flex;
   align-items: center;
   gap: 12px;
   text-decoration: none;
+  min-width: 0;
 }
 
 .admin-sidebar-logo {
@@ -148,6 +162,12 @@
 }
 .admin-sidebar--collapsed .admin-sidebar-title {
   display: none;
+}
+/* Pag naka-collapse, wala nang space sa tabi ng logo — ibaba na lang
+   ang bell sa ilalim, nakasentro, imbes na katabi ng brand */
+.admin-sidebar--collapsed .admin-sidebar-header-row {
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* ── Nav ── */

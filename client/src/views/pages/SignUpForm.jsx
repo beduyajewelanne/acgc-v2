@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './SignUpForm.css';
 import { CRUD } from 'services/data.services';
 
@@ -89,6 +90,8 @@ const PH_GEOGRAPHY_REGISTRY = {
 };
 
 const SignUpForm = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -111,6 +114,12 @@ const SignUpForm = () => {
   
   // Track visibility state of the global document terms overlay modal
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [notification, setNotification] = useState(null);
+  useEffect(() => {
+    if (!notification) return;
+    const dismissTimer = setTimeout(() => setNotification(null), 5000);
+    return () => clearTimeout(dismissTimer);
+  }, [notification]);
 
   const handleProvinceChange = (e) => {
     const selectedProvince = e.target.value;
@@ -147,6 +156,14 @@ const SignUpForm = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const errors = [];
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+    if (!emailPattern.test(formData.email.trim())) {
+      errors.push('Please enter a valid email address (e.g. name@example.com).');
+    }
+    const phonePattern = /^(09\d{9}|\+639\d{9})$/;
+    if (!phonePattern.test(formData.phone.replace(/[\s-]/g, ''))) {
+      errors.push('Please enter a valid PH mobile number (e.g. 09123456789).');
+    }
 
     if (!formData.termsAccepted) {
       errors.push('You must accept the Terms and Conditions.');
@@ -170,24 +187,10 @@ const SignUpForm = () => {
       };
       CRUD(url, requestOptions, (res) => {
         if (res.remarks == "success") {
-          alert("Registration Successful!");
-          setFormData({
-            firstName: '',
-            lastName: '',
-            email: '',
-            username: '',
-            phone: '',
-            address: '',
-            province: '',
-            city: '',
-            barangay: '',
-            zipCode: '',            
-            password: '',
-            confirmPassword: '',
-            termsAccepted: false
-          });
+          setNotification({ type: 'success', message: 'Registration successful! Redirecting to login...' });
+          setTimeout(() => navigate('/login', { state: location.state }), 1800);
         } else {
-          alert("Registration Failed: " + res.message);
+          setNotification({ type: 'error', message: 'Registration failed: ' + res.message });
         }
       });
       console.log("Form Output Payload: ", formData);
@@ -196,6 +199,20 @@ const SignUpForm = () => {
 
   return (
     <div className="signup-page-wrapper">
+      {notification && (
+        <div className={`su-toast su-toast-${notification.type}`} role="alert">
+          <span className="su-toast-icon">{notification.type === 'success' ? '✓' : '✕'}</span>
+          <p className="su-toast-message">{notification.message}</p>
+          <button
+            type="button"
+            className="su-toast-close"
+            aria-label="Dismiss notification"
+            onClick={() => setNotification(null)}
+          >
+            &times;
+          </button>
+        </div>
+      )}
       <div className="signup-page">
         <div className="signup-card">
           

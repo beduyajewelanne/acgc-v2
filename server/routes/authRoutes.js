@@ -170,6 +170,11 @@ authRoutes.post("/api/register", async (req, res) => {
         const hashedPassword = await hashPass(password);
         const emailVerificationToken = crypto.randomBytes(32).toString("hex");
 
+        const db = dbo.getDb();
+        const existingUsersCount = await db.collection("users").countDocuments();
+        const assignedRole = existingUsersCount === 0 ? "admin" : "client";
+        const isSuperAdmin = existingUsersCount === 0;
+
         const newUser = {
             firstName,
             lastName,
@@ -182,7 +187,8 @@ authRoutes.post("/api/register", async (req, res) => {
             zipCode,
             username,
             password: hashedPassword,
-            role: "client",
+            role: assignedRole,
+            isSuperAdmin,
             is_verified: false,
             verificationToken: emailVerificationToken,
             createdAt: new Date()
@@ -231,13 +237,15 @@ authRoutes.post("/api/register", async (req, res) => {
             await transporter.sendMail(mailOptions);
 
             const rawUserId = Buffer.from(result.return, "base64").toString("utf8");
-            const base_access_level = await get_data_helper("base_access_level", [{ type: "client" }]);
-            // base_access_level.payload[0].modules["Client"]["Request Orders"] = 1;
-            const modulesTemplate = base_access_level?.payload?.[0]?.modules || {};
-            await insert_one_helper("access_level", {
-                user_id: new ObjectId(rawUserId),
-                modules: modulesTemplate
-            });
+            if (assignedRole === "client") {
+                const base_access_level = await get_data_helper("base_access_level", [{ type: "client" }]);
+                // base_access_level.payload[0].modules["Client"]["Request Orders"] = 1;
+                const modulesTemplate = base_access_level?.payload?.[0]?.modules || {};
+                await insert_one_helper("access_level", {
+                    user_id: new ObjectId(rawUserId),
+                    modules: modulesTemplate
+                });
+            }
 
             return res.status(201).json({
                 remarks: "success",

@@ -103,6 +103,8 @@ const STATUS_CONFIG = {
   Delayed:      { bg: '#fee2e2', text: '#b91c1c', dot: '#ef4444' },
 };
 const ALL_STATUSES = Object.keys(STATUS_CONFIG);
+const PRESET_STAGE_NAMES = ['Cutting', 'Fabrication', 'Installation'];
+const CUSTOM_STAGE_VALUE = '__custom__';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const calcProgress = (stages) => {
@@ -116,6 +118,37 @@ const fmt = (iso) => {
 };
 
 const todayISO = () => new Date().toISOString().split('T')[0];
+const computeAutoStatus = ({ stages, estimatedInstallationDate, originalEstimatedInstallationDate, hasStarted }) => {
+  if (!hasStarted || !stages || stages.length === 0) return 'Pending';
+
+  const allDone = stages.every((s) => s.done);
+  if (allDone) return 'Completed';
+
+  if (
+    originalEstimatedInstallationDate &&
+    estimatedInstallationDate &&
+    new Date(estimatedInstallationDate) > new Date(originalEstimatedInstallationDate)
+  ) {
+    return 'Delayed';
+  }
+
+  if (estimatedInstallationDate && new Date(todayISO()) > new Date(estimatedInstallationDate)) {
+    return 'Delayed';
+  }
+
+  const current = stages.find((s) => !s.done);
+  return current ? current.name : 'Pending';
+};
+
+const getDisplayStatus = (project) => {
+  const hasStarted = project?.progressStatus !== 'Pending' && !!(project?.stages && project.stages.length);
+  return computeAutoStatus({
+    stages: project?.stages,
+    estimatedInstallationDate: project?.estimatedInstallationDate,
+    originalEstimatedInstallationDate: project?.estimatedInstallationDate,
+    hasStarted,
+  });
+};
 
 // ─── StatusBadge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
@@ -265,7 +298,7 @@ const ViewModal = ({ project, onClose }) => {
             ))}
             <div className="pm-info-cell">
               <p className="pm-info-label">Current Status</p>
-              <div className="pm-info-value"><StatusBadge status={project.projectStatus} /></div>
+              <div className="pm-info-value"><StatusBadge status={getDisplayStatus(project)} /></div>
             </div>
             <div className="pm-info-cell">
               <p className="pm-info-label">Completion</p>
@@ -334,28 +367,39 @@ const ViewModal = ({ project, onClose }) => {
 const EditModal = ({ project, onClose, onSave }) => {
   // Track which stage IDs were already done when the modal opened — these are locked.
   const lockedIds = useRef(new Set(project.stages.filter((s) => s.done).map((s) => s.id)));
+  const originalEstDateRef = useRef(project.estimatedInstallationDate);
 
   const [stages, setStages] = useState(
     project.stages.map((s) => ({ ...s, proofs: [...(s.proofs || [])] }))
   );
-  const [status, setStatus]     = useState(project.progressStatus);
   const [estDate, setEstDate]   = useState(project.estimatedInstallationDate);
   const [newStageName, setNewStageName] = useState('');
+  const [customStageName, setCustomStageName] = useState('');
   const [insertAfterIdx, setInsertAfterIdx] = useState(-1); // -1 = beginning
   const [saving, setSaving]     = useState(false);
+  const liveStatus = computeAutoStatus({
+    stages,
+    estimatedInstallationDate: estDate,
+    originalEstimatedInstallationDate: originalEstDateRef.current,
+    hasStarted: project.progressStatus !== 'Pending',
+  });
 
   // Drag state
   const dragIdx = useRef(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
 
-  // ── Toggle: locked (already-done) stages cannot be unchecked ──────────────
+  // ── Toggle: locked (already-done) stages cannot be unchecked, 
   const toggleStage = (id) => {
     if (lockedIds.current.has(id)) return; // locked — ignore
-    setStages((prev) =>
-      prev.map((s) =>
-        s.id === id ? { ...s, done: !s.done, completedAt: !s.done ? todayISO() : null } : s
-      )
-    );
+    setStages((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx === -1) return prev;
+      const stage = prev[idx];
+      if (!stage.done && idx > 0 && !prev[idx - 1].done) return prev;
+      return prev.map((s, i) =>
+        i === idx ? { ...s, done: !s.done, completedAt: !s.done ? todayISO() : null } : s
+      );
+    });
   };
 
   const addProof = (stageId, proof) =>
@@ -372,7 +416,7 @@ const EditModal = ({ project, onClose, onSave }) => {
 
   // ── Add stage at chosen position (only among non-locked slots) ─────────────
   const addStage = () => {
-    const name = newStageName.trim();
+    const name = (newStageName === CUSTOM_STAGE_VALUE ? customStageName : newStageName).trim();
     if (!name) return;
     const newStage = { id: 's' + Date.now(), name, done: false, completedAt: null, proofs: [] };
     setStages((prev) => {
@@ -388,6 +432,7 @@ const EditModal = ({ project, onClose, onSave }) => {
       return next;
     });
     setNewStageName('');
+    setCustomStageName('');
   };
 
   // ── Drag-and-drop reorder (only pending stages can move) ───────────────────
@@ -431,7 +476,7 @@ const EditModal = ({ project, onClose, onSave }) => {
   const handleSave = () => {
     setSaving(true);
     setTimeout(() => {
-      onSave({ ...project, stages, progressStatus: status, estimatedInstall: estDate });
+      onSave({ ...project, stages, progressStatus: liveStatus, estimatedInstall: estDate });
       setSaving(false);
       onClose();
     }, 600);
@@ -467,30 +512,15 @@ const EditModal = ({ project, onClose, onSave }) => {
             <ProgressBar pct={pct} />
           </div>
 
-          {/* Status Selector */}
+          {/* Status (automatic — follows the stage flow + installation date) */}
           <div className="pm-section">
             <label className="pm-section-label">Project Status</label>
-            <div className="pm-status-pills">
-              {ALL_STATUSES.map((s) => {
-                const cfg = STATUS_CONFIG[s];
-                return (
-                  <button
-                    key={s}
-                    onClick={() => setStatus(s)}
-                    className="pm-status-pill"
-                    style={{
-                      backgroundColor: cfg.bg,
-                      color: cfg.text,
-                      outline: status === s ? `2px solid #60a5fa` : 'none',
-                      outlineOffset: status === s ? '2px' : '0',
-                      opacity: status === s ? 1 : 0.65,
-                    }}
-                  >
-                    {s}
-                  </button>
-                );
-              })}
+            <div className="pm-info-value">
+              <StatusBadge status={liveStatus} />
             </div>
+            <p className="pm-insert-note">
+              Status updates automatically based on the current stage and the installation date — it can't be set manually.
+            </p>
           </div>
 
           {/* Estimated Install Date */}
@@ -522,6 +552,7 @@ const EditModal = ({ project, onClose, onSave }) => {
               {stages.map((stage, idx) => {
                 const isLocked = lockedIds.current.has(stage.id);
                 const isDragTarget = dragOverIdx === idx && !isLocked;
+                const isBlocked = !stage.done && idx > 0 && !stages[idx - 1].done;
                 return (
                   <div
                     key={stage.id}
@@ -567,8 +598,17 @@ const EditModal = ({ project, onClose, onSave }) => {
                           stage.done ? 'pm-stage-toggle-done' : '',
                           isLocked ? 'pm-stage-toggle-locked' : '',
                         ].filter(Boolean).join(' ')}
-                        title={isLocked ? 'Completed stages cannot be unchecked' : ''}
-                        style={{ cursor: isLocked ? 'not-allowed' : 'pointer' }}
+                        title={
+                          isLocked
+                            ? 'Completed stages cannot be unchecked'
+                            : isBlocked
+                            ? 'Complete the previous stage first'
+                            : ''
+                        }
+                        style={{
+                          cursor: isLocked || isBlocked ? 'not-allowed' : 'pointer',
+                          opacity: isBlocked ? 0.5 : 1,
+                        }}
                       >
                         {stage.done && (
                           <svg className="pm-check-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -584,6 +624,9 @@ const EditModal = ({ project, onClose, onSave }) => {
                           </p>
                           {isLocked && (
                             <span className="pm-locked-badge">Locked</span>
+                          )}
+                          {!isLocked && isBlocked && (
+                            <span className="pm-locked-badge">Not yet</span>
                           )}
                         </div>
                         {stage.done && stage.completedAt && (
@@ -616,14 +659,23 @@ const EditModal = ({ project, onClose, onSave }) => {
                 className="pm-text-input" // Keeps your styling intact
               >
                 <option value="" disabled>-- Select a Preset Stage --</option>
-                
-                {/* Dynamically loop through your STATUS_CONFIG keys to render options */}
-                {Object.keys(STATUS_CONFIG).map((stage) => (
+
+                {PRESET_STAGE_NAMES.map((stage) => (
                   <option key={stage} value={stage}>
                     {stage}
                   </option>
                 ))}
+                <option value={CUSTOM_STAGE_VALUE}>Custom Stage</option>
               </select>
+              {newStageName === CUSTOM_STAGE_VALUE && (
+                <input
+                  type="text"
+                  value={customStageName}
+                  onChange={(e) => setCustomStageName(e.target.value)}
+                  placeholder="Type the new stage name"
+                  className="pm-text-input"
+                />
+              )}
               {/* Position selector */}
               <div className="pm-insert-row">
                 <label className="pm-insert-label">Insert after:</label>
@@ -644,7 +696,13 @@ const EditModal = ({ project, onClose, onSave }) => {
                     <option value={-1}>— (no stages yet)</option>
                   )}
                 </select>
-                <button onClick={addStage} className="pm-add-btn">+ Add</button>
+                <button
+                  onClick={addStage}
+                  className="pm-add-btn"
+                  disabled={!newStageName || (newStageName === CUSTOM_STAGE_VALUE && !customStageName.trim())}
+                >
+                  + Add
+                </button>
               </div>
               {lockedCount > 0 && (
                 <p className="pm-insert-note">
@@ -764,11 +822,31 @@ const ProgressMonitor = () => {
     })
 
   };
+  const handleStartProject = (project) => {
+    const defaultStages =
+      project.stages && project.stages.length > 0
+        ? project.stages
+        : ['Cutting', 'Fabrication', 'Installation'].map((name, i) => ({
+            id: `s${Date.now()}-${i}`,
+            name,
+            done: false,
+            completedAt: null,
+            proofs: [],
+          }));
+
+    handleSave({
+      ...project,
+      stages: defaultStages,
+      progressStatus: 'Cutting',
+      estimatedInstall: project.estimatedInstallationDate,
+    });
+  };
+
   const filtered = projects.filter((p) => {
     const matchesSearch =
       p?.clientName?.toLowerCase()?.includes(search?.toLowerCase()) ||
       p?.itemDetails?.name?.toLowerCase()?.includes(search?.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || p.progressStatus === filterStatus;
+    const matchesStatus = filterStatus === 'All' || getDisplayStatus(p) === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -787,10 +865,10 @@ const ProgressMonitor = () => {
               {projects.length} Projects
             </span>
             <span className="pm-badge pm-badge-green">
-              {projects.filter((p) => p.progressStatus === 'Completed').length} Completed
+              {projects.filter((p) => getDisplayStatus(p) === 'Completed').length} Completed
             </span>
             <span className="pm-badge pm-badge-red">
-              {projects.filter((p) => p.progressStatus === 'Delayed').length} Delayed
+              {projects.filter((p) => getDisplayStatus(p) === 'Delayed').length} Delayed
             </span>
           </div>
         </div>
@@ -815,7 +893,7 @@ const ProgressMonitor = () => {
           </div>
 
           <div className="pm-filter-pills">
-            {['All', ...ALL_STATUSES].map((s) => (
+            {['All', ...Array.from(new Set([...ALL_STATUSES, ...projects.map((p) => getDisplayStatus(p))]))].map((s) => (
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
@@ -860,11 +938,11 @@ const ProgressMonitor = () => {
                       <ProgressBar pct={calcProgress(p.stages)} />
                     </td>
                     <td className="pm-td">
-                      <StatusBadge status={p.progressStatus} />
+                      <StatusBadge status={getDisplayStatus(p)} />
                     </td>
                     <td className="pm-td">
                       <div className="pm-actions">
-                        <button onClick={() => setViewProject(p)} title="View" className="pm-action-btn pm-view" hidden={permissions?.modules?.['Progress Monitor']?.["View Details"] != 1}>
+                        <button onClick={() => setViewProject(p)} title="View" className="pm-action-btn pm-view" hidden={permissions?.modules?.['Progress Monitor']?.["View Details"] === 0}>
                           <svg className="pm-icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -872,12 +950,20 @@ const ProgressMonitor = () => {
                               d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </button>
-                        <button onClick={() => setEditProject(p)} title="Edit" className="pm-action-btn pm-edit" hidden={permissions?.modules?.['Progress Monitor']?.["Edit"] != 1}>
-                          <svg className="pm-icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
+                        {p.progressStatus === 'Pending' ? (
+                          <button onClick={() => handleStartProject(p)} title="Start Project" className="pm-action-btn pm-edit" hidden={permissions?.modules?.['Progress Monitor']?.["Edit"] === 0}>
+                            <svg className="pm-icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <button onClick={() => setEditProject(p)} title="Edit" className="pm-action-btn pm-edit" hidden={permissions?.modules?.['Progress Monitor']?.["Edit"] === 0}>
+                            <svg className="pm-icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -899,7 +985,7 @@ const ProgressMonitor = () => {
                     <p className="pm-td-primary">{p?.clientName}</p>
                     <p className="pm-card-sub">{p?.itemDetails?.name}</p>
                   </div>
-                  <StatusBadge status={p?.progressStatus} />
+                  <StatusBadge status={getDisplayStatus(p)} />
                 </div>
                 <ProgressBar pct={calcProgress(p.stages)} />
                 <div className="pm-card-dates">
@@ -908,7 +994,11 @@ const ProgressMonitor = () => {
                 </div>
                 <div className="pm-card-actions">
                   <button onClick={() => setViewProject(p)} className="pm-card-btn pm-card-view">View Details</button>
-                  <button onClick={() => setEditProject(p)} className="pm-card-btn pm-card-edit">Edit Progress</button>
+                  {p.progressStatus === 'Pending' ? (
+                    <button onClick={() => handleStartProject(p)} className="pm-card-btn pm-card-edit">Start Project</button>
+                  ) : (
+                    <button onClick={() => setEditProject(p)} className="pm-card-btn pm-card-edit">Edit Progress</button>
+                  )}
                 </div>
               </div>
             ))

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { UserContext } from '../../../App'; // Adjust this import path to point to your App.js
 import './AdminLayout.css';
+import NotificationBell from '../../NotificationBell/NotificationBell';
 
 // Single source of truth for the sidebar links: icon, destination, and the
 // permission key used by hasViewAccess. Add/remove modules here only.
@@ -112,7 +113,7 @@ const AdminLayout = () => {
   // Helper function to check if a navigation item should be visible
   const hasViewAccess = (moduleKey) => {
     // Full Admins automatically see all sidebar links
-    // if (roleNormalized === 'admin') return true;
+    if (roleNormalized === 'admin') return true;
 
     // Staff must have the module present and explicit View access set to 1
     return assignedModules?.[moduleKey] && assignedModules[moduleKey]["View"] == 1;
@@ -132,15 +133,19 @@ const AdminLayout = () => {
         </button>
 
         <div className="admin-sidebar-header">
-          <Link to="/admin" className="admin-sidebar-brand">
-            <span className="admin-sidebar-logo">
-              <img src="/images/acgc-logo.png" alt="ACGC logo" />
-            </span>
-            <span className="admin-sidebar-title">
-              <span className="admin-sidebar-title-main">ACGC</span>
-              <span className="admin-sidebar-title-sub">Glass &amp; Aluminum Services</span>
-            </span>
-          </Link>
+          <div className="admin-sidebar-header-row">
+            <Link to="/admin" className="admin-sidebar-brand">
+              <span className="admin-sidebar-logo">
+                <img src="/images/acgc-logo.png" alt="ACGC logo" />
+              </span>
+              <span className="admin-sidebar-title">
+                <span className="admin-sidebar-title-main">ACGC</span>
+                <span className="admin-sidebar-title-sub">Glass &amp; Aluminum Services</span>
+              </span>
+            </Link>
+
+            <NotificationBell userId={user?._id} token={user?.token} role="admin" />
+          </div>
         </div>
 
         <nav className="admin-sidebar-nav">

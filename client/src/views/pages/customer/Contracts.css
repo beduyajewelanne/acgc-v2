@@ -138,6 +138,87 @@
 
 .btn-decline:hover { background: var(--dark-red); }
 
+/* ── Confirm Modal (replaces window.confirm) ── */
+.contract-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.contract-confirm-box {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 26px 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.contract-confirm-icon { font-size: 2rem; margin-bottom: 10px; }
+
+.contract-confirm-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 8px;
+}
+
+.contract-confirm-message {
+  font-size: 0.9rem;
+  color: var(--slate);
+  line-height: 1.5;
+  margin-bottom: 22px;
+}
+
+.contract-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* ── Toast (replaces alert) ── */
+.contract-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  z-index: 1100;
+  max-width: 360px;
+  animation: contractToastIn 0.25s ease;
+}
+
+@keyframes contractToastIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.contract-toast-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.contract-toast-error   { background: var(--light-red); color: var(--dark-red); border: 1px solid rgba(139,30,34,0.25); }
+
+.contract-toast-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: inherit;
+  opacity: 0.6;
+}
+.contract-toast-close:hover { opacity: 1; }
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
   .contract-card {

@@ -230,8 +230,9 @@ export default function AdminDashboard() {
                 <span className="ad-warranty-expiry">
                   Expires {
                     new Date(
-                      new Date(war.estimatedInstallationDate).setDate(
-                        new Date(war.estimatedInstallationDate).getDate() + 90
+                      new Date(war.warrantyStart || war.estimatedInstallationDate).setDate(
+                        new Date(war.warrantyStart || war.estimatedInstallationDate).getDate() +
+                          (Number(war.warrantyDays) > 0 ? Number(war.warrantyDays) : 90)
                       )
                     ).toLocaleDateString()
                   }

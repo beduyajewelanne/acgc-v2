@@ -36,6 +36,10 @@ try {
 
   const backupRoutes = require("./routes/backupRoutes");
   app.use(backupRoutes);
+
+  const notificationRoutes = require('./routes/notification');
+  app.use(notificationRoutes);
+
 } catch (err) {
   console.error("Error setting up routes:", err.message);
 }

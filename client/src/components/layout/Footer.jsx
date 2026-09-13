@@ -1,8 +1,25 @@
-
-import React from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import './Footer.css';
+import { UserContext } from '../../App';
+import { CRUD } from '../../services/data.services';
 
 const Footer = () => {
+  const { user } = useContext(UserContext);
+  const isLoggedIn = !!user?.token;
+  const [canTrackProducts, setCanTrackProducts] = useState(false);
+  useEffect(() => {
+    if (isLoggedIn) return;
+    CRUD(
+      window.base_api + "get_global_client_template",
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
+      (res) => {
+        if (res && res.remarks === "success" && res.payload) {
+          setCanTrackProducts(res.payload["Can Track Products"] === 1);
+        }
+      }
+    );
+  }, [isLoggedIn]);
+
   return (
     <footer className="main-footer">
       <div className="footer-content">
@@ -20,7 +37,7 @@ const Footer = () => {
           <ul>
             <li><a href="/customer/products">Browse Products</a></li>
             <li><a href="/about">About Us</a></li>
-            <li><a href="/track">Track Order</a></li>
+            {!isLoggedIn && canTrackProducts && <li><a href="/track">Track Order</a></li>}
           </ul>
         </div>
       </div>

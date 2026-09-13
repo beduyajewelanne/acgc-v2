@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useContext, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, Zap, Eye, Search, SlidersHorizontal, X, CheckCircle2 } from 'lucide-react';
 import ProductModal from './ProductModal';
 import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
+import { CartContext } from 'context/CartContext';
 import './BrowseProduct.css';
 
 const CartToast = ({ product, message, onDismiss }) => (
@@ -14,61 +15,68 @@ const CartToast = ({ product, message, onDismiss }) => (
   </div>
 );
 
-const ProductCard = ({ product, onView, onAddToCart }) => (
-  <div className="bp-product-card">
-    <div className="bp-card-image-wrap">
-      <img src={product.images[0] || 'https://via.placeholder.com/600x400?text=No+Image'} alt={product.name} className="bp-card-image" />
-      <span className="bp-card-badge">{product.type}</span>
-      {product.isTopProduct && (
-        <span className="bp-card-top-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          Top Pick
-        </span>
-      )}
+const ProductCard = ({ product, user, permissions, canEstimatePricing, isLoggedIn, onView, onAddToCart }) => {
+  return (
+    <div className="bp-product-card">
+      <div className="bp-card-image-wrap">
+        <img src={product.images[0] || 'https://via.placeholder.com/600x400?text=No+Image'} alt={product.name} className="bp-card-image" />
+        <span className="bp-card-badge">{product.type}</span>
+        {product.isTopProduct && (
+          <span className="bp-card-top-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Top Pick
+          </span>
+        )}
+      </div>
+      <div className="bp-card-body">
+        <p className="bp-card-category">{product.category}</p>
+        <h3 className="bp-card-name">{product.name}</h3>
+        <p>{product.height} x {product.width} {product.unit}</p>
+        <p className="bp-card-price">
+          ₱{product.price.toLocaleString()}
+          <span className="bp-card-unit"> / sq ft</span>
+        </p>
+        {canEstimatePricing && product.width > 0 && product.height > 0 && (() => {
+          const toFeet = (val, unit) => {
+            if (unit === 'ft') return val;
+            if (unit === 'm')  return val * 3.28084;
+            if (unit === 'in') return val / 12;
+            if (unit === 'cm') return val / 30.48;
+            return val;
+          };
+          const area = toFeet(product.width, product.unit) * toFeet(product.height, product.unit);
+          const computed = area * product.price;
+          return (
+            <p className="bp-card-computed-price">
+              ₱{computed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          );
+        })()}
+      </div>
+      <div className="bp-card-actions">
+        <button className="bp-btn-view" onClick={() => onView(product)}>
+          <Eye size={15} />
+          View Product
+        </button>
+        <button className="bp-btn-order" onClick={() => onView(product, 'order')}>
+          <Zap size={15} />
+        </button>
+        {isLoggedIn && (
+          <button className="bp-btn-cart" onClick={() => onAddToCart(product)}>
+            <ShoppingCart size={15} />
+          </button>
+        )}
+      </div>
     </div>
-    <div className="bp-card-body">
-      <p className="bp-card-category">{product.category}</p>
-      <h3 className="bp-card-name">{product.name}</h3>
-      <p>{product.height} x {product.width} {product.unit}</p>
-      <p className="bp-card-price">
-        ₱{product.price.toLocaleString()}
-        <span className="bp-card-unit"> / sq ft</span>
-      </p>
-      {product.width > 0 && product.height > 0 && (() => {
-        const toFeet = (val, unit) => {
-          if (unit === 'ft') return val;
-          if (unit === 'm')  return val * 3.28084;
-          if (unit === 'in') return val / 12;
-          if (unit === 'cm') return val / 30.48;
-          return val;
-        };
-        const area = toFeet(product.width, product.unit) * toFeet(product.height, product.unit);
-        const computed = area * product.price;
-        return (
-          <p className="bp-card-computed-price">
-            ₱{computed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        );
-      })()}
-    </div>
-    <div className="bp-card-actions">
-      <button className="bp-btn-view" onClick={() => onView(product)}>
-        <Eye size={15} />
-        View Product
-      </button>
-      <button className="bp-btn-order" onClick={() => onView(product, 'order')}>
-        <Zap size={15} />
-      </button>
-      <button className="bp-btn-cart" onClick={() => onAddToCart(product)}>
-        <ShoppingCart size={15} />
-      </button>
-    </div>
-  </div>
-);
+  );
+};
 
 const BrowseProducts = () => {
   const { user, permissions } = useContext(UserContext);
+  const { refreshCart: refreshHeaderCart } = useContext(CartContext);
   const navigate = useNavigate();
+  const location = useLocation();
+  const autoRedirectToCart = useRef(false);
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All Products');
@@ -79,19 +87,38 @@ const BrowseProducts = () => {
   const [toastMsg, setToastMsg] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [pendingMeasurements, setPendingMeasurements] = useState(null);
+  const [guestClientPerms, setGuestClientPerms] = useState(null);
+
+  const isLoggedIn = !!(user && user.token);
+  const canEstimatePricing = isLoggedIn
+    ? permissions?.modules?.["Client"]?.["Estimate Pricing"] === 1
+    : guestClientPerms?.["Estimate Pricing"] === 1;
+
+  useEffect(() => {
+    if (isLoggedIn) return; // logged-in users get this from UserContext permissions instead
+    const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/get_global_client_template';
+    const requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    };
+    CRUD(apiUri, requestOptions, (res) => {
+      if (res && res.remarks === 'success' && res.payload) {
+        setGuestClientPerms(res.payload);
+      }
+    });
+  }, [isLoggedIn]);
 
   const fetchCartItems = () => {
     if (!user || !user.token) return;
     const apiUri = (window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + '/api/get_cart';
-    const payload = {
-      token: user.token,
-      _id: user._id
-    };
+    const payload = { token: user.token, _id: user._id };
     const requestOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...payload })
-    }
+    };
     CRUD(apiUri, requestOptions, (res) => {
       if (res && res.remarks === 'success' && Array.isArray(res.payload)) {
         setCart(res.payload);
@@ -151,9 +178,15 @@ const BrowseProducts = () => {
   }, [search, filterType, filterCategory, products]);
 
   const handleView = (product, intent = 'view') => {
-    if (intent === 'order' && (!user || !user.token)) {
-      navigate('/login');
-      return;
+    if (intent === 'order') {
+      if (!user || !user.token) {
+        navigate('/login', { state: { redirectToProduct: product.id } });
+        return;
+      }
+      if (permissions?.modules?.["Client"]?.["Request Orders"] !== 1) {
+        showToast(product, "You don't have permission to place order requests.");
+        return;
+      }
     }
     setSelectedProduct(product);
     setModalIntent(intent);
@@ -161,9 +194,14 @@ const BrowseProducts = () => {
 
   const handleAddToCart = (product, measurements = null) => {
     if (!user || !user.token) {
-      navigate('/login');
+      navigate('/login', { state: { redirectToCartProduct: product.id, measurements } });
       return;
     }
+    if (permissions?.modules?.["Client"]?.["Request Orders"] !== 1) {
+      showToast(product, "You don't have permission to add items to cart.");
+      return;
+    }
+
     const finalMeasurements = measurements || {
       width: product.width || 0,
       height: product.height || 0,
@@ -183,17 +221,44 @@ const BrowseProducts = () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...payload })
-    }
+    };
 
     CRUD(apiUri, requestOptions, (res) => {
       if (res && res.remarks === 'success') {
         showToast(product, `Added ${product.name} to cart`);
         fetchCartItems();
+        refreshHeaderCart();
+        if (autoRedirectToCart.current) {
+          autoRedirectToCart.current = false;
+          navigate('/customer/cart');
+        }
       } else {
-        alert("Failed to add product to database cart.");
+        alert("Failed to add product to cart.");
       }
     });
   };
+
+  useEffect(() => {
+    if (products.length === 0) return;
+    if (!location.state) return;
+
+    if (location.state.openProductId) {
+      const target = products.find(p => p.id === location.state.openProductId);
+      if (target) {
+        setPendingMeasurements(location.state.measurements || null);
+        handleView(target, location.state.intent || 'order');
+      }
+      navigate(location.pathname, { replace: true, state: {} });
+    } else if (location.state.autoAddToCartId) {
+      const target = products.find(p => p.id === location.state.autoAddToCartId);
+      if (target) {
+        autoRedirectToCart.current = true;
+        handleAddToCart(target, location.state.measurements || null);
+      }
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
 
   const showToast = (product, message = '') => {
     setToast(product || { name: 'Success' });
@@ -229,29 +294,29 @@ const BrowseProducts = () => {
             </button>
           )}
         </div>
-          <div className="bp-filter-wrap">
-            <SlidersHorizontal size={15} className="bp-filter-icon" />
-            <select
-              className="bp-filter-select"
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-            >
-              <option value="">All Types</option>
-              {uniqueTypes.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <select
-              className="bp-filter-select"
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-            >
-              <option value="">All Categories</option>
-              {uniqueCategories.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
+        <div className="bp-filter-wrap">
+          <SlidersHorizontal size={15} className="bp-filter-icon" />
+          <select
+            className="bp-filter-select"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+          >
+            <option value="">All Types</option>
+            {uniqueTypes.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <select
+            className="bp-filter-select"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            {uniqueCategories.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="bp-results-row">
@@ -271,6 +336,10 @@ const BrowseProducts = () => {
             <ProductCard
               key={p.id}
               product={p}
+              user={user}
+              permissions={permissions}
+              canEstimatePricing={canEstimatePricing}
+              isLoggedIn={isLoggedIn}
               onView={handleView}
               onAddToCart={handleAddToCart}
             />
@@ -294,10 +363,12 @@ const BrowseProducts = () => {
         <ProductModal
           product={selectedProduct}
           initialIntent={modalIntent}
-          onClose={() => setSelectedProduct(null)}
+          initialMeasurements={pendingMeasurements}
+          onClose={() => { setSelectedProduct(null); setPendingMeasurements(null); }}
           onAddToCart={handleAddToCart}
           user={user}
           permissions={permissions}
+          canEstimatePricing={canEstimatePricing}
         />
       )}
 

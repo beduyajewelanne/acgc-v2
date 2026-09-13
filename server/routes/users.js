@@ -37,7 +37,8 @@ userRoutes.post("/api/get_settings_users", async (req, res) => {
                     role: u.role,          // "staff" or "client"
                     subrole: u.subrole,    // "Skilled Worker", "Helper", etc.
                     status: u.status || "Active",
-                    modules: accessResult ? accessResult.modules : null
+                    modules: accessResult ? accessResult.modules : null,
+                    isSuperAdmin: u.isSuperAdmin === true 
                 };
             }));
 
@@ -53,11 +54,38 @@ userRoutes.post("/api/get_settings_users", async (req, res) => {
 userRoutes.post("/api/update_user_access_level", async (req, res) => {
     try {
         const db = dbo.getDb();
-        const { target_user_id, role, subrole, modules } = req.body;
+        const { token, admin_id, target_user_id, role, subrole, modules } = req.body;
 
+        if (!token || !admin_id) {
+            return res.status(400).json({ remarks: "failed", message: "Authentication details are required" });
+        }
         if (!target_user_id) {
             return res.status(400).json({ remarks: "failed", message: "Missing targeted identifier token" });
         }
+
+        checkAuth(token, admin_id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Unauthorized" });
+
+            try {
+                if (String(admin_id) === String(target_user_id)) {
+                    return res.status(403).json({ remarks: "failed", message: "You cannot modify your own account permissions." });
+                }
+                const requestingUser = await db.collection("users").findOne({ _id: new ObjectId(admin_id) });
+                const requesterIsFullAdmin = requestingUser?.role?.toLowerCase() === "admin" || requestingUser?.isSuperAdmin === true;
+
+                if (!requesterIsFullAdmin) {
+                    const requestingAccess = await db.collection("access_level").findOne({ user_id: new ObjectId(admin_id) });
+                    const settingsPerms = requestingAccess?.modules?.Settings || {};
+                    const canManageAccess = settingsPerms["Edit"] === 1 || settingsPerms["Manage Access"] === 1;
+
+                    if (!canManageAccess) {
+                        return res.status(403).json({ remarks: "failed", message: "You do not have permission to modify staff access levels." });
+                    }
+                }
+                const targetUserDoc = await db.collection("users").findOne({ _id: new ObjectId(target_user_id) });
+                if (targetUserDoc?.isSuperAdmin) {
+                    return res.status(403).json({ remarks: "failed", message: "The Super Admin account is protected and cannot be modified." });
+                }
 
         await db.collection("users").updateOne(
             { _id: new ObjectId(target_user_id) },
@@ -86,6 +114,11 @@ userRoutes.post("/api/update_user_access_level", async (req, res) => {
         );
 
         res.json({ remarks: "success", message: "User privileges written successfully" });
+    } catch (innerErr) {
+        console.error("Individual User Permission Write Fail:", innerErr);
+        res.status(500).json({ remarks: "failed", message: "Internal server error occurred", error: innerErr.message });
+    }
+});
 
     } catch (err) {
         console.error("Individual User Permission Write Fail:", err);
@@ -173,8 +206,10 @@ userRoutes.post("/api/get_global_client_template", async (req, res) => {
         "Request Orders": 0,
         "View Only": 0,
         "Track Project Progress": 0,
-        "Request Site Inspection": 0,
-        "Estimate Pricing": 0
+        "Can Track Products": 0,
+        "Estimate Pricing": 0,
+        "Can upload feedback": 0,
+        "Show Ratings Homepage": 0
       } 
     });
     
@@ -527,6 +562,29 @@ userRoutes.post("/api/get_logs", async (req, res) => {
         });
     } catch (err) {
         console.error("Profile settings writing failure:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+userRoutes.post("/api/check_customer_account", async (req, res) => {
+    const { token, _id, email } = req.body;
+
+    if (!token) return res.status(400).json({ error: "Token is required" });
+    if (!email) return res.status(400).json({ remarks: "failed", message: "Email is required" });
+
+    try {
+        checkAuth(token, _id, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            const emailCheckQuery = [
+                { $match: { email: { $regex: `^${email}$`, $options: "i" } } }
+            ];
+            const existingEmail = await check_record_exists("users", emailCheckQuery);
+            const hasAccount = existingEmail?.payload?.length > 0;
+
+            return res.status(200).json({ remarks: "success", hasAccount });
+        });
+    } catch (err) {
+        console.error("Error checking customer account:", err);
         return res.status(500).json({ error: err.message });
     }
 });

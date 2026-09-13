@@ -433,6 +433,23 @@ productRoutes.post("/api/submit_feedback", async (req, res) => {
                         message: "You have already submitted feedback for this order." 
                     });
                 }
+                const db = dbo.getDb();
+                const orderItems = await db.collection("order_requests").find({ orderId: orderId }).toArray();
+
+                if (orderItems.length === 0) {
+                    return res.status(404).json({
+                        remarks: "failed",
+                        message: "No matching order found for the provided orderId."
+                    });
+                }
+
+                const isFullyInstalled = orderItems.every((item) => item.progressStatus === "Completed");
+                if (!isFullyInstalled) {
+                    return res.status(400).json({
+                        remarks: "failed",
+                        message: "Feedback isn't available yet — this project is not yet marked Completed in Progress Monitoring."
+                    });
+                }
             }
 
             const newFeedback = {
@@ -516,68 +533,6 @@ productRoutes.get("/api/customer_ratings", async (req, res) => {
         });
     } catch (err) {
         console.error("Error in /api/customer_ratings:", err);
-        return res.status(500).json({ error: err.message || err });
-    }
-});
-// GET TRANSACTIONS (INCLUDES FEEDBACKS FOR ADMIN) 
-productRoutes.post("/api/get_transactions", async (req, res) => {
-    const { token, user_id } = req.body;
-    if (!token) return res.status(400).json({ error: "Token is required" });
-
-    try {
-        checkAuth(token, user_id, async (isValid) => {
-            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
-
-            const ordersResult = await get_data_helper("orders", []);
-            const orders = ordersResult?.payload || [];
-
-            const feedbacksResult = await get_data_helper("feedbacks", []);
-            const feedbacks = feedbacksResult?.payload || [];
-
-            const transactionList = orders.map(order => {
-                const matchedFeedbacks = feedbacks.filter(f => 
-                    String(f.orderId) === String(order.orderId || order.id || order._id)
-                );
-
-                const latestFeedback = matchedFeedbacks.length > 0 ? matchedFeedbacks[matchedFeedbacks.length - 1] : null;
-
-                return {
-                    ...order,
-                    id: order.orderId || order._id,
-                    clientName: order.userName || order.clientName || (order.user ? `${order.user.firstName} ${order.user.lastName}` : "Customer"),
-                    customerEmail: order.userEmail || order.email || "",
-                    feedback: latestFeedback ? latestFeedback.comment : order.feedback || "",
-                    rating: latestFeedback ? latestFeedback.rating : order.rating || null,
-                    feedbacks: matchedFeedbacks
-                };
-            });
-
-            
-            feedbacks.forEach(f => {
-                const exists = transactionList.some(t => String(t.id) === String(f.orderId));
-                if (!exists) {
-                    transactionList.push({
-                        id: f._id || f.orderId || `FB-${Math.random().toString(36).substr(2, 5)}`,
-                        contractId: f.orderId || "Direct Feedback",
-                        clientName: f.userName || "Customer",
-                        customerEmail: "",
-                        category: f.productCategory || "Completed Project",
-                        dateCreated: f.createdAt,
-                        feedback: f.comment,
-                        rating: f.rating,
-                        feedbacks: [f]
-                    });
-                }
-            });
-
-            return res.status(200).json({
-                remarks: "success",
-                message: "Transactions and feedbacks fetched successfully",
-                payload: transactionList
-            });
-        });
-    } catch (err) {
-        console.error("Error in /api/get_transactions:", err);
         return res.status(500).json({ error: err.message || err });
     }
 });

@@ -2,11 +2,13 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
+import { CartContext } from 'context/CartContext';
 import './Cart.css';
 import OrderRequestFormBatch from './OrderRequestFormBatch';
 
 const Cart = () => {
-  const { user } = useContext(UserContext);
+  const { user, permissions } = useContext(UserContext);
+  const { refreshCart: refreshHeaderCart } = useContext(CartContext);
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]); // Now tracks item.id instead of product_id
@@ -14,6 +16,9 @@ const Cart = () => {
   // View states: 'cart' or 'checkout'
   const [view, setView] = useState('cart');
   const [checkoutItems, setCheckoutItems] = useState([]);
+
+  // Same "Request Orders" permission that gates ordering on the Browse Products
+  const canOrder = permissions?.modules?.["Client"]?.["Request Orders"] === 1;
 
   // 1. Fetch live cart items from database
   const fetchCartItems = () => {
@@ -68,6 +73,7 @@ const Cart = () => {
 
         setCartItems(normalized);
         setSelectedIds([]); 
+        refreshHeaderCart();
       }
     });
   };
@@ -127,6 +133,7 @@ const Cart = () => {
 
   // 3. Checkout selected batch
   const handleCheckoutSelected = () => {
+    if (!canOrder) return;
     const itemsToCheckout = cartItems.filter(item => selectedIds.includes(item.id));
     if (itemsToCheckout.length === 0) return;
     setCheckoutItems(itemsToCheckout);
@@ -135,6 +142,7 @@ const Cart = () => {
 
   // 4. Checkout all items
   const handleCheckOutAll = () => {
+    if (!canOrder) return;
     if (cartItems.length === 0) return;
     setCheckoutItems(cartItems);
     setView('checkout');
@@ -146,7 +154,7 @@ const Cart = () => {
     ? selectedItems.reduce((acc, item) => acc + item.price, 0)
     : cartItems.reduce((acc, item) => acc + item.price, 0);
 
-  if (view === 'checkout') {
+  if (view === 'checkout' && canOrder) {
     return (
       <OrderRequestFormBatch
         items={checkoutItems}
@@ -164,7 +172,12 @@ const Cart = () => {
 
   return (
     <div className="cart-container">
-      <h2 className="cart-title">Shopping Cart</h2>
+      <h2 className="cart-title">
+        Shopping Cart
+        {cartItems.length > 0 && (
+          <span className="cart-count-badge">{cartItems.length}</span>
+        )}
+      </h2>
       
       {cartItems.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', paddingLeft: '10px' }}>
@@ -207,7 +220,7 @@ const Cart = () => {
                     
                     {item.image ? (
                       <img 
-                        src={window.base_api.replace('/api/', '') + item.image} 
+                        src={(window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + item.image} 
                         alt={item.name} 
                         className="item-image-placeholder" 
                         style={{ objectFit: 'cover', background: 'none' }}
@@ -226,15 +239,17 @@ const Cart = () => {
                     <button className="remove-btn" onClick={() => handleRemove([item.id])}>🗑️</button>
                   </div>
                 </div>
-                <button 
-                  className="place-item-btn"
-                  onClick={() => {
-                    setCheckoutItems([item]);
-                    setView('checkout');
-                  }}
-                >
-                  Place Order for This Item →
-                </button>
+                {canOrder && (
+                  <button 
+                    className="place-item-btn"
+                    onClick={() => {
+                      setCheckoutItems([item]);
+                      setView('checkout');
+                    }}
+                  >
+                    Place Order for This Item →
+                  </button>
+                )}
               </div>
             ))
           )}
@@ -252,14 +267,16 @@ const Cart = () => {
           </div>
           <small className="checkout-note">* Final pricing confirmed after site inspection</small>
 
-          <button 
-            className="place-item-btn" 
-            style={{ marginTop: '20px', fontWeight: 'bold' }}
-            disabled={cartItems.length === 0}
-            onClick={selectedIds.length > 0 ? handleCheckoutSelected : handleCheckOutAll}
-          >
-            {selectedIds.length > 0 ? `Checkout Selected (${selectedIds.length}) →` : 'Checkout All Items →'}
-          </button>
+          {canOrder && (
+            <button 
+              className="place-item-btn" 
+              style={{ marginTop: '20px', fontWeight: 'bold' }}
+              disabled={cartItems.length === 0}
+              onClick={selectedIds.length > 0 ? handleCheckoutSelected : handleCheckOutAll}
+            >
+              {selectedIds.length > 0 ? `Checkout Selected (${selectedIds.length}) →` : 'Checkout All Items →'}
+            </button>
+          )}
 
           {selectedIds.length > 0 && (
             <button 

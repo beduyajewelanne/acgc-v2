@@ -59,6 +59,38 @@ function fmtDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 }
+function getWarrantyDaysDisplay(inspection) {
+  const wd = inspection?.warrantyDays;
+  const hasExplicitWarrantyDays = wd !== undefined && wd !== null && wd !== '';
+  return hasExplicitWarrantyDays ? Number(wd) : 90;
+}
+
+function getContractRequirementGaps(item) {
+  const gaps = [];
+
+  if (!item?.estimatedInstallationDate) {
+    gaps.push('Estimated Installation Date');
+  }
+
+  const measurements = item?.measurements || [];
+  if (measurements.length === 0) {
+    gaps.push('Product & Measurements');
+  } else {
+    const incomplete = measurements.some(m =>
+      !m.product || String(m.product).trim() === '' ||
+      !(Number(m.width) > 0) ||
+      !(Number(m.height) > 0) ||
+      !(Number(m.pricePerSqFt) > 0)
+    );
+    if (incomplete) gaps.push('Complete Product, Measurements & Price per Sq Ft');
+  }
+
+  return gaps;
+}
+
+function canGenerateContract(item) {
+  return getContractRequirementGaps(item).length === 0;
+}
 
 function getStatusMeta(status) {
   switch (status) {
@@ -79,6 +111,7 @@ function emptyForm() {
     siteAddress: '',
     inspectionDate: '',
     estimatedInstallationDate: '',
+    warrantyDays: 90,
     status: 'Needs to be Called',
     notes: '',
     paymentTerms: PAYMENT_TERMS_OPTIONS[0],
@@ -428,7 +461,7 @@ function ContractModal({ inspection, onClose, onSend, permissions }) {
                 {sent ? '✅ Sent to Customer' : sending ? '⏳ Sending...' : '📨 Send to Customer'}
               </button>
             )}
-            <button className="si-contract-dl-btn" onClick={handleDownloadPDF} hidden={permissions?.modules?.["Site Inspection"]?.["Download Contract"] !== 1}>
+            <button className="si-contract-dl-btn" onClick={handleDownloadPDF} hidden={permissions?.modules?.["Site Inspection"]?.["Download Contract"] === 0}>
               ⬇️ Download PDF
             </button>
             <button className="si-modal-close" onClick={onClose}>×</button>
@@ -570,7 +603,7 @@ function ContractModal({ inspection, onClose, onSend, permissions }) {
               <div className="si-contract-warranty-box" style={{ display: 'flex', gap: '8px', marginBottom: '12px', fontSize: '11px' }}>
                 <div style={{ fontSize: '16px' }}>🛡️</div>
                 <div>
-                  <strong>90-Day Warranty:</strong> ACGC Glass & Aluminum Services provides a 90-day warranty on all installed products and workmanship starting from installation completion.
+                  <strong>{getWarrantyDaysDisplay(inspection)}-Day Warranty:</strong> ACGC Glass & Aluminum Services provides a {getWarrantyDaysDisplay(inspection)}-day warranty on all installed products and workmanship starting from installation completion.
                 </div>
               </div>
             )}
@@ -625,6 +658,8 @@ function ContractModal({ inspection, onClose, onSend, permissions }) {
 // ─── View Modal ──────────────────────────────────────────────────────────────
 function ViewModal({ inspection, onClose, onGenerateContract, permissions }) {
   console.log(inspection)
+  const contractGaps = getContractRequirementGaps(inspection);
+  const contractBlocked = contractGaps.length > 0;
   return (
     <div className="si-modal-overlay" onClick={onClose}>
       <div className="si-modal-box si-modal-box--large" onClick={e => e.stopPropagation()}>
@@ -634,12 +669,30 @@ function ViewModal({ inspection, onClose, onGenerateContract, permissions }) {
             <p className="si-modal-subtitle">SI-{String(inspection.id).padStart(4, '0')} · Created {inspection.dateCreated}</p>
           </div>
           <div className="si-modal-topbar-actions">
-            <button className="si-gen-contract-btn" onClick={onGenerateContract} hidden={(permissions?.modules?.["Site Inspection"]?.["Generate Contract"] !== 1 && !inspection.estimatedInstallationDate) || !inspection.estimatedInstallationDate}>📄 Generate Contract</button>
+            <button
+              className="si-gen-contract-btn"
+              onClick={() => !contractBlocked && onGenerateContract()}
+              disabled={contractBlocked}
+              title={contractBlocked ? `Complete before generating a contract: ${contractGaps.join(' · ')}` : undefined}
+              hidden={permissions?.modules?.["Site Inspection"]?.["Generate Contract"] === 0}
+            >📄 Generate Contract</button>
             <button className="si-modal-close" onClick={onClose}>×</button>
           </div>
         </div>
 
         <div className="si-modal-body">
+          {/* Clarify, right in the system, exactly what's still needed before a
+              contract can be generated — instead of the button just silently
+              disappearing/being disabled with no explanation. */}
+          {contractBlocked && permissions?.modules?.["Site Inspection"]?.["Generate Contract"] !== 0 && (
+            <div className="si-contract-info-banner si-contract-info-banner--amber">
+              <span>⚠️</span>
+              <div>
+                <div>This order isn't ready for contract generation yet. Missing: <strong>{contractGaps.join(', ')}</strong>.</div>
+              </div>
+            </div>
+          )}
+
           {/* Customer Agreement Banner */}
           {inspection.contractStatus === 'agreed' && (
             <div className="si-contract-info-banner si-contract-info-banner--green">
@@ -648,7 +701,7 @@ function ViewModal({ inspection, onClose, onGenerateContract, permissions }) {
                 <div>Customer <strong>{inspection.clientName}</strong> has agreed to the contract on <strong>{fmtDate(inspection.contractAgreedDate)}</strong>.</div>
                 {inspection.warrantyStartDate && (
                   <div style={{marginTop: 4}}>
-                    🛡️ <strong>90-Day Warranty:</strong> {fmtDate(inspection.warrantyStartDate)} – {fmtDate(inspection.warrantyEndDate)}
+                    🛡️ <strong>{getWarrantyDaysDisplay(inspection)}-Day Warranty:</strong> {fmtDate(inspection.warrantyStartDate)} – {fmtDate(inspection.warrantyEndDate)}
                   </div>
                 )}
               </div>
@@ -702,7 +755,7 @@ function ViewModal({ inspection, onClose, onGenerateContract, permissions }) {
                 <span>{inspection.paymentTerms}</span>
               </div>
               <div className="si-payment-row">
-                <span>Downpayment Status</span>
+                <span>{String(inspection.paymentTerms || '').trim() === 'Full payment' ? 'Payment Status' : 'Downpayment Status'}</span>
                 <span className={inspection.downpaymentPaid ? 'si-paid-chip' : 'si-unpaid-chip'}>
                   {inspection.downpaymentPaid ? '✅ Paid' : '⏳ Pending'}
                 </span>
@@ -721,7 +774,7 @@ function ViewModal({ inspection, onClose, onGenerateContract, permissions }) {
             <div className="si-detail-section">
               <div className="si-detail-section-title">Warranty</div>
               <div className="si-warranty-detail-box">
-                <div>🛡️ <strong>90-Day Warranty</strong></div>
+                <div>🛡️ <strong>{getWarrantyDaysDisplay(inspection)}-Day Warranty</strong></div>
                 <div className="si-warranty-detail-dates">
                   <span>Start: <strong>{fmtDate(inspection.warrantyStartDate)}</strong></span>
                   <span>End: <strong>{fmtDate(inspection.warrantyEndDate)}</strong></span>
@@ -916,6 +969,7 @@ function ConfirmManualApproveModal({ inspection, onConfirm, onClose }) {
 // ─── New / Edit Modal ─────────────────────────────────────────────────────────
 function InspectionFormModal({ initial, onClose, onSave }) {
   const isEdit = !!initial;
+  const { user } = useContext(UserContext);
   const [form, setForm] = useState(() =>
     isEdit
       ? { 
@@ -928,6 +982,70 @@ function InspectionFormModal({ initial, onClose, onSave }) {
   const [measurements, setMeasurements] = useState(form.measurements);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+
+  // Warranty length preset — 30 / 90 days, or a custom number of days for
+  // testing/edge cases. Defaults to whichever preset matches the saved
+  // warrantyDays, or 90 for records that don't have one yet.
+  const [warrantyPreset, setWarrantyPreset] = useState(() => {
+    const wd = isEdit ? (initial?.warrantyDays ?? 90) : 90;
+    if (wd === 30) return '30';
+    if (wd === 90) return '90';
+    return 'custom';
+  });
+
+  const applyWarrantyPreset = (preset) => {
+    setWarrantyPreset(preset);
+    if (preset === '30') set('warrantyDays', 30);
+    else if (preset === '90') set('warrantyDays', 90);
+    // 'custom' leaves the current/typed value as-is until the admin enters one
+  };
+
+  // If the record already came in flagged as having an account (e.g. it was already
+  // detected before, or the customer signed up on their own), the "No" toggle is
+  // locked so admin can't accidentally uncheck it while editing.
+  const initialHasAccount = isEdit && initial?.customerHasAccount === true;
+  const [accountAutoDetected, setAccountAutoDetected] = useState(initialHasAccount);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const emailCheckTimer = useRef(null);
+  const accountLocked = initialHasAccount || accountAutoDetected;
+
+  // Debounced lookup: while admin manually types/edits a customer email, check if that
+  // email already belongs to an existing website account. If it does, force "Yes" and
+  // lock the "No" option so admin can't mark a known account as "no account".
+  const handleEmailChange = (value) => {
+    set('customerEmail', value);
+    if (emailCheckTimer.current) clearTimeout(emailCheckTimer.current);
+
+    if (initialHasAccount) return; // already known/locked, nothing to check
+
+    const trimmed = value.trim();
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+    if (!isValidEmail) {
+      setAccountAutoDetected(false);
+      setCheckingEmail(false);
+      return;
+    }
+
+    emailCheckTimer.current = setTimeout(() => {
+      if (!user || !user.token) return;
+      setCheckingEmail(true);
+      const apiUri = (window.base_api || `http://localhost:5000/api/`) + 'check_customer_account';
+      const requestOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: user.token, _id: user._id, email: trimmed }),
+      };
+      CRUD(apiUri, requestOptions, (res) => {
+        setCheckingEmail(false);
+        if (res && res.remarks === 'success' && res.hasAccount) {
+          setAccountAutoDetected(true);
+          set('customerHasAccount', true);
+        } else {
+          setAccountAutoDetected(false);
+        }
+      });
+    }, 500);
+  };
 
   const computed = calcGrandTotal(measurements);
   const finalTotal = form.manualOverride !== '' && form.manualOverride !== null ? parseFloat(form.manualOverride) || 0 : computed;
@@ -942,6 +1060,7 @@ function InspectionFormModal({ initial, onClose, onSave }) {
     if (!form.siteAddress.trim()) e.siteAddress = 'Required';
     if (!form.inspectionDate) e.inspectionDate = 'Required';
     if (form.paymentTerms === 'Custom arrangement' && !form.paymentDate) e.paymentDate = 'Required';
+    if (warrantyPreset === 'custom' && (form.warrantyDays === '' || form.warrantyDays === null || form.warrantyDays === undefined || Number(form.warrantyDays) < 0)) e.warrantyDays = 'Required';
     return e;
   };
 
@@ -949,6 +1068,10 @@ function InspectionFormModal({ initial, onClose, onSave }) {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     setSaving(true);
+
+    const wasPaidBefore = isEdit && initial?.downpaymentPaid === true;
+    const justMarkedPaid = form.downpaymentPaid === true && !wasPaidBefore;
+
     setTimeout(() => {
       onSave({
         ...form,
@@ -956,14 +1079,16 @@ function InspectionFormModal({ initial, onClose, onSave }) {
         estimatedTotal: finalTotal,
         manualOverride: form.manualOverride,
         dateCreated: isEdit ? form.dateCreated : today,
+        justMarkedPaid,
       });
       setSaving(false);
     }, 600);
   };
 
   const needsPaymentDate = form.paymentTerms !== '50% downpayment, 50% upon completion'
-    && form.paymentTerms !== 'Full payment'
     && !form.downpaymentPaid;
+
+  const isFullPaymentTerm = form.paymentTerms === 'Full payment';
 
   return (
     <div className="si-modal-overlay" onClick={onClose}>
@@ -1024,6 +1149,30 @@ function InspectionFormModal({ initial, onClose, onSave }) {
                 <div><StatusBadge status={form.status === 'Pending' ? 'Needs to be Called' : form.status} /></div>
               </div>
             </div>
+            <div className="si-form-grid-3 si-mt-12">
+              <div className="si-form-field">
+                <label>Warranty Period</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button type="button" className={`si-toggle-btn ${warrantyPreset === '30' ? 'si-toggle-btn--active' : ''}`} onClick={() => applyWarrantyPreset('30')}>30 Days</button>
+                  <button type="button" className={`si-toggle-btn ${warrantyPreset === '90' ? 'si-toggle-btn--active' : ''}`} onClick={() => applyWarrantyPreset('90')}>90 Days</button>
+                  <button type="button" className={`si-toggle-btn ${warrantyPreset === 'custom' ? 'si-toggle-btn--active' : ''}`} onClick={() => applyWarrantyPreset('custom')}>Custom</button>
+                </div>
+                {warrantyPreset === 'custom' && (
+                  <>
+                    <input
+                      type="number"
+                      min="0"
+                      className={`si-fi si-mt-12 ${errors.warrantyDays ? 'si-fi--err' : ''}`}
+                      placeholder="Enter number of days (0 = no warranty)"
+                      value={form.warrantyDays ?? ''}
+                      onChange={e => { set('warrantyDays', e.target.value === '' ? '' : parseInt(e.target.value, 10)); setErrors(x => ({...x, warrantyDays:''})); }}
+                    />
+                    {errors.warrantyDays && <span className="si-err-msg">{errors.warrantyDays}</span>}
+                  </>
+                )}
+                <span className="si-field-hint">Coverage starts on the installation date. Used for testing warranty expiry.</span>
+              </div>
+            </div>
           </div>
 
           {/* Customer Account */}
@@ -1034,16 +1183,31 @@ function InspectionFormModal({ initial, onClose, onSave }) {
                 <label>Has Account on Website?</label>
                 <div className="si-toggle-group">
                   <button type="button" className={`si-toggle-btn ${form.customerHasAccount ? 'si-toggle-btn--active' : ''}`} onClick={() => set('customerHasAccount', true)}>✅ Yes</button>
-                  <button type="button" className={`si-toggle-btn ${!form.customerHasAccount ? 'si-toggle-btn--active si-toggle-btn--no' : ''}`} onClick={() => { set('customerHasAccount', false); set('customerEmail', ''); }}>❌ No</button>
+                  <button
+                    type="button"
+                    className={`si-toggle-btn ${!form.customerHasAccount ? 'si-toggle-btn--active si-toggle-btn--no' : ''}`}
+                    onClick={() => { set('customerHasAccount', false); }}
+                    disabled={accountLocked}
+                    title={accountLocked ? 'This customer already has an account on the website.' : ''}
+                  >❌ No</button>
                 </div>
+                {accountLocked && (
+                  <span className="si-field-hint">✅ Detected an existing account for this customer.</span>
+                )}
               </div>
-              {form.customerHasAccount && (
-                <div className="si-form-field si-fade-in">
-                  <label>Customer Email</label>
-                  <input type="email" className="si-fi" value={form.customerEmail} onChange={e => set('customerEmail', e.target.value)} placeholder="e.g. maria@email.com" />
-                  <span className="si-field-hint">Contract will be sent to this email.</span>
-                </div>
-              )}
+              <div className="si-form-field si-fade-in">
+                <label>Customer Email {!form.customerHasAccount && <span className="si-req" style={{ color: '#a0aec0' }}>(optional)</span>}</label>
+                <input type="email" className="si-fi" value={form.customerEmail} onChange={e => handleEmailChange(e.target.value)} placeholder="e.g. maria@email.com" />
+                {checkingEmail ? (
+                  <span className="si-field-hint">Checking if this email already has an account...</span>
+                ) : (
+                  <span className="si-field-hint">
+                    {form.customerHasAccount
+                      ? 'Contract will be sent to this email.'
+                      : 'Optional — only needed if you plan to email the contract; you can still print it without one.'}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1105,7 +1269,7 @@ function InspectionFormModal({ initial, onClose, onSave }) {
                 </select>
               </div>
               <div className="si-form-field">
-                <label>Downpayment Received?</label>
+                <label>{isFullPaymentTerm ? 'Payment Received?' : 'Downpayment Received?'}</label>
                 <div className="si-toggle-group">
                   <button type="button" className={`si-toggle-btn ${form.downpaymentPaid ? 'si-toggle-btn--active' : ''}`} onClick={() => set('downpaymentPaid', true)}>✅ Yes, Paid</button>
                   <button type="button" className={`si-toggle-btn ${!form.downpaymentPaid ? 'si-toggle-btn--active si-toggle-btn--no' : ''}`} onClick={() => set('downpaymentPaid', false)}>⏳ Not Yet</button>
@@ -1115,10 +1279,21 @@ function InspectionFormModal({ initial, onClose, onSave }) {
 
             {!form.downpaymentPaid && needsPaymentDate && (
               <div className="si-form-field si-mt-12 si-fade-in">
-                <label>Agreed Payment Date<span className="si-req">*</span></label>
+                <label>
+                  Agreed Payment Date
+                  {form.paymentTerms === 'Custom arrangement' ? (
+                    <span className="si-req">*</span>
+                  ) : (
+                    <span className="si-req" style={{ color: '#a0aec0' }}> (optional)</span>
+                  )}
+                </label>
                 <input type="date" className="si-fi" value={form.paymentDate} min={today} onChange={e => set('paymentDate', e.target.value)} />
                 {errors.paymentDate && <span className="si-err-msg">{errors.paymentDate}</span>}
-                <span className="si-field-hint">Client agreed to pay downpayment on this date.</span>
+                <span className="si-field-hint">
+                  {isFullPaymentTerm
+                    ? 'Optional — you may specify when the customer agreed to pay in full.'
+                    : 'Client agreed to pay downpayment on this date.'}
+                </span>
               </div>
             )}
           </div>
@@ -1146,6 +1321,7 @@ const SiteInspection = () => {
   const [filterStatus, setFilterStatus] = useState('All');
   const [toast, setToast] = useState(null);
   const [showCanceled, setShowCanceled] = useState(false);
+  const [highlightId, setHighlightId] = useState(null);
   const nextId = useRef(0);
   // console.log(permissions)
   useEffect(() => {
@@ -1155,8 +1331,27 @@ const SiteInspection = () => {
   }, [user])
 
   useEffect(() => {
-    if (location.state) {
+    if (location.state?.type) {
       setModal(location.state);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (location.state?.highlightOrderId) {
+      if (location.state.showCanceled) setShowCanceled(true);
+      setHighlightId(location.state.highlightOrderId);
+
+      const scrollTimer = setTimeout(() => {
+        document
+          .querySelector(`[data-order-row="${location.state.highlightOrderId}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+      const clearTimer = setTimeout(() => setHighlightId(null), 4000);
+
+      return () => {
+        clearTimeout(scrollTimer);
+        clearTimeout(clearTimer);
+      };
     }
   }, [location.state]);
 
@@ -1229,6 +1424,29 @@ const SiteInspection = () => {
     CRUD(api_url, requestOptions, (res) => {
       if (res && res.remarks === "success") {
         showToast(isUpdate ? 'Inspection updated successfully.' : 'New inspection created!');
+
+        if (data.justMarkedPaid) {
+          const orderIdForPayment = data.orderId || data.id || res.payload?.orderId || res.payload?.id;
+          const totalAmt = Number(data.manualOverride) || Number(data.estimatedTotal) || 0;
+          const isFullPaymentTerm = String(data.paymentTerms || '').trim() === 'Full payment';
+          const amountPaid = isFullPaymentTerm ? totalAmt : totalAmt * 0.5;
+
+          if (orderIdForPayment && amountPaid > 0) {
+            const paymentRequestOptions = {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                token: user.token,
+                user_id: user._id,
+                orderId: orderIdForPayment,
+                paymentMethod: 'Cash',
+                totalPayment: amountPaid,
+              })
+            };
+            CRUD(window.base_api + "edit_payment", paymentRequestOptions, () => {});
+          }
+        }
+
         getRecords(); // Refresh data rows immediately from database to ensure UI sync
         closeModal();
       } else {
@@ -1390,7 +1608,12 @@ const SiteInspection = () => {
               </thead>
               <tbody>
                 {filtered.map((item) => (
-                  <tr key={item.id} className="si-row">
+                  <tr
+                    key={item.id}
+                    className="si-row"
+                    data-order-row={item.id}
+                    style={item.id === highlightId ? { backgroundColor: '#fef9c3', transition: 'background-color 1s ease' } : undefined}
+                  >
                     <td className="si-td-num">{String(item.id).padStart(4, '0')}</td>
                     <td>
                       <div className="si-client-name">{item.clientName}</div>
@@ -1404,13 +1627,25 @@ const SiteInspection = () => {
                     <td className="si-td-price">{fmtCurrency(item.estimatedTotal)}</td>
                     <td>
                       <div className="si-action-group">
-                        <button className="si-act-btn si-act-view" title="View" onClick={() => setModal({ type: 'view', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["View Details"] !== 1}>👁</button>
+                        <button className="si-act-btn si-act-view" title="View" onClick={() => setModal({ type: 'view', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["View Details"] === 0}>👁</button>
                         {item.status !== 'Cancelled' && (
                           <>
-                            <button className="si-act-btn si-act-edit" title="Edit" onClick={() => setModal({ type: 'edit', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Edit"] !== 1}>✏️</button>
-                            <button className="si-act-btn si-act-edit" title="Manual Approve" onClick={() => setModal({ type: 'manual-approve', inspection: item })} hidden={item.customerHasAccount != false || permissions?.modules?.["Site Inspection"]?.["Edit"] !== 1}>✔️</button>
-                            <button className="si-act-btn si-act-cancel" title="Cancel" onClick={() => setModal({ type: 'cancel', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Cancel"] !== 1}>🗑</button>
-                            <button className="si-act-btn si-act-contract" title="Generate Contract" onClick={() => setModal({ type: 'contract', inspection: item })} hidden={(permissions?.modules?.["Site Inspection"]?.["Generate Contract"] !== 1 && !item.estimatedInstallationDate) || !item.estimatedInstallationDate}>📄</button>
+                            <button className="si-act-btn si-act-edit" title="Edit" onClick={() => setModal({ type: 'edit', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Edit"] === 0}>✏️</button>
+                            <button className="si-act-btn si-act-edit" title="Manual Approve" onClick={() => setModal({ type: 'manual-approve', inspection: item })} hidden={item.customerHasAccount != false || permissions?.modules?.["Site Inspection"]?.["Edit"] === 0}>✔️</button>
+                            <button className="si-act-btn si-act-cancel" title="Cancel" onClick={() => setModal({ type: 'cancel', inspection: item })} hidden={permissions?.modules?.["Site Inspection"]?.["Cancel"] === 0}>🗑</button>
+                            {(() => {
+                              const gaps = getContractRequirementGaps(item);
+                              const blocked = gaps.length > 0;
+                              return (
+                                <button
+                                  className="si-act-btn si-act-contract"
+                                  title={blocked ? `Complete before generating a contract: ${gaps.join(' · ')}` : 'Generate Contract'}
+                                  onClick={() => !blocked && setModal({ type: 'contract', inspection: item })}
+                                  disabled={blocked}
+                                  hidden={permissions?.modules?.["Site Inspection"]?.["Generate Contract"] === 0}
+                                >📄</button>
+                              );
+                            })()}
                           </>
                         )}
                       </div>

@@ -9,6 +9,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { get_data_helper, check_record_exists, decrypt, insert_one_helper, validateHash, hashPass, update_one_helper, delete_or_archive_many_helper, delete_or_archive_helper, checkAuth, actionLog } = require("../helper/Helper");
+const { pushNotification } = require("./notification");
 
 // Configure file upload storage options
 const storage = multer.diskStorage({
@@ -444,8 +445,21 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
                         contractLink: doc.contractLink || "#",
                         receiptLink: doc.receiptLink || "#",
                         is_cancelledAllowed: (doc.is_cancelledAllowed == 1 || doc.status === "Pending") ? 1 : 0,
+                        paymentProofLink: doc.paymentProofLink || null,
+                        paymentNotifiedByCustomer: !!doc.paymentNotifiedByCustomer,
+                        declaredPaymentAmount: parseFloat(doc.declaredPaymentAmount) || 0,
+                        lastDeclaredAmount: parseFloat(doc.lastDeclaredAmount) || 0,
+                        lastConfirmedIncrement: parseFloat(doc.lastConfirmedIncrement) || 0,
+                        lastPaymentMatchedDeclaration: typeof doc.lastPaymentMatchedDeclaration === 'boolean' ? doc.lastPaymentMatchedDeclaration : null,
+                        totalPayment: parseFloat(doc.totalPayment) || 0,
+                        paymentTerms: doc.paymentTerms || '',
+                        manualOverride: parseFloat(doc.manualOverride) || 0,
+                        installationCompleted: true,
                         items: []
                     };
+                }
+                if (doc.progressStatus !== "Completed") {
+                    groupedMap[groupKey].installationCompleted = false;
                 }
 
                 const rootQuantity = parseInt(doc.quantity) || 1;
@@ -516,6 +530,16 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
                     contractLink: order.contractLink,
                     receiptLink: order.receiptLink,
                     is_cancelledAllowed: order.is_cancelledAllowed,
+                    paymentProofLink: order.paymentProofLink,
+                    paymentNotifiedByCustomer: order.paymentNotifiedByCustomer,
+                    declaredPaymentAmount: order.declaredPaymentAmount,
+                    lastDeclaredAmount: order.lastDeclaredAmount,
+                    lastConfirmedIncrement: order.lastConfirmedIncrement,
+                    lastPaymentMatchedDeclaration: order.lastPaymentMatchedDeclaration,
+                    totalPayment: order.totalPayment,
+                    paymentTerms: order.paymentTerms,
+                    manualOverride: order.manualOverride,
+                    installationCompleted: order.installationCompleted,
                     items: order.items
                 };
             });
@@ -704,6 +728,7 @@ cartRoutes.post("/api/get_order_requests", async (req, res) => {
                     customerEmail: b.clientEmail || "",
                     customerHasAccount: b.customerHasAccount == true ? true : b.user_id ? true : false ,
                     manualOverride: parseFloat(b.manualOverride) || "",
+                    ...(b.warrantyDays !== undefined && b.warrantyDays !== null ? { warrantyDays: b.warrantyDays } : {}),
                 };
             });
 
@@ -727,7 +752,13 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
             const pipeline = [
                 {
                     $match: {
-                        contractApproved: { $exists: true, $ne: null }
+                        $or: [
+                            { contractApproved: { $exists: true, $ne: null } },
+                            { totalPayment: { $gt: 0 } },
+                            { downpaymentPaid: true },
+                            { contractSentToCustomer: true },
+                            { contractLink: { $exists: true, $nin: [null, "", "#"] } }
+                        ]
                     }
                 },
                 {
@@ -783,11 +814,19 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
                     customerEmail: b.clientEmail || "",
                     customerHasAccount: b.customerHasAccount == true ? true : b.user_id ? true : false ,
                     manualOverride: parseFloat(b.manualOverride) || "",
+                    ...(b.warrantyDays !== undefined && b.warrantyDays !== null ? { warrantyDays: b.warrantyDays } : {}),
                     paymentDate: b.paymentDate || "",
                     contractId: b.contractId,
                     totalPayment: b.totalPayment || 0,
                     transactionNumber: b.transactionNumber || "",
                     category: (() => {
+                        const grandTotalForCat = parseFloat(b.manualOverride) || parseFloat(b.estimatedTotal) || group.totalEstimatedCost || 0;
+                        const paidForCat = parseFloat(b.totalPayment) || 0;
+                        const isFullyPaidForCat = grandTotalForCat > 0 && paidForCat >= grandTotalForCat;
+                        if (isFullyPaidForCat) {
+                            return "Completed Project";
+                        }
+
                         // 1. Instantly check if there are any unfinished items across the order
                         const isAllCompleted = group.measurements.every(m => m.progressStatus === "Completed");
                         
@@ -795,26 +834,59 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
                             return "In Progress";
                         }
 
-                        // 2. Establish the exact timeline boundary for 90 days ago from right now
-                        const ninetyDaysAgo = new Date();
-                        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+                        const hasExplicitWarrantyDaysForCat = b.warrantyDays !== undefined && b.warrantyDays !== null && b.warrantyDays !== '';
+                        const warrantyDaysForCat = hasExplicitWarrantyDaysForCat ? Number(b.warrantyDays) : 90;
+                        const warrantyCutoffDate = new Date();
+                        warrantyCutoffDate.setDate(warrantyCutoffDate.getDate() - warrantyDaysForCat);
 
-                        // 3. Inspect if every single item has aged out past the 90-day threshold
-                        const isPastNinetyDaysAll = group.measurements.every(m => {
+                        const isPastWarrantyAll = group.measurements.every(m => {
                             // If a date string is somehow missing, keep it in "Warranty" for safety
                             if (!m.estimatedInstallationDate) return false; 
                             
                             const installationDate = new Date(m.estimatedInstallationDate);
-                            return installationDate < ninetyDaysAgo;
+                            return installationDate < warrantyCutoffDate;
                         });
 
                         // 4. Return categorical state classifications
-                        return isPastNinetyDaysAll ? "Completed Project" : "Warranty";
+                        return isPastWarrantyAll ? "Completed Project" : "Warranty";
                     })(),
                     paymentMethod: b.paymentMethod || 'Cash',
                     paymentStatus: b.paymentStatus || 'Pending',
                     contractLink: b.contractLink || "",
+                    paymentProofLink: b.paymentProofLink || null,
+                    paymentNotifiedByCustomer: !!b.paymentNotifiedByCustomer,
+                    declaredPaymentAmount: parseFloat(b.declaredPaymentAmount) || 0,
                 };
+            });
+
+            const feedbacksResult = await get_data_helper("feedbacks", [{ $sort: { createdAt: -1 } }]);
+            const allFeedbacks = feedbacksResult?.payload || feedbacksResult || [];
+
+            const matchedFeedbackOrderIds = new Set();
+            normalizedPayload.forEach(tx => {
+                const feedbacksForOrder = allFeedbacks.filter(f => String(f.orderId) === String(tx.id));
+                if (feedbacksForOrder.length > 0) {
+                    matchedFeedbackOrderIds.add(String(tx.id));
+                    const latest = feedbacksForOrder[0];
+                    tx.feedback = latest.comment || "";
+                    tx.rating = latest.rating || null;
+                    tx.feedbacks = feedbacksForOrder;
+                }
+            });
+            allFeedbacks.forEach(f => {
+                if (!f.orderId || matchedFeedbackOrderIds.has(String(f.orderId))) return;
+                normalizedPayload.push({
+                    id: f._id ? String(f._id) : (f.orderId || `FB-${Math.random().toString(36).substr(2, 5)}`),
+                    contractId: f.orderId || "Direct Feedback",
+                    clientName: f.userName || "Customer",
+                    customerEmail: "",
+                    category: f.productCategory || "Completed Project",
+                    dateCreated: f.createdAt ? new Date(f.createdAt).toISOString().split('T')[0] : "",
+                    feedback: f.comment || "",
+                    rating: f.rating || null,
+                    feedbacks: [f],
+                    measurements: []
+                });
             });
 
             return res.status(200).json({ remarks: "success", payload: normalizedPayload });
@@ -830,7 +902,8 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
     const { 
         token, _id, clientName, clientNumber, siteAddress, inspectionDate, 
         estimatedInstallationDate, status, notes, paymentTerms, downpaymentPaid, 
-        paymentDate, customerHasAccount, customerEmail, measurements, manualOverride, estimatedTotal 
+        paymentDate, customerHasAccount, customerEmail, measurements, manualOverride, estimatedTotal,
+        warrantyDays
     } = req.body;
 
     if (!token) return res.status(401).json({ remarks: "Unauthorized" });
@@ -854,6 +927,8 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
 
             const sharedOrderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             const isCancelledValue = status === "Canceled" || status === "Cancelled" ? 1 : 0;
+            const hasExplicitWarrantyDays = warrantyDays !== undefined && warrantyDays !== null && warrantyDays !== '';
+            const warrantyDaysValue = hasExplicitWarrantyDays ? Number(warrantyDays) : undefined;
 
             // Map each row in measurements safely
             const documentBatch = (measurements || []).map((row, index) => {
@@ -895,6 +970,7 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
                     downpaymentPaid: downpaymentPaid === true || downpaymentPaid === "true",
                     paymentDate: paymentDate || "",
                     customerHasAccount: !!matchedUserId,
+                    ...(warrantyDaysValue !== undefined ? { warrantyDays: warrantyDaysValue } : {}),
                     
                     // Integrity Fix: Only attach the total transaction financial figures to the FIRST item doc 
                     // to avoid multi-row duplicate compounding errors inside aggregation lookups
@@ -939,7 +1015,8 @@ cartRoutes.post("/api/update_order_request", async (req, res) => {
     const { 
         token, user_id, id, orderId, clientName, clientNumber, siteAddress, inspectionDate, 
         estimatedInstallationDate, status, notes, paymentTerms, downpaymentPaid, 
-        paymentDate, customerHasAccount, customerEmail, measurements, manualOverride, estimatedTotal 
+        paymentDate, customerHasAccount, customerEmail, measurements, manualOverride, estimatedTotal,
+        warrantyDays
     } = req.body;
 
     if (!token) return res.status(401).json({ remarks: "Unauthorized" });
@@ -961,6 +1038,9 @@ cartRoutes.post("/api/update_order_request", async (req, res) => {
             }
 
             const isCancelledValue = status === "Canceled" || status === "Cancelled" ? 1 : 0;
+
+            const hasExplicitWarrantyDays = warrantyDays !== undefined && warrantyDays !== null && warrantyDays !== '';
+            const warrantyDaysValue = hasExplicitWarrantyDays ? Number(warrantyDays) : undefined;
 
             // 1. Clear out the previous grouped documents under this orderId to prevent layout row fragmentation
             await db.collection("order_requests").deleteMany({ orderId: targetOrderId });
@@ -1002,6 +1082,7 @@ cartRoutes.post("/api/update_order_request", async (req, res) => {
                     downpaymentPaid: downpaymentPaid === true || downpaymentPaid === "true",
                     paymentDate: paymentDate || "",
                     customerHasAccount: !!matchedUserId,
+                    ...(warrantyDaysValue !== undefined ? { warrantyDays: warrantyDaysValue } : {}),
                     manualOverride: manualOverride !== undefined && manualOverride !== null ? parseFloat(manualOverride) : "",
                     estimatedTotal: parseFloat(estimatedTotal) || 0,
                     quantity: qtyVal,
@@ -1502,7 +1583,7 @@ cartRoutes.post("/api/update_order_request_progress", async (req, res) => {
 });
 
 cartRoutes.post("/api/edit_payment", async (req, res) => {
-    const { token, user_id, orderId, paymentMethod, totalPayment, transactionNumber } = req.body;
+    const { token, user_id, orderId, paymentMethod, totalPayment, transactionNumber, resolvesCustomerNotification, customerDeclaredAmount } = req.body;
 
     // 1. Initial input validation
     if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session token" });
@@ -1541,6 +1622,7 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
             // Extract threshold values safely from the cluster document
             const manualOverrideTarget = parseFloat(targetSample.manualOverride) || 0.0;
             const estimatedTotalTarget = parseFloat(targetSample.estimatedTotal) || 0.0;
+            const previousTotalPayment = parseFloat(targetSample.totalPayment) || 0.0;
 
 
             const targetRequiredAmount = manualOverrideTarget > 0 ? manualOverrideTarget : estimatedTotalTarget;
@@ -1558,6 +1640,9 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
 
             // Check your server console to verify both values are now clean numbers
             console.log(`Comparing numbers: ${roundedTotalPayment} >= ${roundedTargetAmount} -> result:`, roundedTotalPayment >= roundedTargetAmount);
+            const incrementalRecorded = Math.round((floatTotalPayment - previousTotalPayment) * 100) / 100;
+            const floatDeclaredAmount = parseFloat(customerDeclaredAmount) || 0;
+            const matchesDeclaration = floatDeclaredAmount > 0 && Math.abs(floatDeclaredAmount - incrementalRecorded) <= 1;
 
             // 6. Update EVERY document inside the cluster matching the targeted orderId group instantly
             const updateResult = await db.collection("order_requests").updateMany(
@@ -1569,10 +1654,31 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
                         transactionNumber: cleanTransactionNumber,
                         paymentStatus: calculatedPaymentStatus,
                         paymentUpdatedAt: new Date(),
-                        ...(status != "" ? { status: status } : {})
+                        ...(status != "" ? { status: status } : {}),
+                        ...(resolvesCustomerNotification ? {
+                            paymentNotifiedByCustomer: false,
+                            paymentConfirmedByAdmin: true,
+                            lastDeclaredAmount: floatDeclaredAmount,
+                            lastConfirmedIncrement: incrementalRecorded,
+                            lastPaymentMatchedDeclaration: matchesDeclaration
+                        } : {})
                     } 
                 }
             );
+
+            if (resolvesCustomerNotification && targetSample.user_id) {
+                await pushNotification({
+                    recipientRole: "customer",
+                    recipientId: targetSample.user_id,
+                    type: "payment_confirmed",
+                    title: matchesDeclaration ? "Payment Confirmed" : "Payment Reviewed",
+                    message: matchesDeclaration
+                        ? `Your payment of ₱${incrementalRecorded.toLocaleString('en-PH', { minimumFractionDigits: 2 })} for order ${orderId} has been confirmed.`
+                        : `Admin recorded ₱${incrementalRecorded.toLocaleString('en-PH', { minimumFractionDigits: 2 })} for order ${orderId}${floatDeclaredAmount > 0 ? ` (you reported ₱${floatDeclaredAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })})` : ''}. Please call us if this doesn't look right.`,
+                    link: "/orders",
+                    orderId: orderId
+                });
+            }
 
             // 7. Return execution response context profiles safely
             if (updateResult.matchedCount > 0) {
@@ -1600,6 +1706,101 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
     }
 });
 
+
+// ─── CUSTOMER: UPLOAD PROOF OF PAYMENT (used by the "I've Already Paid" action) ───
+cartRoutes.post("/api/upload_payment_proof", upload.single("proofFile"), async (req, res) => {
+    const { token, userId, orderId } = req.body;
+
+    if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session token" });
+    if (!orderId) return res.status(400).json({ remarks: "failed", message: "Missing orderId target reference identifier" });
+
+    try {
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
+            if (!req.file) return res.status(400).json({ remarks: "failed", message: "No proof of payment file was received." });
+
+            const db = dbo.getDb();
+            const savedRelativePath = `/uploads/${req.file.filename}`;
+
+            const updateResult = await db.collection("order_requests").updateMany(
+                { orderId: orderId },
+                { $set: { paymentProofLink: savedRelativePath, paymentProofUploadedAt: new Date() } }
+            );
+
+            if (updateResult.matchedCount > 0) {
+                await actionLog(userId, "Uploaded Proof of Payment", `Customer uploaded proof of payment for orderId: ${orderId}`);
+                return res.status(200).json({
+                    remarks: "success",
+                    message: "Proof of payment uploaded successfully.",
+                    payload: { paymentProofLink: savedRelativePath }
+                });
+            } else {
+                return res.status(404).json({ remarks: "failed", message: "No matching order records found with the provided orderId reference." });
+            }
+        });
+    } catch (err) {
+        console.error("Critical error inside /api/upload_payment_proof handler:", err);
+        return res.status(500).json({ remarks: "failed", error: err.message || err });
+    }
+});
+
+// ─── CUSTOMER: NOTIFY ADMIN THAT PAYMENT WAS SENT ─────────────────────────
+cartRoutes.post("/api/notify_payment_sent", async (req, res) => {
+    const { token, userId, orderId, declaredAmount } = req.body;
+
+    if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session token" });
+    if (!orderId) return res.status(400).json({ remarks: "failed", message: "Missing orderId target reference identifier" });
+
+    const floatDeclaredAmount = parseFloat(declaredAmount);
+    if (isNaN(floatDeclaredAmount) || floatDeclaredAmount <= 0) {
+        return res.status(400).json({ remarks: "failed", message: "Please provide a valid amount you paid." });
+    }
+
+    try {
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
+
+            const db = dbo.getDb();
+
+            const targetSample = await db.collection("order_requests").findOne({ orderId: orderId });
+            if (!targetSample) {
+                return res.status(404).json({ remarks: "failed", message: "No matching order records found with the provided orderId reference." });
+            }
+
+            const updateResult = await db.collection("order_requests").updateMany(
+                { orderId: orderId },
+                {
+                    $set: {
+                        paymentNotifiedByCustomer: true,
+                        paymentNotifiedAt: new Date(),
+                        declaredPaymentAmount: floatDeclaredAmount,
+                        paymentConfirmedByAdmin: false
+                    }
+                }
+            );
+
+            if (updateResult.matchedCount > 0) {
+                await actionLog(userId, "Notified Payment Sent", `Customer notified admin that payment was sent for orderId: ${orderId} (declared amount: ${floatDeclaredAmount})`);
+
+                await pushNotification({
+                    recipientRole: "admin",
+                    type: "payment_declared",
+                    title: "Customer Reported a Payment",
+                    message: `${targetSample.clientName || "A customer"} says they paid ₱${floatDeclaredAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} for order ${orderId}. Please confirm.`,
+                    link: "/admin/transactions",
+                    orderId: orderId
+                });
+
+                return res.status(200).json({ remarks: "success", message: "Admin notified successfully." });
+            } else {
+                return res.status(404).json({ remarks: "failed", message: "No matching order records found with the provided orderId reference." });
+            }
+        });
+    } catch (err) {
+        console.error("Critical error inside /api/notify_payment_sent handler:", err);
+        return res.status(500).json({ remarks: "failed", error: err.message || err });
+    }
+});
 
 cartRoutes.post('/api/dashboard_data', async (req, res) => {
     const { token, user_id } = req.body;
@@ -1754,11 +1955,19 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
                     customerEmail: b.clientEmail || "",
                     customerHasAccount: b.customerHasAccount == true ? true : b.user_id ? true : false ,
                     manualOverride: parseFloat(b.manualOverride) || "",
+                    ...(b.warrantyDays !== undefined && b.warrantyDays !== null ? { warrantyDays: b.warrantyDays } : {}),
                     paymentDate: b.paymentDate || "",
                     contractId: b.contractId,
                     totalPayment: b.totalPayment || 0,
                     transactionNumber: b.transactionNumber || "",
                     category: (() => {
+                        const grandTotalForCat = parseFloat(b.manualOverride) || parseFloat(b.estimatedTotal) || group.totalEstimatedCost || 0;
+                        const paidForCat = parseFloat(b.totalPayment) || 0;
+                        const isFullyPaidForCat = grandTotalForCat > 0 && paidForCat >= grandTotalForCat;
+                        if (isFullyPaidForCat) {
+                            return "Completed Project";
+                        }
+
                         // 1. Instantly check if there are any unfinished items across the order
                         const isAllCompleted = group.measurements.every(m => m.progressStatus === "Completed");
                         
@@ -1766,25 +1975,29 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
                             return "In Progress";
                         }
 
-                        // 2. Establish the exact timeline boundary for 90 days ago from right now
-                        const ninetyDaysAgo = new Date();
-                        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+                        // 2. Establish the timeline boundary 
+                        const hasExplicitWarrantyDaysForCat = b.warrantyDays !== undefined && b.warrantyDays !== null && b.warrantyDays !== '';
+                        const warrantyDaysForCat = hasExplicitWarrantyDaysForCat ? Number(b.warrantyDays) : 90;
+                        const warrantyCutoffDate = new Date();
+                        warrantyCutoffDate.setDate(warrantyCutoffDate.getDate() - warrantyDaysForCat);
 
-                        // 3. Inspect if every single item has aged out past the 90-day threshold
-                        const isPastNinetyDaysAll = group.measurements.every(m => {
+                        // 3. Inspect if every single item has aged out past this order's warranty window
+                        const isPastWarrantyAll = group.measurements.every(m => {
                             // If a date string is somehow missing, keep it in "Warranty" for safety
                             if (!m.estimatedInstallationDate) return false; 
                             
                             const installationDate = new Date(m.estimatedInstallationDate);
-                            return installationDate < ninetyDaysAgo;
+                            return installationDate < warrantyCutoffDate;
                         });
 
                         // 4. Return categorical state classifications
-                        return isPastNinetyDaysAll ? "Completed Project" : "Warranty";
+                        return isPastWarrantyAll ? "Completed Project" : "Warranty";
                     })(),
                     paymentMethod: b.paymentMethod || 'Cash',
                     paymentStatus: b.paymentStatus || 'Pending',
                     contractLink: b.contractLink || "",
+                    paymentProofLink: b.paymentProofLink || null,
+                    paymentNotifiedByCustomer: !!b.paymentNotifiedByCustomer,
                 };
             });
             warrantyNormalized = warrantyNormalized.filter(d => d.category === "Warranty");

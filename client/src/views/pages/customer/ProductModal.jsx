@@ -209,7 +209,7 @@ const PrivateFeedbackForm = ({ product, user }) => {
 };
 
 /* ─── Product Modal ──────────────────────────────────────────────────────── */
-const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, permissions }) => {
+const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, permissions, canEstimatePricing, initialMeasurements }) => {
   const navigate = useNavigate();
   const [imgIndex, setImgIndex] = useState(0);
   const [measurements, setMeasurements] = useState({ width: '', height: '', unit: 'ft' });
@@ -224,12 +224,19 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
   useEffect(() => {
     if (initialIntent === 'order') {
       setMeasurements({
-        width: product.width,
-        height: product.height,
-        unit: product.unit
+        width: initialMeasurements?.width ?? product.width,
+        height: initialMeasurements?.height ?? product.height,
+        unit: initialMeasurements?.unit ?? product.unit
       })
     }
   },[initialIntent])
+
+  const canRequestOrders = !(user && user.token) || permissions?.modules?.["Client"]?.["Request Orders"] === 1;
+  useEffect(() => {
+    if (view === 'order' && !canRequestOrders) {
+      setView('detail');
+    }
+  }, [view, canRequestOrders]);
 
   const clientPerms = permissions?.modules?.["Client"];
   const isFeedbackAllowed = clientPerms 
@@ -298,7 +305,7 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
     onAddToCart(product, hasMeasurements ? measurements : null);
   };
 
-  if (view === 'order') {
+  if (view === 'order' && canRequestOrders) {
     return (
       <OrderRequestForm
         product={product}
@@ -383,7 +390,7 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
             <hr className="bp-detail-divider" />
 
             {/* Price Estimator */}
-            {permissions?.modules?.[ "Client" ]?.["Estimate Pricing"] == 1 && (
+            {canEstimatePricing && (
               <PriceEstimator
                 product={product}
                 measurements={measurements}
@@ -401,7 +408,10 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
                       setView('order');
                     }
                   } else {
-                    navigate('/login');
+                    // Guest: remember which product (and what they'd already
+                    // typed into the estimator) so Login can send them straight
+                    // back here, measurements intact, after they sign in.
+                    navigate('/login', { state: { redirectToProduct: product.id, measurements } });
                   }
                 }}
                 hidden={user && user.token && permissions?.modules?.["Client"]?.["Request Orders"] !== 1}
@@ -409,21 +419,15 @@ const ProductModal = ({ product, initialIntent, onClose, onAddToCart, user, perm
                 <Zap size={16} /> Place Order Request
               </button>
               
-              <button 
-                className="bp-cta-cart" 
-                onClick={() => {
-                  if (user && user.token) {
-                    if (permissions?.modules?.["Client"]?.["Request Orders"] === 1) {
-                      handleAddToCart();
-                    }
-                  } else {
-                    navigate('/login');
-                  }
-                }}
-                hidden={user && user.token && permissions?.modules?.["Client"]?.["Request Orders"] !== 1}
-              >
-                <ShoppingCart size={16} /> Add to Cart
-              </button>
+              {user && user.token && (
+                <button
+                  className="bp-cta-cart"
+                  onClick={handleAddToCart}
+                  hidden={permissions?.modules?.["Client"]?.["Request Orders"] !== 1}
+                >
+                  <ShoppingCart size={16} /> Add to Cart
+                </button>
+              )}
             </div>
 
             {/* Inquiry */}

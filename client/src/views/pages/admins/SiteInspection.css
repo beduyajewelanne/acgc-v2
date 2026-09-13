@@ -303,6 +303,8 @@
   transition: var(--transition);
 }
 .si-act-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.si-act-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+.si-act-btn:disabled:hover { transform: none; box-shadow: none; }
 .si-act-view:hover    { border-color: #7a1420; background: #fbebec; }
 .si-act-edit:hover    { border-color: #f59e0b; background: #fffbeb; }
 .si-act-cancel:hover  { border-color: var(--danger); background: var(--danger-lt); }
@@ -415,6 +417,8 @@
   white-space: nowrap;
 }
 .si-gen-contract-btn:hover { background: #ede9fe; border-color: #7c3aed; }
+.si-gen-contract-btn:disabled { opacity: .5; cursor: not-allowed; background: #f5f3ff; border-color: #c4b5fd; }
+.si-gen-contract-btn:disabled:hover { background: #f5f3ff; border-color: #c4b5fd; }
 
 /* ─── Modal Body ────────────────────────────────────────────────────────────── */
 .si-modal-body {
@@ -940,6 +944,8 @@
 .si-toggle-btn--active { background: var(--accent); color: #fff; }
 .si-toggle-btn--no.si-toggle-btn--active { background: var(--amber); color: #fff; }
 .si-toggle-btn:not(.si-toggle-btn--active):hover { background: #f3f4f6; }
+.si-toggle-btn:disabled { opacity: .5; cursor: not-allowed; }
+.si-toggle-btn:disabled:hover { background: transparent; }
 
 /* ─── Buttons ───────────────────────────────────────────────────────────────── */
 .si-btn-primary {

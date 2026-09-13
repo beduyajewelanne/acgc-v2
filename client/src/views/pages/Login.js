@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { CRUD, encrypt } from "services/data.services";
 import { UserContext } from "App";
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectState = location.state;
   const [form, setForm] = useState({ emailOrUsername: "", password: "", remember: false });
   const [message, setMessage] = useState(null); // { type: "error"|"warning"|"success", text }
   const [showPassword, setShowPassword] = useState(false);
@@ -99,6 +101,25 @@ export default function Login() {
           await setUser(data);
           if (role === "admin" || role === "staff") {
             navigate("/admin");
+          } else if (redirectState?.redirectToProduct) {
+            // Guest tried to place an order before logging in — send them
+            // straight back to that product, ready to order.
+            navigate("/customer/products", {
+              state: {
+                openProductId: redirectState.redirectToProduct,
+                intent: "order",
+                measurements: redirectState.measurements
+              }
+            });
+          } else if (redirectState?.redirectToCartProduct) {
+            // Guest tried to add a product to cart before logging in — add
+            // it now and drop them straight into the cart.
+            navigate("/customer/products", {
+              state: {
+                autoAddToCartId: redirectState.redirectToCartProduct,
+                measurements: redirectState.measurements
+              }
+            });
           } else {
             navigate("/");
           }
@@ -944,7 +965,7 @@ export default function Login() {
                 <div className="form-links">
                   <Link to="/forgot-password">Forgot Password?</Link>
                   <span className="divider">|</span>
-                  <Link to="/signup">Sign Up</Link>
+                  <Link to="/signup" state={redirectState}>Sign Up</Link>
                 </div>
               </form>
             </div>

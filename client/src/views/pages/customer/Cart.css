@@ -30,12 +30,30 @@
 }
 
 .cart-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 2rem;
   font-weight: 700;
   color: var(--text-dark);
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 2px solid var(--light-gray);
+}
+
+.cart-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--primary-red);
+  color: var(--white);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* ── Layout: items + summary ── */

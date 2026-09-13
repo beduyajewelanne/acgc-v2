@@ -18,7 +18,7 @@ const toFeet = (value, unit) => {
 };
 
 /* ─── Order Summary Modal ────────────────────────────────────────────────── */
-const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
+const OrderSummaryModal = ({ order, onCancel, onProceed, isSubmitting }) => {
   const { product, measurements, customer } = order;
   console.log(measurements)
   const hasMeas = measurements && parseFloat(measurements.width) > 0 && parseFloat(measurements.height) > 0;
@@ -110,9 +110,9 @@ const OrderSummaryModal = ({ order, onCancel, onProceed }) => {
         </div>
 
         <div className="bp-summary-actions">
-          <button className="bp-sum-cancel" onClick={onCancel}>Cancel</button>
-          <button className="bp-sum-proceed" onClick={onProceed}>
-            <Zap size={15} /> Proceed
+          <button className="bp-sum-cancel" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
+          <button className="bp-sum-proceed" onClick={onProceed} disabled={isSubmitting}>
+            <Zap size={15} /> {isSubmitting ? 'Submitting…' : 'Proceed'}
           </button>
         </div>
       </div>
@@ -167,6 +167,7 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
   const [showSummary, setShowSummary] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (user && user.token) {
@@ -204,6 +205,9 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
   };
 
   const handleProceed = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const token = user?.token;
     const userId = user?._id;
     const payload = {
@@ -229,6 +233,7 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       }, (res) => {
+        setIsSubmitting(false);
         if (res && res.remarks === "success") {
           console.log("Order Request successfully processed:", res);
           setShowSummary(false);
@@ -240,6 +245,7 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
     } catch (error) {
       console.error("Failed to submit order request:", error);
       alert("A network or configuration error occurred. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
@@ -418,6 +424,7 @@ const OrderRequestForm = ({ product, measurements, onBack, onClose }) => {
             order={{ product, measurements, customer }}
             onCancel={() => setShowSummary(false)}
             onProceed={handleProceed}
+            isSubmitting={isSubmitting}
           />
         )}
       </div>

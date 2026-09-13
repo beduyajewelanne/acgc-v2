@@ -1,20 +1,17 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useLocation } from 'react-router-dom';
 import { CRUD } from 'services/data.services';
 import { UserContext } from 'App';
 import './MyOrders.css';
 
-// Absolute clean local financial numbers presentation formatter
 const fmtCurrency = (num) => '₱ ' + (Number(num) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Systematic dimension normalization to Feet (sq.ft tracking math helper)
 const calcProductLineTotal = (prod) => {
   const w = parseFloat(prod.width) || 0;
   const h = parseFloat(prod.height) || 0;
-  // FIX: Explicitly targeting 'ratePerSqFt' from your exact database payload structure
   const rate = parseFloat(prod.ratePerSqFt) || parseFloat(prod.pricePerSqFt) || parseFloat(prod.rate) || 0;
   const qty = parseInt(prod.quantity) || parseInt(prod.qty) || 1;
 
-  // If dimensions or rate are completely missing, only then fallback safely to lineTotal
   if (w === 0 || h === 0 || rate === 0) return parseFloat(prod.lineTotal) || 0;
 
   const unitStr = String(prod.unit || 'in').toLowerCase().trim();
@@ -22,7 +19,6 @@ const calcProductLineTotal = (prod) => {
   let widthInFeet = w;
   let heightInFeet = h;
 
-  // Convert given values to feet based on dynamic unit strings
   if (unitStr === 'in' || unitStr === 'inch' || unitStr === 'inches') {
     widthInFeet = w / 12;
     heightInFeet = h / 12;
@@ -38,23 +34,23 @@ const calcProductLineTotal = (prod) => {
   return sqFt * rate * qty;
 };
 
-/* Order Feedback Modal */
 const OrderFeedbackModal = ({ order, user, onClose, onSuccess }) => {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!comment.trim()) {
-      alert("Please provide a reason or comment for your feedback.");
+      setError("Please provide a reason or comment for your feedback.");
       return;
     }
 
+    setError('');
     setSubmitting(true);
     
     const apiUri = (window.base_api || "http://localhost:5000/api/") + "submit_feedback";
-
     const firstItem = (order.items && order.items[0]) ? order.items[0] : {};
     
     const payload = {
@@ -80,24 +76,23 @@ const OrderFeedbackModal = ({ order, user, onClose, onSuccess }) => {
       (res) => {
         setSubmitting(false);
         if (res && res.remarks === 'success') {
-          alert("Thank you! Your feedback has been submitted.");
           order.feedback = comment;
           order.rating = rating;
           order.isFeedbackSubmitted = true;
-          onSuccess(order.orderId || order.id, rating, comment); // Instant swap sa badge + re-fetches orders from API
+          onSuccess(order.orderId || order.id, rating, comment);
           onClose();
-        } else {
-          const alreadySubmitted = /already submitted/i.test(res?.message || '');
-          if (alreadySubmitted) {
-            // Meron na palang feedback dati para dito sa order na 'to sa
-            // backend - i-sync na lang yung button papuntang badge instead
-            // na iwan siyang stuck.
-            order.isFeedbackSubmitted = true;
-            onSuccess(order.orderId || order.id, order.rating || rating, order.feedback || comment);
-            onClose();
-          }
-          alert(res?.message || "Failed to submit feedback. Please try again.");
+          return;
         }
+
+        const alreadySubmitted = /already submitted/i.test(res?.message || '');
+        if (alreadySubmitted) {
+          order.isFeedbackSubmitted = true;
+          onSuccess(order.orderId || order.id, order.rating || rating, order.feedback || comment);
+          onClose();
+          return;
+        }
+
+        setError(res?.message || "Failed to submit feedback. Please try again.");
       }
     );
   };
@@ -136,6 +131,7 @@ const OrderFeedbackModal = ({ order, user, onClose, onSuccess }) => {
               required
               style={{ width: '100%', padding: '8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
             />
+            {error && <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '6px' }}>{error}</p>}
           </div>
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -160,8 +156,201 @@ const OrderFeedbackModal = ({ order, user, onClose, onSuccess }) => {
   );
 };
 
-/* ─── Main Component ─────────────────────────────────────────────────────── */
+const parseJsonSafe = (res) => {
+  return res.text().then((text) => {
+    let data = null;
+    if (text) {
+      try { data = JSON.parse(text); } catch { data = null; }
+    }
+    if (data) return data;
+    return res.ok
+      ? { remarks: 'success' }
+      : { remarks: 'error', message: `Server error (${res.status}). Please try again.` };
+  });
+};
+
+const PaymentProofSection = ({ order, user, onUpdate, isFullyPaid, balanceRemaining }) => {
+  const [file, setFile] = useState(null);
+  const [declaredAmount, setDeclaredAmount] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0] || null);
+    setError('');
+  };
+
+  const uploadProofIfSelected = (cleanBase) => {
+    if (!file) return Promise.resolve(null);
+
+    const formData = new FormData();
+    formData.append('proofFile', file);
+    formData.append('token', user.token);
+    formData.append('userId', user._id);
+    formData.append('orderId', order.orderId || order.id);
+
+    return fetch(`${cleanBase}/upload_payment_proof`, { method: 'POST', body: formData })
+      .then(parseJsonSafe)
+      .then((res) => {
+        if (res && res.remarks === 'success') {
+          return res.payload?.paymentProofLink || res.paymentProofLink || null;
+        }
+        throw new Error(res?.message || 'Failed to upload proof of payment.');
+      });
+  };
+  const notifyPaid = (cleanBase, amountNum) => {
+    const payload = {
+      token: user.token,
+      userId: user._id,
+      orderId: order.orderId || order.id,
+      declaredAmount: amountNum
+    };
+
+    return fetch(`${cleanBase}/notify_payment_sent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(parseJsonSafe)
+      .then((res) => {
+        if (res && res.remarks === 'success') return true;
+        throw new Error(res?.message || 'Failed to notify admin. Please try again.');
+      });
+  };
+
+  const resetForm = () => {
+    setFile(null);
+    setDeclaredAmount('');
+    setError('');
+    setFormOpen(false);
+  };
+
+  const handleSubmitPaid = () => {
+    const amountNum = parseFloat(declaredAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setError('Please enter how much you paid so admin can confirm it.');
+      return;
+    }
+    if (balanceRemaining > 0 && amountNum > balanceRemaining + 1) {
+      setError(`That's more than your remaining balance of ${fmtCurrency(balanceRemaining)}. Please double-check the amount.`);
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+
+    const cleanBase = (window.base_api || "http://localhost:5000/api/").replace(/\/$/, '');
+
+    uploadProofIfSelected(cleanBase)
+      .then((proofLink) => notifyPaid(cleanBase, amountNum).then(() => proofLink))
+      .then((proofLink) => {
+        setSubmitting(false);
+        const patch = { paymentNotifiedByCustomer: true, declaredPaymentAmount: amountNum };
+        if (proofLink) patch.paymentProofLink = proofLink;
+        onUpdate(order.orderId || order.id, patch);
+        resetForm();
+      })
+      .catch((err) => {
+        setSubmitting(false);
+        setError(err.message || 'Something went wrong. Please try again.');
+      });
+  };
+
+  const isPendingConfirmation = !!order.paymentNotifiedByCustomer;
+  const canDeclarePayment = !isFullyPaid && !isPendingConfirmation;
+  const hasMismatch = order.lastPaymentMatchedDeclaration === false;
+
+  return (
+    <div className="upload-section" style={{ marginTop: '20px', borderTop: '1px dashed #ddd', paddingTop: '15px' }}>
+      <label style={{ fontSize: '12px', fontWeight: '600', color: '#666', display: 'block', marginBottom: '8px' }}>Proof of Payment</label>
+
+      {order.paymentProofLink && (
+        <p style={{ fontSize: '13px', marginBottom: '12px' }}>
+          <a href={window.base_api.replace('/api/', '') + order.paymentProofLink} target="_blank" rel="noreferrer" style={{ color: '#1d4ed8', fontWeight: '600' }}>
+            📎 View your last uploaded proof
+          </a>
+        </p>
+      )}
+
+      {isFullyPaid ? (
+        <div className="payment-status-banner confirmed">✓ Fully paid and confirmed. Thank you!</div>
+      ) : isPendingConfirmation ? (
+        <div className="payment-status-banner pending">
+          ⏳ We've notified admin that you paid <strong>{fmtCurrency(order.declaredPaymentAmount)}</strong>. This is pending confirmation — we'll notify you here once it's verified.
+        </div>
+      ) : !formOpen ? (
+        <button
+          className="link-btn"
+          onClick={() => setFormOpen(true)}
+          style={{ padding: '9px 18px', fontSize: '13px', backgroundColor: '#28a745', color: '#fff', border: 'none', cursor: 'pointer' }}
+        >
+          I've Already Paid
+        </button>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: '600', color: '#666', display: 'block', marginBottom: '6px' }}>
+              How much did you pay? <span style={{ fontWeight: 400, color: '#94a3b8' }}>(required)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 5000.00"
+              value={declaredAmount}
+              onChange={(e) => { setDeclaredAmount(e.target.value); setError(''); }}
+              disabled={submitting}
+              className="declared-amount-input"
+              autoFocus
+            />
+            <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+              Admin will confirm this amount on their end once received.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label className="file-choose-btn">
+              Choose File <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '11px' }}>(optional)</span>
+              <input type="file" className="file-input-hidden" accept="image/*,.pdf" onChange={handleFileChange} disabled={submitting} />
+            </label>
+            {file && <span className="file-chosen-name">{file.name}</span>}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              className="link-btn"
+              onClick={handleSubmitPaid}
+              disabled={submitting}
+              style={{ padding: '9px 18px', fontSize: '13px', backgroundColor: '#28a745', color: '#fff', border: 'none', cursor: submitting ? 'default' : 'pointer' }}
+            >
+              {submitting ? 'Submitting...' : 'Submit Payment Info'}
+            </button>
+            <button
+              className="link-btn"
+              onClick={resetForm}
+              disabled={submitting}
+              style={{ padding: '9px 18px', fontSize: '13px', backgroundColor: '#e2e8f0', color: '#475569', border: 'none', cursor: submitting ? 'default' : 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {hasMismatch && (
+        <div className="payment-status-banner mismatch">
+          ⚠️ You declared {fmtCurrency(order.lastDeclaredAmount)}, but admin recorded {fmtCurrency(order.lastConfirmedIncrement)} for that payment. If this looks wrong, please call us at <strong>+63 912 345 6789</strong> to sort it out.
+        </div>
+      )}
+
+      {error && <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '8px' }}>{error}</p>}
+    </div>
+  );
+};
+
 const MyOrders = () => {
+  const location = useLocation();
   const { user, permissions } = useContext(UserContext);
   const isFeedbackAllowed = 
   permissions?.modules?.["Client"]?.["Can upload feedback"] === 1 ||
@@ -170,7 +359,29 @@ const MyOrders = () => {
   const [orders, setOrders] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [feedbackModalOrder, setFeedbackModalOrder] = useState(null);
+  const [highlightId, setHighlightId] = useState(null);
   const feedbackCacheKey = `submittedFeedback_${user?._id || 'guest'}`;
+
+  useEffect(() => {
+    if (location.state?.highlightOrderId) {
+      const id = location.state.highlightOrderId;
+      setExpandedId(id);
+      setHighlightId(id);
+
+      const scrollTimer = setTimeout(() => {
+        document
+          .querySelector(`[data-order-row="${id}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+      const clearTimer = setTimeout(() => setHighlightId(null), 4000);
+
+      return () => {
+        clearTimeout(scrollTimer);
+        clearTimeout(clearTimer);
+      };
+    }
+  }, [location.state]);
+
   const getFeedbackCache = () => {
     try {
       return JSON.parse(localStorage.getItem(feedbackCacheKey)) || {};
@@ -178,6 +389,7 @@ const MyOrders = () => {
       return {};
     }
   };
+
   const saveFeedbackToCache = (orderId, rating, comment) => {
     const cache = getFeedbackCache();
     cache[orderId] = { rating, comment };
@@ -227,6 +439,12 @@ const MyOrders = () => {
       (o.orderId === orderId || o.id === orderId)
         ? { ...o, feedback: comment, rating: rating, isFeedbackSubmitted: true }
         : o
+    ));
+  };
+
+  const handleOrderPatch = (orderId, patch) => {
+    setOrders(prev => prev.map(o =>
+      (o.orderId === orderId || o.id === orderId) ? { ...o, ...patch } : o
     ));
   };
 
@@ -285,14 +503,19 @@ const MyOrders = () => {
         ) : (
           orders.map((order) => {
             const orderIdKey = order.orderId;
-            
-            // Extracts explicit values directly from your payload object structures 
-            const totalOrderCost = parseFloat(order.estimatedTotal) || 0;
-            const downpaymentPaid = parseFloat(order.downpaymentPaid) || 0;
-            const requiredDP = parseFloat(order.requiredDownpayment) || (totalOrderCost * 0.5);
+            const totalOrderCost = (parseFloat(order.manualOverride) > 0 ? parseFloat(order.manualOverride) : parseFloat(order.estimatedTotal)) || 0;
+            const amountPaid = parseFloat(order.totalPayment) || 0;
+            const isFullPaymentTerm = String(order.paymentTerms || '').trim() === 'Full payment';
+            const balanceRemaining = Math.max(totalOrderCost - amountPaid, 0);
+            const isFullyPaid = totalOrderCost > 0 && amountPaid >= totalOrderCost;
 
             return (
-              <div className={`order-card ${expandedId === orderIdKey ? 'expanded' : ''}`} key={orderIdKey}>
+              <div
+                className={`order-card ${expandedId === orderIdKey ? 'expanded' : ''}`}
+                key={orderIdKey}
+                data-order-row={orderIdKey}
+                style={orderIdKey === highlightId ? { backgroundColor: '#fef9c3', transition: 'background-color 1s ease' } : undefined}
+              >
                 <div className="order-header" onClick={() => toggleExpand(orderIdKey)} style={{ cursor: 'pointer' }}>
                   <div>
                     <h3>{order.name}</h3>
@@ -309,7 +532,6 @@ const MyOrders = () => {
                       <p style={{ fontWeight: '600', margin: '0 0 10px 0', fontSize: '14px', color: '#444' }}>Products inside this Tracked Request:</p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {(order.items || []).map((prod, pIdx) => {
-                          // Recalculates dynamically over the raw parameters
                           const calculatedLinePrice = calcProductLineTotal(prod);
 
                           return (
@@ -339,12 +561,16 @@ const MyOrders = () => {
                         </p>
                       </div>
                       <div>
-                        <label>DOWNPAYMENT PAID:</label>
-                        <p style={{ fontWeight: '500', margin: '4px 0 0 0' }}>{fmtCurrency(downpaymentPaid)}</p>
+                        <label>{isFullPaymentTerm ? 'AMOUNT PAID (FULL PAYMENT):' : 'DOWNPAYMENT PAID:'}</label>
+                        <p style={{ fontWeight: '500', margin: '4px 0 0 0' }}>{fmtCurrency(amountPaid)}</p>
                       </div>
                       <div>
-                        <label>REQUIRED DP (50%):</label>
-                        <p style={{ fontWeight: '500', margin: '4px 0 0 0' }}>{fmtCurrency(requiredDP)}</p>
+                        <label>BALANCE:</label>
+                        {isFullyPaid ? (
+                          <p style={{ fontWeight: '600', margin: '4px 0 0 0', color: '#16a34a' }}>✅ Fully Paid</p>
+                        ) : (
+                          <p style={{ fontWeight: '500', margin: '4px 0 0 0' }}>{fmtCurrency(balanceRemaining)}</p>
+                        )}
                       </div>
                       <div>
                         <label>SITE INSPECTION:</label>
@@ -360,33 +586,30 @@ const MyOrders = () => {
                       {order.contractLink && order.contractLink !== '#' && <a href={window.base_api.replace('/api/', '') + order.contractLink} className="link-btn" target="_blank" rel="noreferrer">View Contract</a>}
                       {order.receiptLink && order.receiptLink !== '#' && <a href={order.receiptLink} className="link-btn" target="_blank" rel="noreferrer">View Receipt</a>}
                     
-                      {/* Leave or View Feedback Section */}
-                      {(order.status === "Completed" || order.status === "Completed Project" || order.status === "Paid") && (
+                      {(order.feedback || order.rating || order.isFeedbackSubmitted) ? (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          backgroundColor: '#f0fdf4',
+                          color: '#16a34a',
+                          border: '1px solid #bbf7d0',
+                          padding: '8px 14px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          fontWeight: '600'
+                        }}>
+                          <span>✓ Feedback Submitted</span>
+                          <span style={{ color: '#f59e0b', fontSize: '12px' }}>
+                            ({'★'.repeat(order.rating || 5)})
+                          </span>
+                        </div>
+                      ) : order.installationCompleted ? (
                         !isFeedbackAllowed ? (
                           <div style={{ marginTop: '10px', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
                             Feedback submission is currently unavailable.
                           </div>
-                        ) : (order.feedback || order.rating || order.isFeedbackSubmitted) ? (
-                        
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            backgroundColor: '#f0fdf4',
-                            color: '#16a34a',
-                            border: '1px solid #bbf7d0',
-                            padding: '8px 14px',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            fontWeight: '600'
-                          }}>
-                            <span>✓ Feedback Submitted</span>
-                            <span style={{ color: '#f59e0b', fontSize: '12px' }}>
-                              ({'★'.repeat(order.rating || 5)})
-                            </span>
-                          </div>
                         ) : (
-                        
                           <button
                             onClick={() => setFeedbackModalOrder(order)}
                             className="link-btn"
@@ -394,6 +617,12 @@ const MyOrders = () => {
                           >
                             ★ Leave Feedback / Review
                           </button>
+                        )
+                      ) : (
+                        (order.status === "Completed" || order.status === "Completed Project" || order.status === "Paid") && (
+                          <div style={{ marginTop: '10px', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                            Feedback will be available once installation is completed.
+                          </div>
                         )
                       )}
 
@@ -409,10 +638,7 @@ const MyOrders = () => {
                       )}
                     </div>
 
-                    <div className="upload-section" style={{ marginTop: '20px', borderTop: '1px dashed #ddd', paddingTop: '15px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: '600', color: '#666', display: 'block', marginBottom: '5px' }}>Upload Proof of Payment (Optional):</label>
-                      <input type="file" className="file-input" multiple />
-                    </div>
+                    <PaymentProofSection order={order} user={user} onUpdate={handleOrderPatch} isFullyPaid={isFullyPaid} balanceRemaining={balanceRemaining} />
                   </div>
                 )}
               </div>

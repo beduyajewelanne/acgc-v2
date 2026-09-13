@@ -17,21 +17,83 @@ const calcWarrantyDays = (endDate) => {
   return diff;
 };
 
+const getWarrantyEndDate = (t) => {
+  const start = t.warrantyStart || t.estimatedInstallationDate;
+  if (!start) return null;
+  
+  const hasExplicitWarrantyDays = t.warrantyDays !== undefined && t.warrantyDays !== null && t.warrantyDays !== '';
+  const days = hasExplicitWarrantyDays ? Number(t.warrantyDays) : 90;
+  
+  const end = new Date(start);
+  end.setDate(end.getDate() + days);
+  return end;
+};
+
+const isWarrantyExpired = (t) => {
+  const end = getWarrantyEndDate(t);
+  if (!end) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return end < today;
+};
+
 // --- Aligned to check your actual live database pricing properties ---
 const deriveStatus = (paid, total) => (Number(paid || 0) >= Number(total || 0) ? 'Paid' : 'Pending');
 
 const INITIAL_TRANSACTIONS = [];
+
+// ─── Sort Comparator ────────────────────────────────────────────────────────
+const compareTransactions = (a, b, field) => {
+  switch (field) {
+    case 'date':
+      return new Date(a.dateCreated || 0) - new Date(b.dateCreated || 0);
+    case 'clientName':
+      return (a.clientName || '').localeCompare(b.clientName || '');
+    case 'unpaid': {
+      const balA = Number(a.manualOverride || a.estimatedTotal || 0) - Number(a.totalPayment || 0);
+      const balB = Number(b.manualOverride || b.estimatedTotal || 0) - Number(b.totalPayment || 0);
+      return balA - balB;
+    }
+    case 'paid':
+      return Number(a.totalPayment || 0) - Number(b.totalPayment || 0);
+    case 'method':
+      return (a.paymentMethod || '').localeCompare(b.paymentMethod || '');
+    case 'customerType': {
+      const typeA = a.customerHasAccount ? 'Website Order' : 'Walk-in';
+      const typeB = b.customerHasAccount ? 'Website Order' : 'Walk-in';
+      return typeA.localeCompare(typeB);
+    }
+    case 'installDate':
+      return new Date(a.estimatedInstallationDate || 0) - new Date(b.estimatedInstallationDate || 0);
+    default:
+      return 0;
+  }
+};
+
+// ─── Sort Direction Labels ──────────────────────────────────────────────────
+const SORT_DIRECTION_LABELS = {
+  date: { asc: 'Oldest First', desc: 'Newest First' },
+  clientName: { asc: 'A to Z', desc: 'Z to A' },
+  unpaid: { asc: 'Lowest Balance First', desc: 'Highest Balance First' },
+  paid: { asc: 'Lowest Paid First', desc: 'Highest Paid First' },
+  method: { asc: 'Cash First', desc: 'Online First' },
+  customerType: { asc: 'Walk-in First', desc: 'Website Order First' },
+  installDate: { asc: 'Soonest First', desc: 'Latest First' },
+  paymentStatus: { asc: 'Fully Paid Only', desc: 'With Balance Only' },
+};
 
 // ─── Contract HTML Generator ──────────────────────────────────────────────────
 const generateContractHTML = (tx, accepted = false) => {
   const totalVal = Number(tx.manualOverride || tx.estimatedTotal || 0);
   const paidVal = Number(tx.totalPayment || 0);
   const status = deriveStatus(paidVal, totalVal);
-  const isFullyPaid = status === 'Fully Paid';
+  const isFullyPaid = status === 'Paid';
   const remaining = totalVal - paidVal;
   const downpayment = paidVal > 0 ? paidVal : totalVal * 0.5;
   const balance = totalVal - downpayment;
   const acceptedDate = fmtDate(tx.dateCreated);
+  const hasExplicitContractWarrantyDays = tx.warrantyDays !== undefined && tx.warrantyDays !== null && tx.warrantyDays !== '';
+  const contractWarrantyDays = hasExplicitContractWarrantyDays ? Number(tx.warrantyDays) : 90;
 
   // Derive products list
   const productText = tx.measurements && tx.measurements.length > 0 
@@ -226,8 +288,8 @@ const generateContractHTML = (tx, accepted = false) => {
       <div class="warranty-box">
         <div class="warranty-icon">&#128737;</div>
         <div>
-          <div class="warranty-title">90-Day Warranty</div>
-          <p class="warranty-body">ACGC Glass &amp; Aluminum Services provides a <strong>90-day warranty</strong> on all installed products and workmanship. The warranty period begins on the <strong>date of installation completion</strong>.</p>
+          <div class="warranty-title">${contractWarrantyDays}-Day Warranty</div>
+          <p class="warranty-body">ACGC Glass &amp; Aluminum Services provides a <strong>${contractWarrantyDays}-day warranty</strong> on all installed products and workmanship. The warranty period begins on the <strong>date of installation completion</strong>.</p>
           <p class="warranty-note">Warranty dates will be recorded upon installation completion.</p>
         </div>
       </div>
@@ -335,7 +397,7 @@ const ConfirmDialog = ({ title, message, onConfirm, onCancel, confirmLabel = 'Co
 const ContractModal = ({ tx, onClose }) => {
   const totalVal = Number(tx.manualOverride || tx.estimatedTotal || 0);
   const paidVal = Number(tx.totalPayment || 0);
-  const accepted = deriveStatus(paidVal, totalVal) === 'Fully Paid';
+  const accepted = deriveStatus(paidVal, totalVal) === 'Paid';
   if (!tx) return null;
   return (
     <div className="transaction-modal-overlay" onClick={onClose}>
@@ -504,6 +566,48 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
               <InfoRow label="Transaction Number" value={tx.transactionNumber} mono />
             )}
             <InfoRow label="Payment Date" value={fmtDate(tx.paymentDate)} />
+
+            {tx.paymentNotifiedByCustomer && (
+              <div className="transaction-info-row">
+                <span className="transaction-info-label">Customer-Declared Amount</span>
+                <span className="transaction-info-value" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <strong>{fmt(tx.declaredPaymentAmount)}</strong>
+                  <span className="transaction-badge-pending">🔔 Needs Confirmation</span>
+                </span>
+              </div>
+            )}
+
+            <div className="transaction-info-row">
+              <span className="transaction-info-label">Proof of Payment</span>
+              {tx.paymentProofLink ? (
+                <a
+                  href={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="transaction-info-value"
+                  style={{ color: '#1d4ed8', textDecoration: 'underline' }}
+                >
+                  📎 View Uploaded Proof
+                </a>
+              ) : (
+                <span className="transaction-info-value">Not yet submitted</span>
+              )}
+            </div>
+
+            {tx.paymentProofLink && /\.(png|jpe?g|gif|webp)$/i.test(tx.paymentProofLink) && (
+              <a
+                href={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                target="_blank"
+                rel="noreferrer"
+                className="payment-proof-thumb-link"
+              >
+                <img
+                  src={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                  alt="Customer's uploaded proof of payment"
+                  className="payment-proof-thumb"
+                />
+              </a>
+            )}
           </InfoSection>
 
           <InfoSection title="Contract Information">
@@ -512,53 +616,58 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
             <InfoRow label="Inspection Date" value={fmtDate(tx.inspectionDate)} />
           </InfoSection>
 
-          {(tx.category === 'Warranty' || tx.estimatedInstallationDate) && (
-            <InfoSection title="Warranty Information">
-              <InfoRow
-                label="Warranty Start"
-                value={fmtDate(tx.warrantyStart || tx.estimatedInstallationDate)}
-              />
+          {(tx.category === 'Warranty' || tx.estimatedInstallationDate || tx.warrantyStart) && (
+              <InfoSection title="Warranty Information">
+                <InfoRow
+                  label="Warranty Start"
+                  value={fmtDate(tx.warrantyStart || tx.estimatedInstallationDate)}
+                />
 
-              <InfoRow
-                label="Warranty End"
-                value={fmtDate(
-                  new Date(
-                    new Date(tx.warrantyStart || tx.estimatedInstallationDate)
-                      .setDate(new Date(tx.warrantyStart || tx.estimatedInstallationDate).getDate() + 90)
-                  )
-                )}
-              />
+                <InfoRow
+                  label="Warranty End"
+                  value={fmtDate(getWarrantyEndDate(tx))}
+                />
 
-              <div className="transaction-warranty-days-row">
-                <span className="transaction-info-label">Remaining Warranty Days</span>
+                <div className="transaction-warranty-days-row">
+                  {(() => {
+                    const hasExplicitWarrantyDays = tx.warrantyDays !== undefined && tx.warrantyDays !== null && tx.warrantyDays !== '';
+                    const currentWarrantyDays = hasExplicitWarrantyDays ? Number(tx.warrantyDays) : 90;
 
-                {tx.estimatedInstallationDate ? (
-                  (() => {
-                    const days = Math.ceil(
-                      (
-                        new Date(
-                          new Date(tx.warrantyStart || tx.estimatedInstallationDate)
-                            .setDate(new Date(tx.warrantyStart || tx.estimatedInstallationDate).getDate() + 90)
-                        ) - new Date()
-                      ) / (1000 * 60 * 60 * 24)
+                    return (
+                      <>
+                        <span className="transaction-info-label">
+                          Remaining Warranty Days ({currentWarrantyDays}-day warranty)
+                        </span>
+
+                        {currentWarrantyDays === 0 ? (
+                          <span className="transaction-warranty-expired">
+                            No Warranty (0 days)
+                          </span>
+                        ) : (tx.estimatedInstallationDate || tx.warrantyStart) ? (
+                          (() => {
+                            const days = Math.ceil(
+                              (getWarrantyEndDate(tx) - new Date()) / (1000 * 60 * 60 * 24)
+                            );
+
+                            return days < 0 ? (
+                              <span className="transaction-warranty-expired">
+                                Expired ({Math.abs(days)} days ago)
+                              </span>
+                            ) : (
+                              <span className="transaction-warranty-active">
+                                {days} days remaining
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <span className="transaction-info-value">—</span>
+                        )}
+                      </>
                     );
-
-                    return days < 0 ? (
-                      <span className="transaction-warranty-expired">
-                        Expired ({Math.abs(days)} days ago)
-                      </span>
-                    ) : (
-                      <span className="transaction-warranty-active">
-                        {days} days remaining
-                      </span>
-                    );
-                  })()
-                ) : (
-                  <span className="transaction-info-value">—</span>
-                )}
-              </div>
-            </InfoSection>
-          )}
+                  })()}
+                </div>
+              </InfoSection>
+            )}
         </div>
 
         <div className="transaction-modal-footer">
@@ -675,31 +784,46 @@ const PayRow = ({ label, value, color, bold }) => (
 // ─── Edit Modal ──────────────────────────────────────────────────────────────
 const EditModal = ({ tx, onClose, onSave }) => {
   const totalVal = Number(tx.manualOverride || tx.estimatedTotal || 0);
-  const paidVal = Number(tx.totalPayment || 0);
-  const isLocked = deriveStatus(paidVal, totalVal) === 'Fully Paid';
-  
-  const [paid, setPaid] = useState(String(paidVal));
+  const alreadyPaid = Number(tx.totalPayment || 0);
+  const remainingBeforePayment = totalVal - alreadyPaid;
+  const isLocked = deriveStatus(alreadyPaid, totalVal) === 'Paid';
+  const [newPayment, setNewPayment] = useState('');
   const [method, setMethod] = useState(tx.paymentMethod || 'Cash');
   const [txnNum, setTxnNum] = useState(tx.transactionNumber || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSave = () => {
-    const paidNum = parseFloat(paid);
-    if (isNaN(paidNum) || paidNum < 0) { setError('Please enter a valid amount paid.'); return; }
-    if (paidNum > totalVal) { setError('Amount paid cannot exceed the total project amount.'); return; }
+  const newPaymentNum = Number(newPayment) || 0;
+  const projectedTotalPaid = alreadyPaid + newPaymentNum;
+
+const handleSave = () => {
+    const amountNum = parseFloat(newPayment);
+    if (isNaN(amountNum) || amountNum <= 0) { 
+      setError('Please enter the amount received for this payment.'); 
+      return; 
+    }
+    const roundedAlreadyPaid = Math.round(alreadyPaid * 100) / 100;
+    const roundedTotalVal = Math.round(totalVal * 100) / 100;
+    const roundedNewPayment = Math.round(amountNum * 100) / 100;
+
+    const updatedTotalPayment = Math.round((roundedAlreadyPaid + roundedNewPayment) * 100) / 100;
+    
+    if (updatedTotalPayment > roundedTotalVal + 0.01) { 
+      setError(`Amount exceeds the remaining balance of ${fmt(remainingBeforePayment)}.`); 
+      return; 
+    }
     
     setSaving(true);
     
-    // Construct payload parameters for the live connected endpoint request
     const payloadFields = {
-      orderId: tx.orderId || tx.id, // Fallback gracefully depending on grouping key structures
+      orderId: tx.orderId || tx.id,
       paymentMethod: method,
-      totalPayment: paidNum,
-      transactionNumber: method === 'Online' ? txnNum : ''
+      totalPayment: updatedTotalPayment,
+      transactionNumber: method === 'Online' ? txnNum : '',
+      resolvesCustomerNotification: !!tx.paymentNotifiedByCustomer,
+      customerDeclaredAmount: tx.declaredPaymentAmount || null
     };
 
-    // Forward the built details payload parameters directly to the parent runner
     onSave(tx.id, payloadFields, () => {
       setSaving(false);
       onClose();
@@ -737,20 +861,72 @@ const EditModal = ({ tx, onClose, onSave }) => {
                 <p>You may update the amount paid, payment method, and transaction number.</p>
               </div>
 
+              {tx.paymentNotifiedByCustomer && (
+                <div className="customer-declared-notice">
+                  <div className="customer-declared-notice-header">
+                    <span>🔔</span>
+                    <p>Customer says they paid <strong>{fmt(tx.declaredPaymentAmount)}</strong>. Confirm it matches what you received.</p>
+                  </div>
+                  {Number(tx.declaredPaymentAmount) > 0 && (
+                    <button
+                      type="button"
+                      className="transaction-btn-ghost"
+                      style={{ fontSize: '12px', padding: '5px 10px', width: 'fit-content' }}
+                      onClick={() => { setNewPayment(String(tx.declaredPaymentAmount)); setError(''); }}
+                    >
+                      Use this amount
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div className="transaction-field-group">
+                <label className="transaction-field-label">Proof of Payment</label>
+                {tx.paymentProofLink ? (
+                  <>
+                    <a
+                      href={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="transaction-btn-ghost"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', width: 'fit-content', textDecoration: 'none' }}
+                    >
+                      📎 View Proof of Payment
+                    </a>
+                    {/\.(png|jpe?g|gif|webp)$/i.test(tx.paymentProofLink) && (
+                      <a
+                        href={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="payment-proof-thumb-link"
+                      >
+                        <img
+                          src={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                          alt="Customer's uploaded proof of payment"
+                          className="payment-proof-thumb"
+                        />
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <p className="transaction-field-hint">Customer has not submitted proof of payment yet.</p>
+                )}
+              </div>
+
               {error && <div className="transaction-edit-error">⚠️ {error}</div>}
 
               <div className="transaction-field-group">
-                <label className="transaction-field-label">Amount Paid (₱)</label>
+                <label className="transaction-field-label">New Payment Received (₱)</label>
                 <input
                   type="number"
                   className="transaction-field-input"
-                  value={paid}
+                  value={newPayment}
                   min="0"
-                  max={totalVal}
-                  onChange={(e) => { setPaid(e.target.value); setError(''); }}
+                  max={remainingBeforePayment}
+                  onChange={(e) => { setNewPayment(e.target.value); setError(''); }}
                   placeholder="0.00"
                 />
-                <p className="transaction-field-hint">Total project amount: {fmt(totalVal)}</p>
+                <p className="transaction-field-hint">Already paid: {fmt(alreadyPaid)} · Remaining balance: {fmt(remainingBeforePayment)}</p>
               </div>
 
               <div className="transaction-field-group">
@@ -788,9 +964,9 @@ const EditModal = ({ tx, onClose, onSave }) => {
               </div>
 
               <div className="transaction-balance-preview">
-                <span>Remaining Balance</span>
-                <strong className={(totalVal - (Number(paid) || 0)) > 0 ? 'transaction-color-red' : 'transaction-color-green'}>
-                  {fmt(totalVal - (Number(paid) || 0))}
+                <span>Remaining Balance After This Payment</span>
+                <strong className={(totalVal - projectedTotalPaid) > 0 ? 'transaction-color-red' : 'transaction-color-green'}>
+                  {fmt(totalVal - projectedTotalPaid)}
                 </strong>
               </div>
             </>
@@ -815,6 +991,7 @@ const EditModal = ({ tx, onClose, onSave }) => {
 const Transactions = () => {
   const location = useLocation()
   const { user, permissions } = useContext(UserContext); 
+  const isFullAdmin = user?.role?.trim().toLowerCase() === 'admin';
   const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
@@ -824,6 +1001,9 @@ const Transactions = () => {
   const [editTx, setEditTx] = useState(null);
   const [contractTx, setContractTx] = useState(null);
   const [deleteFeedbackTarget, setDeleteFeedbackTarget] = useState(null);
+  const [highlightId, setHighlightId] = useState(null);
+  const [sortField, setSortField] = useState('date');
+  const [sortDir, setSortDir] = useState('desc');
 
   useEffect(() => {
     if (user && user.token !== "") {
@@ -832,10 +1012,41 @@ const Transactions = () => {
   }, [user]);
 
   useEffect(() => {
-    if(location.state){
-      setViewTx(location.state.tx)
+    if (location.state && location.state.view === 'warranties') {
+      setFilter('Contract & Warranties');
     }
-  },[location])
+  }, [location]);
+
+  useEffect(() => {
+    if (location.state?.highlightOrderId) {
+      setHighlightId(location.state.highlightOrderId);
+
+      const scrollTimer = setTimeout(() => {
+        document
+          .querySelector(`[data-order-row="${location.state.highlightOrderId}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+      const clearTimer = setTimeout(() => setHighlightId(null), 4000);
+
+      return () => {
+        clearTimeout(scrollTimer);
+        clearTimeout(clearTimer);
+      };
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (location.state && location.state.tx) {
+      setViewTx(location.state.tx);
+      if (user && user.token) fetchTransactions(user);
+    }
+  }, [location])
+  useEffect(() => {
+    if (!viewTx) return;
+    const targetId = viewTx.id || viewTx._id || viewTx.orderId;
+    const fresh = transactions.find((t) => (t.id || t._id || t.orderId) === targetId);
+    if (fresh && fresh !== viewTx) setViewTx(fresh);
+  }, [transactions])
 
   function fetchTransactions(user){
     const token = user.token;
@@ -894,7 +1105,7 @@ const handleDeleteFeedback = (feedbackId) => {
         acc.revenue += totalAmount;
         acc.collected += paidAmount;
         acc.pending += totalAmount - paidAmount;
-        if (deriveStatus(paidAmount, totalAmount) === 'Fully Paid') acc.completed++;
+        if (deriveStatus(paidAmount, totalAmount) === 'Paid') acc.completed++;
         return acc;
       },
       { revenue: 0, collected: 0, pending: 0, completed: 0 }
@@ -911,9 +1122,22 @@ const handleDeleteFeedback = (feedbackId) => {
   const filtered = useMemo(() => {
     let list = [...transactions];
     if (filter === 'Completed Projects') {
-      list = list.filter((t) => t.category === 'Completed Project' || t.category === 'Completed');
+      list = list.filter((t) => {
+        if (t.category === 'Completed Project' || t.category === 'Completed') return true;
+
+        const totalAmount = Number(t.manualOverride || t.estimatedTotal || 0);
+        const paidAmount = Number(t.totalPayment || 0);
+        const isFullyPaid = deriveStatus(paidAmount, totalAmount) === 'Paid';
+        return isFullyPaid && isWarrantyExpired(t);
+      });
     } else if (filter === 'Contract & Warranties') {
-      list = list.filter((t) => t.category === 'Contract' || t.category === 'Warranty' || t.category === 'In Progress');
+      list = list.filter((t) => {
+        const totalAmount = Number(t.manualOverride || t.estimatedTotal || 0);
+        const paidAmount = Number(t.totalPayment || 0);
+        const isFullyPaid = deriveStatus(paidAmount, totalAmount) === 'Paid';
+        if (isFullyPaid && !isWarrantyExpired(t)) return true;
+        return t.category === 'Contract' || t.category === 'Warranty' || t.category === 'In Progress';
+      });
     } else if (filter === 'Customer Feedbacks') {
     list = list.filter((t) => t.feedback || t.rating || (t.feedbacks && t.feedbacks.length > 0));
 
@@ -941,8 +1165,23 @@ const handleDeleteFeedback = (feedbackId) => {
         return nameMatch || contractMatch || productMatch;
       });
     }
+
+    if (filter !== 'Customer Feedbacks' && sortField === 'paymentStatus') {
+      list = list.filter((t) => {
+        const totalAmount = Number(t.manualOverride || t.estimatedTotal || 0);
+        const paidAmount = Number(t.totalPayment || 0);
+        const isFullyPaid = deriveStatus(paidAmount, totalAmount) === 'Paid';
+        return sortDir === 'asc' ? isFullyPaid : !isFullyPaid;
+      });
+    } else if (filter !== 'Customer Feedbacks' && sortField !== 'none') {
+      list = [...list].sort((a, b) => {
+        const cmp = compareTransactions(a, b, sortField);
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+
     return list;
-  }, [transactions, filter, search, feedbackCategory, feedbackSortDate]);
+  }, [transactions, filter, search, feedbackCategory, feedbackSortDate, sortField, sortDir]);
 
 const handleSave = (id, updates, onSuccess, onError) => {
     if (!user || !user.token) {
@@ -960,7 +1199,9 @@ const handleSave = (id, updates, onSuccess, onError) => {
         orderId: updates.orderId, // Target unique clustering field index parameters
         paymentMethod: updates.paymentMethod,
         totalPayment: updates.totalPayment,
-        transactionNumber: updates.transactionNumber
+        transactionNumber: updates.transactionNumber,
+        resolvesCustomerNotification: updates.resolvesCustomerNotification,
+        customerDeclaredAmount: updates.customerDeclaredAmount
       })
     };
 
@@ -982,7 +1223,9 @@ const handleSave = (id, updates, onSuccess, onError) => {
                 totalPayment: updates.totalPayment,
                 paymentMethod: updates.paymentMethod,
                 transactionNumber: updates.transactionNumber,
-                paymentStatus: isPaidNow ? "Paid" : "Pending"
+                status: isPaidNow ? "Paid" : "Pending",
+                paymentNotifiedByCustomer: updates.resolvesCustomerNotification ? false : t.paymentNotifiedByCustomer,
+                paymentConfirmedByAdmin: updates.resolvesCustomerNotification ? true : t.paymentConfirmedByAdmin
               };
             }
             return t;
@@ -1010,12 +1253,32 @@ const handleSave = (id, updates, onSuccess, onError) => {
       </div>
 
       <div className="transaction-summary-grid">
-        <SummaryCard icon="💰" label="Total Revenue" value={fmt(summary.revenue)} color="blue" />
-        <SummaryCard icon="✅" label="Total Collected" value={fmt(summary.collected)} color="green" />
-        <SummaryCard icon="⏳" label="Pending Balance" value={fmt(summary.pending)} color="amber" />
-        <SummaryCard icon="🏗️" label="Completed Projects" value={summary.completed} color="purple" />
+        <SummaryCard 
+          icon={<img src="/images/totalRevenue.png" alt="Revenue" style={{ width: 20, height: 20, objectFit: 'contain' }} />} 
+          label="Total Revenue" 
+          value={fmt(summary.revenue)} 
+          color="blue" 
+        />
+        <SummaryCard 
+          icon={<img src="/images/collected.png" alt="Collected" style={{ width: 20, height: 20, objectFit: 'contain' }} />} 
+          label="Total Collected" 
+          value={fmt(summary.collected)} 
+          color="green" 
+        />
+        <SummaryCard 
+          icon={<img src="/images/pending.png" alt="Pending" style={{ width: 20, height: 20, objectFit: 'contain' }} />} 
+          label="Pending Balance" 
+          value={fmt(summary.pending)} 
+          color="amber" 
+        />
+        <SummaryCard 
+          icon={<img src="/images/complete.png" alt="Completed" style={{ width: 20, height: 20, objectFit: 'contain' }} />} 
+          label="Completed Projects" 
+          value={summary.completed} 
+          color="purple" 
+        />
         <SummaryCard
-          icon="⭐"
+          icon={<img src="/images/stars.png" alt="Rating" style={{ width: 20, height: 20, objectFit: 'contain' }} />}
           label="Average Customer Rating"
           value={ratingSummary.count > 0 ? `${ratingSummary.average.toFixed(1)} / 5 (${ratingSummary.count})` : 'No ratings yet'}
           color="amber"
@@ -1060,14 +1323,59 @@ const handleSave = (id, updates, onSuccess, onError) => {
           </div>
         )}
 
-        <div className="transaction-search-box">
-          <span className="transaction-search-ico">🔍</span>
-          <input
-            className="transaction-search-input"
-            placeholder="Search client, product, contract…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="transaction-right-controls">
+          {filter !== 'Customer Feedbacks' && (
+            <div className="transaction-sort-bar">
+              <span className="transaction-sort-icon">⇅</span>
+              {/* Sort Field Dropdown */}
+              <select
+                value={sortField}
+                onChange={(e) => {
+                  const field = e.target.value;
+                  setSortField(field);
+                  setSortDir(
+                    field === 'clientName' || field === 'method' || field === 'customerType'
+                      ? 'asc'
+                      : 'desc'
+                  );
+                }}
+                className="transaction-sort-select"
+              >
+                <option value="date">Date</option>
+                <option value="clientName">Customer Name</option>
+                <option value="unpaid">Unpaid (Balance)</option>
+                <option value="paid">Paid Amount</option>
+                <option value="method">Payment Method</option>
+                <option value="customerType">Customer Type</option>
+                <option value="installDate">Installation Date</option>
+                <option value="paymentStatus">Payment Status</option>
+              </select>
+
+              {sortField !== 'none' && <span className="transaction-sort-divider" />}
+
+              {/* Sort Direction Dropdown — label changes depending on the field */}
+              {sortField !== 'none' && (
+                <select
+                  value={sortDir}
+                  onChange={(e) => setSortDir(e.target.value)}
+                  className="transaction-sort-select"
+                >
+                  <option value="asc">{SORT_DIRECTION_LABELS[sortField]?.asc || 'Ascending'}</option>
+                  <option value="desc">{SORT_DIRECTION_LABELS[sortField]?.desc || 'Descending'}</option>
+                </select>
+              )}
+            </div>
+          )}
+
+          <div className="transaction-search-box">
+            <span className="transaction-search-ico">🔍</span>
+            <input
+              className="transaction-search-input"
+              placeholder="Search client, product, contract…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
@@ -1190,13 +1498,18 @@ const handleSave = (id, updates, onSuccess, onError) => {
           filtered.map((t, i) => {
             const totalAmount = Number(t.manualOverride || t.estimatedTotal || 0);
             const paidAmount = Number(t.totalPayment || 0);
-            const isFullyPaid = deriveStatus(paidAmount, totalAmount) === 'Fully Paid';
+            const isFullyPaid = deriveStatus(paidAmount, totalAmount) === 'Paid';
             const productDisplay = t.measurements && t.measurements.length > 0
               ? t.measurements.map(m => m.product).join(",")
               : "Glass Fitting";
 
             return (
-              <tr key={t.id} className="transaction-data-row">
+              <tr
+                key={t.id}
+                className={`transaction-data-row ${t.paymentNotifiedByCustomer ? 'row-needs-review' : ''}`}
+                data-order-row={t.id}
+                style={t.id === highlightId ? { backgroundColor: '#fef9c3', transition: 'background-color 1s ease' } : undefined}
+              >
                 <td className="transaction-col-num">{i + 1}</td>
                 <td>
                   <div className="transaction-client-cell">
@@ -1228,11 +1541,18 @@ const handleSave = (id, updates, onSuccess, onError) => {
                 <td className="transaction-col-date">{fmtDate(t.estimatedInstallationDate)}</td>
                 <td><CategoryBadge category={t.category} /></td>
                 <td>
-                  {t.status === "Paid" ? (
-                    <span className="transaction-badge-paid">Fully Paid</span>
-                  ) : (
-                    <span className="transaction-badge-pending">Pending</span>
-                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                    {t.status === "Paid" ? (
+                      <span className="transaction-badge-paid">Fully Paid</span>
+                    ) : (
+                      <span className="transaction-badge-pending">Pending</span>
+                    )}
+                    {t.paymentNotifiedByCustomer && (
+                      <span className="transaction-badge-notify" title={`Customer says they paid ${fmt(t.declaredPaymentAmount)}`}>
+                        🔔 Needs Confirmation
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td>
                   <div className="transaction-action-group">
@@ -1240,33 +1560,44 @@ const handleSave = (id, updates, onSuccess, onError) => {
                       className="transaction-action-btn transaction-btn-edit" 
                       onClick={() => setViewTx(t)} 
                       title="View Details"
-                      hidden={permissions?.modules?.["Transactions"]?.["View Details"] !== 1}
+                      hidden={
+                        isFullAdmin
+                          ? false
+                          : filter === 'Contract & Warranties'
+                            ? (permissions?.modules?.["Transactions"]?.["View Details"] !== 1 && permissions?.modules?.["Transactions"]?.["Edit"] !== 1)
+                            : permissions?.modules?.["Transactions"]?.["View Details"] !== 1
+                      }
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
                         <circle cx="12" cy="12" r="3"/>
                       </svg>
                     </button>
-                    <button
-                      className={`transaction-action-btn transaction-btn-edit ${isFullyPaid ? 'transaction-btn-locked' : ''}`}
-                      onClick={() => !isFullyPaid && setEditTx(t)}
-                      disabled={isFullyPaid}
-                      title={isFullyPaid ? 'Locked fully paid' : 'Edit Payment'}
-                    >
-                      {isFullyPaid ? (
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                      ) : (
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      )}
-                    </button>
-                    <button 
-                      className="transaction-action-btn transaction-btn-contract" 
-                      onClick={() => setContractTx(t)} 
-                      title="View/Download Contract"
-                      hidden={permissions?.modules?.["Transactions"]?.["Edit"] !== 1}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    </button>
+        
+                    {filter !== 'Contract & Warranties' && (
+                      <>
+                        <button
+                          className={`transaction-action-btn transaction-btn-edit ${isFullyPaid ? 'transaction-btn-locked' : ''}`}
+                          onClick={() => !isFullyPaid && setEditTx(t)}
+                          disabled={isFullyPaid}
+                          title={isFullyPaid ? 'Locked fully paid' : 'Edit Payment'}
+                        >
+                          {isFullyPaid ? (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                          ) : (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          )}
+                        </button>
+                        <button 
+                          className="transaction-action-btn transaction-btn-contract" 
+                          onClick={() => setContractTx(t)} 
+                          title="View/Download Contract"
+                          hidden={isFullAdmin ? false : permissions?.modules?.["Transactions"]?.["Edit"] !== 1}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

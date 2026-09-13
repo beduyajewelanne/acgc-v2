@@ -8,7 +8,7 @@ export async function CRUD(url, requestOptions, callback){
   await fetch(url, requestOptions)
     .then(response => response.json())
     .then(result => callback(result))
-    .catch(error => callback({remarks:"error","message":error}));
+    .catch(error => callback({remarks:"error","message":error?.message || String(error)}));
 }
 
 /**

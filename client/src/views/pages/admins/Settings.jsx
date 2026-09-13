@@ -954,7 +954,9 @@ const BackupRecovery = ({ showToast }) => {
   };
 
   const handleDownload = (backup) => {
+    const id = backup._id || backup.id;
     showToast(`Initializing secure download package stream for ${backup.backupName}...`, 'success');
+    window.open(`${window.base_api}backup/download/${id}`, '_blank');
   };
 
   return (

@@ -14,35 +14,28 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cors());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // ── Routes ────────────────────────────────────────────────────────────────────
+// Each route is loaded independently so that a problem in ONE file (a missing
+// npm package, a bad require, etc.) can't silently prevent every route AFTER
+// it in the list from ever being mounted. Before, all requires shared one
+// try/catch, so one bad file quietly took down itself AND everything below it.
+const loadRoute = (routePath) => {
+  try {
+    const route = require(routePath);
+    app.use(route);
+    console.log(`[Routes] Loaded ${routePath}`);
+  } catch (err) {
+    console.error(`[Routes] FAILED to load ${routePath}:`, err);
+  }
+};
 
-try {
-  const authRoutes = require("./routes/authRoutes");
-  app.use(authRoutes);
-
-  const productRoutes = require("./routes/products");
-  app.use(productRoutes);
-
-  const userRoutes = require("./routes/users");
-  app.use(userRoutes);
-
-  const cartRoutes = require("./routes/cart");
-  app.use(cartRoutes);
-
-  const contractRoutes = require("./routes/contracts");
-  app.use(contractRoutes);
-
-  const receiptRoutes = require("./routes/receipts");
-  app.use(receiptRoutes);
-
-  const backupRoutes = require("./routes/backupRoutes");
-  app.use(backupRoutes);
-
-  const notificationRoutes = require('./routes/notification');
-  app.use(notificationRoutes);
-
-} catch (err) {
-  console.error("Error setting up routes:", err.message);
-}
+loadRoute("./routes/authRoutes");
+loadRoute("./routes/products");
+loadRoute("./routes/users");
+loadRoute("./routes/cart");
+loadRoute("./routes/contracts");
+loadRoute("./routes/receipts");
+loadRoute("./routes/backupRoutes");
+loadRoute("./routes/notification");
 
 // test
 app.get("/api/test", (_req, res) => res.json({ status: "ok" }));

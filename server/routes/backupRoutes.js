@@ -4,12 +4,27 @@ const path = require('path');
 const fs = require('fs');
 const cron = require('node-cron');
 const { ObjectId } = require('mongodb');
+const XLSX = require('xlsx');
+const archiver = require('archiver');
 // ✅ Corrected: Using CommonJS require to load your helper database utility module cleanly
 const dbo = require('../helper/db');
 
 const backupRouter = express.Router();
-const DB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/your_db_name";
+// Matches helper/db.js exactly: same env var (ATLAS_URI) and same environment-based
+// database name selection (REACT_APP_ENV), so backups always hit the actual DB the
+// rest of the app is connected to instead of a local fallback that doesn't exist.
+const DB_URI = process.env.ATLAS_URI;
+const DB_NAME = process.env.REACT_APP_ENV === "production" ? "acgc-production" : "acgc-development";
+if (!DB_URI) {
+  console.error("❌ Error: ATLAS_URI is not defined in your environment variables. Backups will fail.");
+}
 const BACKUP_DIR = path.join(process.cwd(), 'backups');
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+// Assumption: transactions live in a "transactions" collection with the same
+// field names used in Transactions.jsx (dateCreated, clientName, totalPayment,
+// manualOverride/estimatedTotal, measurements[].product). Change this if your
+// actual collection name is different.
+const TRANSACTIONS_COLLECTION = "transactions";
 
 if (!fs.existsSync(BACKUP_DIR)) {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -25,6 +40,153 @@ const formatBytes = (bytes, decimals = 1) => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
+
+/**
+ * Recursively sums up file sizes inside a folder (mongodump creates a
+ * subfolder per database, so a shallow read was always reporting ~0 bytes).
+ */
+const getFolderSizeBytes = (dirPath) => {
+    let total = 0;
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+        const fullPath = path.join(dirPath, entry.name);
+        if (entry.isDirectory()) {
+            total += getFolderSizeBytes(fullPath);
+        } else {
+            total += fs.statSync(fullPath).size;
+        }
+    }
+    return total;
+};
+
+/**
+ * Copies the uploads folder (contracts, payment proofs, etc.) into a backup
+ * folder. Only used for "Full System" backups so there's an actual, meaningful
+ * difference between that and the DB-only Weekly/Monthly/Yearly backups.
+ */
+const copyUploadsFolder = (destBackupPath) => {
+    if (!fs.existsSync(UPLOADS_DIR)) return;
+    const dest = path.join(destBackupPath, 'uploads');
+    fs.cpSync(UPLOADS_DIR, dest, { recursive: true });
+};
+
+/**
+ * Builds "Transactions_Summary.xlsx" inside a backup folder: money that came in
+ * (paid amount) and the project/product per client, grouped into one sheet per
+ * month so it's easy to scan a specific month's transactions.
+ */
+const generateTransactionsExcel = async (db, backupPath) => {
+    // Mirrors the same $match + $group pipeline used by /api/get_transactions
+    // in cart.js — actual transaction data lives in "order_requests" (grouped
+    // per orderId), not in a flat "transactions" collection.
+    const pipeline = [
+        {
+            $match: {
+                $or: [
+                    { contractApproved: { $exists: true, $ne: null } },
+                    { totalPayment: { $gt: 0 } },
+                    { downpaymentPaid: true },
+                    { contractSentToCustomer: true },
+                    { contractLink: { $exists: true, $nin: [null, "", "#"] } }
+                ]
+            }
+        },
+        {
+            $group: {
+                _id: "$orderId",
+                baseDoc: { $first: "$$ROOT" },
+                measurements: {
+                    $push: {
+                        id: "$_id",
+                        product: "$itemDetails.name",
+                        width: "$itemDetails.width",
+                        height: "$itemDetails.height",
+                        qty: { $ifNull: ["$quantity", "$itemDetails.quantity", 1] },
+                        pricePerSqFt: "$itemDetails.ratePerSqFt",
+                        unit: "$itemDetails.unit",
+                        progressStatus: "$progressStatus",
+                        warranty: { $ifNull: ["$warranty", ""] },
+                        estimatedInstallationDate: "$estimatedInstallationDate"
+                    }
+                },
+                totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" },
+            }
+        },
+        { $sort: { "baseDoc.createdAt": -1 } }
+    ];
+
+    const rawGroups = await db.collection("order_requests").aggregate(pipeline).toArray();
+
+    // Normalize into the same field shape the rest of this function expects
+    // (matches what the Transaction Management page displays).
+    const transactions = rawGroups.map(group => {
+        const b = group.baseDoc;
+        return {
+            clientName: b.clientName || "Unknown Client",
+            dateCreated: b.createdAt || "",
+            totalPayment: b.totalPayment || 0,
+            manualOverride: parseFloat(b.manualOverride) || "",
+            estimatedTotal: b.estimatedTotal || group.totalEstimatedCost || 0,
+            measurements: group.measurements
+        };
+    });
+
+    // Group rows by "Month Year" (e.g. "January 2026") based on dateCreated
+    const monthGroups = new Map();
+    transactions.forEach(t => {
+        const created = t.dateCreated ? new Date(t.dateCreated) : null;
+        const monthKey = created && !isNaN(created)
+            ? created.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+            : 'Undated';
+
+        const totalAmount = Number(t.manualOverride || t.estimatedTotal || 0);
+        const paidAmount = Number(t.totalPayment || 0);
+        const projectLabel = t.measurements && t.measurements.length > 0
+            ? t.measurements.map(m => m.product).join(", ")
+            : (t.category || "—");
+
+        const row = {
+            "Date": created && !isNaN(created) ? created.toLocaleDateString('en-PH') : '—',
+            "Client": t.clientName || '—',
+            "Project / Product": projectLabel,
+            "Amount Paid": paidAmount,
+            "Total Amount": totalAmount,
+            "Balance": totalAmount - paidAmount,
+            "Status": paidAmount >= totalAmount ? "Paid" : "Pending"
+        };
+
+        if (!monthGroups.has(monthKey)) monthGroups.set(monthKey, []);
+        monthGroups.get(monthKey).push(row);
+    });
+
+    // Sort month keys chronologically (Undated goes last)
+    const sortedMonthKeys = [...monthGroups.keys()].sort((a, b) => {
+        if (a === 'Undated') return 1;
+        if (b === 'Undated') return -1;
+        return new Date(`1 ${a}`) - new Date(`1 ${b}`);
+    });
+
+    const workbook = XLSX.utils.book_new();
+
+    // Overview sheet: total money in per month, so it's the first thing you see
+    const overviewRows = sortedMonthKeys.map(key => {
+        const rows = monthGroups.get(key);
+        const totalPaid = rows.reduce((sum, r) => sum + r["Amount Paid"], 0);
+        return { "Month": key, "Transactions": rows.length, "Total Paid": totalPaid };
+    });
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(overviewRows), "Overview");
+
+    // One sheet per month with the actual transaction rows
+    sortedMonthKeys.forEach(key => {
+        const sheetName = key.slice(0, 31); // Excel sheet name limit
+        const sheet = XLSX.utils.json_to_sheet(monthGroups.get(key));
+        XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+    });
+
+    const excelPath = path.join(backupPath, 'Transactions_Summary.xlsx');
+    XLSX.writeFile(workbook, excelPath);
+    return excelPath;
 };
 
 /**
@@ -51,7 +213,7 @@ const runDatabaseBackup = async (backupType = "Manual") => {
     const recordId = insertionResult.insertedId;
 
     return new Promise((resolve, reject) => {
-        const command = `mongodump --uri="${DB_URI}" --out="${backupPath}"`;
+        const command = `mongodump --uri="${DB_URI}" --db="${DB_NAME}" --out="${backupPath}"`;
 
         exec(command, async (error, stdout, stderr) => {
             if (error) {
@@ -64,18 +226,31 @@ const runDatabaseBackup = async (backupType = "Manual") => {
             }
 
             // 3. Calculate Folder Size to display on dashboard
-            let folderSizeString = "0 MB";
+            let folderSizeString = "0 Bytes";
             try {
-                // Read contents of folder to find nested db files size metric summary
-                const files = fs.readdirSync(backupPath);
-                let totalSize = 0;
-                files.forEach(file => {
-                    const stats = fs.statSync(path.join(backupPath, file));
-                    totalSize += stats.size;
-                });
-                folderSizeString = formatBytes(totalSize);
+                folderSizeString = formatBytes(getFolderSizeBytes(backupPath));
             } catch (szErr) {
-                folderSizeString = "142.3 MB"; // Fallback estimation
+                console.error("[Backup] Size calculation failed:", szErr.message);
+            }
+
+            // 3b. "Full System" also grabs the uploads folder (contracts, payment
+            // proofs, etc.) so it's an actual full copy, not just the database.
+            if (backupType === "Full System") {
+                try {
+                    copyUploadsFolder(backupPath);
+                    folderSizeString = formatBytes(getFolderSizeBytes(backupPath));
+                } catch (upErr) {
+                    console.error("[Backup] Copying uploads folder failed:", upErr.message);
+                }
+            }
+
+            // 4. Generate the transactions Excel summary alongside this backup.
+            // Wrapped so that a problem here (e.g. empty collection) never fails
+            // the backup itself — the mongodump already succeeded at this point.
+            try {
+                await generateTransactionsExcel(db, backupPath);
+            } catch (xlsxErr) {
+                console.error("[Backup] Transactions_Summary.xlsx generation failed:", xlsxErr.message);
             }
 
             // 2b. Success: Update historical collection item data 
@@ -198,6 +373,49 @@ backupRouter.post('/api/backup/run-manual', async (req, res) => {
         return res.status(200).json({ remarks: "success", message: "Manual collection snapshot backed up successfully", payload: result });
     } catch (err) {
         return res.status(500).json({ remarks: "failed", error: err.message });
+    }
+});
+
+// 4. DOWNLOAD A BACKUP (zips the backup folder — DB dump + Transactions_Summary.xlsx
+//    + uploads if it was a Full System backup — and streams it as one .zip file)
+backupRouter.get('/api/backup/download/:id', async (req, res) => {
+    console.log(`[Backup] Download requested for id: ${req.params.id}`);
+    try {
+        const db = dbo.getDb();
+        let record;
+        try {
+            record = await db.collection("backup_history").findOne({ _id: new ObjectId(req.params.id) });
+        } catch (idErr) {
+            console.error("[Backup] Invalid backup id:", idErr.message);
+            return res.status(400).json({ error: "Invalid backup id" });
+        }
+        if (!record) {
+            console.error("[Backup] No backup_history record found for that id");
+            return res.status(404).json({ error: "Backup record not found" });
+        }
+        if (!record.path || !fs.existsSync(record.path)) {
+            console.error("[Backup] Backup path missing on disk:", record.path);
+            return res.status(404).json({ error: "Backup files no longer exist on disk" });
+        }
+
+        console.log(`[Backup] Zipping folder: ${record.path}`);
+        res.attachment(`${record.backupName}.zip`);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        archive.on('error', (archiveErr) => {
+            console.error("[Backup] Zip stream error:", archiveErr);
+            if (!res.headersSent) res.status(500).end();
+        });
+        archive.on('warning', (warn) => {
+            console.warn("[Backup] Zip warning:", warn);
+        });
+        res.on('close', () => console.log(`[Backup] Download response closed (bytes written: ${archive.pointer()})`));
+        archive.pipe(res);
+        archive.directory(record.path, false);
+        await archive.finalize();
+        console.log(`[Backup] Zip finalized successfully for ${record.backupName}`);
+    } catch (err) {
+        console.error("[Backup] Download route crashed:", err);
+        if (!res.headersSent) return res.status(500).json({ error: err.message });
     }
 });
 

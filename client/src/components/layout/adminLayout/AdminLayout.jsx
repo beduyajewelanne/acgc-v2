@@ -72,6 +72,7 @@ const NAV_ITEMS = [
 const SIDEBAR_COLLAPSE_KEY = 'acgc-admin-sidebar-collapsed';
 
 const AdminLayout = () => {
+  const { setUser } = useContext(UserContext);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, permissions, permissionsLoaded } = useContext(UserContext);

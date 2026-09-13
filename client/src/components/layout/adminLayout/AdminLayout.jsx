@@ -95,6 +95,11 @@ const AdminLayout = () => {
 
   const handleLogout = () => {
     localStorage.clear();
+    setUser({
+      firstName: "", lastName: "", email: "", role: "",
+      token: "", address: "", barangay: "", city: "",
+      phone: "", _id: "",
+    });
     navigate('/login');
   };
 

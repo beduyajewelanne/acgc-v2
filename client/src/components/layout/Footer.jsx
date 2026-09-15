@@ -2,11 +2,13 @@ import React, { useContext, useEffect, useState } from 'react';
 import './Footer.css';
 import { UserContext } from '../../App';
 import { CRUD } from '../../services/data.services';
+import { useNavigate } from 'react-router-dom';
 
 const Footer = () => {
   const { user } = useContext(UserContext);
   const isLoggedIn = !!user?.token;
   const [canTrackProducts, setCanTrackProducts] = useState(false);
+  const navigate = useNavigate();
   useEffect(() => {
     if (isLoggedIn) return;
     CRUD(
@@ -35,9 +37,9 @@ const Footer = () => {
         <div>
           <h3>Quick Links</h3>
           <ul>
-            <li><a href="/customer/products">Browse Products</a></li>
-            <li><a href="/about">About Us</a></li>
-            {!isLoggedIn && canTrackProducts && <li><a href="/track">Track Order</a></li>}
+            <li><a onClick={() => navigate('/customer/products')}>Browse Products</a></li>
+            <li><a onClick={() => navigate('/about')}>About Us</a></li>
+            {!isLoggedIn && canTrackProducts && <li><a onClick={() => navigate('/track')}>Track Order</a></li>}
           </ul>
         </div>
       </div>

@@ -1,8 +1,10 @@
 import React from 'react';
 import './ShoppingCart.css'; 
+import { useNavigate } from 'react-router-dom';
 
 const ShoppingCart = ({ cartItems, onRemove }) => {
   const total = cartItems.reduce((acc, item) => acc + item.price, 0);
+  const navigate = useNavigate();
 
   return (
     <div className="cart-container">
@@ -11,7 +13,7 @@ const ShoppingCart = ({ cartItems, onRemove }) => {
       {cartItems.length === 0 ? (
         <div className="empty-cart">
           <p>Your cart is empty</p>
-          <button onClick={() => window.location.href='/customer/products'}>
+          <button onClick={() => navigate('/customer/products')}>
             Browse Products
           </button>
         </div>

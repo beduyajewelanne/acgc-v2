@@ -1,5 +1,5 @@
 import React, { useState, useCallback, createContext, useEffect, useRef, useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getAccessLevels } from './services/data.services';
 
 // Pages
@@ -37,14 +37,14 @@ import AdminProfile from './views/pages/admins/AdminProfile';
 export const UserContext = createContext();
 
 // 404 Layout Resource State View
-const NotFound = () => (
+const NotFound = ({ navigate }) => (
   <div style={{ padding: '80px 20px', textAlign: 'center', fontFamily: 'sans-serif', color: '#1e293b' }}>
     <h1 style={{ fontSize: '4rem', margin: '0 0 10px 0', color: '#0f172a' }}>404</h1>
     <h2 style={{ fontSize: '1.5rem', fontWeight: '500', margin: '0 0 15px 0' }}>Page Not Found</h2>
     <p style={{ color: '#64748b', maxWidth: '400px', margin: '0 auto 25px auto' }}>
       The asset route resource pathway you are attempting to locate does not exist or your profile lacks operational access privileges.
     </p>
-    <a href="/" style={{ display: 'inline-block', background: '#0f172a', color: '#fff', textDecoration: 'none', padding: '10px 20px', borderRadius: '6px', fontSize: '0.9rem' }}>
+    <a onClick={() => navigate('/')} style={{ display: 'inline-block', background: '#0f172a', color: '#fff', textDecoration: 'none', padding: '10px 20px', borderRadius: '6px', fontSize: '0.9rem' }}>
       Return to Homepage
     </a>
   </div>
@@ -52,6 +52,7 @@ const NotFound = () => (
 
 // ─── CUSTOM SECURE ROUTE BALANCER WRAPPER ──────────────────────────────────
 const ProtectedRoute = ({ children, allowedRoles, moduleKey }) => {
+  const navigate = useNavigate();
   const { user, permissions, permissionsLoaded } = useContext(UserContext);
   const localSessionData = localStorage.getItem("userData");
 
@@ -78,7 +79,7 @@ const ProtectedRoute = ({ children, allowedRoles, moduleKey }) => {
   const isRoleAuthorized = allowedRoles.some(role => role.toLowerCase() === userRoleNormalized);
 
   if (!isRoleAuthorized) {
-    return <NotFound />;
+    return <NotFound navigate={navigate} />;
   }
 
   // 3. APPLY GRANULAR MATRIX CHECKS ONLY FOR ADMIN / STAFF (Bypassed for Customers)

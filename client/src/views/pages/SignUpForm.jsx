@@ -411,7 +411,7 @@ const SignUpForm = () => {
                 <button type="submit" className="signup-btn span-12">Verify Email</button>
 
                 <div className="signup-footer span-12">
-                  <p>Already have an account? <a href="/login">Login</a></p>
+                  <p>Already have an account? <a onClick={() => navigate('/login')}>Login</a></p>
                 </div>
               </form>
             </div>

@@ -271,7 +271,13 @@
 }
 
 @media (max-width: 420px) {
-  .cp-nav-grid { grid-template-columns: 1fr; }
+  /* Keep the 3-column nav grid like on laptop — shrink the tiles
+     instead of stacking them into one column. */
+  .cp-nav-grid   { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .cp-nav-item   { padding: 10px 6px; gap: 4px; }
+  .cp-nav-icon   { margin-bottom: 0; }
+  .cp-nav-label  { font-size: 0.78rem; }
+  .cp-nav-sub    { font-size: 0.66rem; }
 }
 
 @media (max-width: 360px) {
@@ -280,4 +286,8 @@
   .cp-avatar { width: 52px; height: 52px; font-size: 1.1rem; }
   .cp-order-item { flex-wrap: wrap; }
   .cp-order-right { width: 100%; justify-content: space-between; }
+  .cp-nav-grid   { gap: 6px; }
+  .cp-nav-item   { padding: 8px 4px; }
+  .cp-nav-label  { font-size: 0.7rem; }
+  .cp-nav-sub    { font-size: 0.6rem; }
 }

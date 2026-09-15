@@ -44,7 +44,7 @@ const Header = ({ isLoggedIn }) => {
     <header className="dashboard-header">
       <div className="logo">
         <Link to="/">
-          <img src="/images/acgc-logo.png" alt="ACGC Logo" className="logo-img" />
+          <img className="logo-img" src="/images/acgc-logo.png" alt="ACGC Logo" />
           <h2>ACGC SYSTEM</h2>
         </Link>
       </div>

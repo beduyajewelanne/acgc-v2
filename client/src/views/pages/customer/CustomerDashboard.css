@@ -503,36 +503,77 @@ html { font-size: 18px; }
 
 /* Responsive Fix for Smaller Screens */
 @media (max-width: 600px) {
-  .rating-container {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1.5rem;
-  }
+  /* Keep the score box + bars side-by-side like the desktop layout —
+     stacking them was what made this section eat so much vertical
+     space and force extra scrolling. Just shrink everything to fit. */
+  .rating-container { gap: 1rem; align-items: center; }
+  .rating-score-box { min-width: 74px; }
+  .rating-number    { font-size: 1.9rem; }
+  .stars-gold       { font-size: 0.8rem; }
+  .rating-label     { font-size: 0.68rem; margin-top: 0.25rem; }
+  .rating-bars      { gap: 0.35rem; }
+  .rating-bar-row   { gap: 0.4rem; }
+  .bar-background   { height: 10px; }
+  .bar-meta         { min-width: 56px; gap: 0.25rem; }
+  .percentage-text  { font-size: 0.7rem; min-width: 28px; }
+  .rating-bar-row .stars-gold { font-size: 0.62rem; }
 }
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
-  .product-grid { grid-template-columns: repeat(2, 1fr); }
+  .product-grid { grid-template-columns: repeat(3, 1fr); gap: 20px; }
 }
 
 @media (max-width: 768px) {
+  html { font-size: 16px; }
   .hero-banner   { padding: 72px 20px 80px; }
   .hero-overlay h1 { font-size: 2.4rem; }
   .hero-overlay p  { font-size: 1.1rem; }
-  .features      { margin: 36px 20px; padding: 28px 20px; }
-  .product-grid  { grid-template-columns: repeat(2, 1fr); gap: 18px; }
+  /* Keep the 3 feature cards side-by-side like desktop — shrink the
+     icon/padding/text instead of stacking them into one long column. */
+  .features      { grid-template-columns: repeat(3, 1fr); margin: 28px 16px; padding: 18px 12px; gap: 12px; }
+  .feature-card  { padding: 8px 4px; }
+  .feature-icon  { width: 34px; height: 34px; margin-bottom: 8px; }
+  .feature-card h3 { font-size: 0.85rem; margin-bottom: 6px; }
+  .feature-card p  { font-size: 0.72rem; line-height: 1.4; }
+  .rating-section  { padding: 0 0.75rem 2rem; margin-top: -12px; }
+  .rating-section h2 { font-size: 1.25rem; margin-bottom: 1rem; }
+  /* Keep 3 columns like the laptop view — shrink gutters + card
+     content instead of dropping to 2 or 1 column. */
+  .product-grid  { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .product-image, .product-card img { height: 120px; }
+  .product-info  { padding: 10px 10px 12px; }
+  .category-badge { font-size: 0.68rem; padding: 2px 8px; margin-bottom: 6px; }
+  .product-info h3 { font-size: 0.82rem; margin-bottom: 6px; line-height: 1.25; }
+  .price-row     { margin: 6px 0 8px; }
+  .price-row .price { font-size: 0.9rem; }
+  .thickness     { font-size: 0.68rem; padding: 2px 8px; }
+  .order-btn     { padding: 8px; font-size: 0.78rem; border-radius: 6px; }
   .product-preview { padding: 0 16px 48px; }
   .preview-header h2 { font-size: 1.7rem; }
   .cta-section   { padding: 56px 20px 64px; }
   .cta-section h2 { font-size: 1.9rem; }
-  .rating-container { gap: 2rem; }
 }
 
 @media (max-width: 560px) {
-  .product-grid  { grid-template-columns: 1fr; }
+  html { font-size: 15px; }
+  /* Still 3 columns — just tighter gutters/text, same laptop feel. */
+  .product-grid  { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .product-image, .product-card img { height: 90px; }
+  .product-info  { padding: 8px 8px 10px; }
+  .category-badge { font-size: 0.6rem; padding: 2px 6px; margin-bottom: 4px; }
+  .product-info h3 { font-size: 0.72rem; margin-bottom: 4px; }
+  .price-row .price { font-size: 0.78rem; }
+  .thickness     { font-size: 0.6rem; padding: 1px 6px; }
+  .order-btn     { padding: 6px; font-size: 0.68rem; }
   .button-group  { flex-direction: column; align-items: center; }
   .cta-buttons   { flex-direction: column; align-items: center; }
-  .features      { grid-template-columns: 1fr; }
+  /* Still 3 feature cards side-by-side, just the tightest sizing. */
+  .features      { grid-template-columns: repeat(3, 1fr); margin: 20px 12px; padding: 14px 8px; gap: 8px; }
+  .feature-card  { padding: 4px 2px; }
+  .feature-icon  { width: 26px; height: 26px; margin-bottom: 6px; }
+  .feature-card h3 { font-size: 0.68rem; margin-bottom: 4px; }
+  .feature-card p  { font-size: 0.58rem; line-height: 1.3; }
   .hero-banner   { padding: 56px 18px 64px; min-height: 0; }
   .hero-overlay h1 { font-size: 1.85rem; }
   .hero-overlay p  { font-size: 1rem; margin-bottom: 1.8rem; }
@@ -543,6 +584,24 @@ html { font-size: 18px; }
   .cta-section h2  { font-size: 1.6rem; }
   .cta-buttons .btn-cta-primary,
   .cta-buttons .btn-secondary-dark { width: 100%; text-align: center; }
-  .rating-number   { font-size: 3rem; }
-  .bar-meta        { min-width: 100px; }
+}
+
+/* Smallest phones — keep the 3-column product grid + 3-column
+   features row, tightest sizing */
+@media (max-width: 380px) {
+  html { font-size: 14px; }
+  .product-grid   { gap: 6px; }
+  .product-image, .product-card img { height: 76px; }
+  .product-info   { padding: 6px 6px 8px; }
+  .product-info h3 { font-size: 0.66rem; }
+  .price-row .price { font-size: 0.7rem; }
+  .category-badge, .thickness { font-size: 0.56rem; }
+  .order-btn      { font-size: 0.62rem; padding: 5px; }
+  .features       { margin: 16px 8px; padding: 10px 6px; gap: 6px; }
+  .feature-icon   { width: 22px; height: 22px; margin-bottom: 4px; }
+  .feature-card h3 { font-size: 0.6rem; }
+  .feature-card p  { font-size: 0.52rem; }
+  .rating-number  { font-size: 1.5rem; }
+  .rating-score-box { min-width: 58px; }
+  .bar-meta       { min-width: 46px; }
 }

@@ -163,13 +163,24 @@
 }
 
 /* ── Small phones ── */
+@media (max-width: 700px) {
+  .dashboard-header .notif-bell-wrapper:not(.notif-bell-wrapper--admin) {
+    position: static;
+  }
+  .dashboard-header .notif-bell-panel {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+  }
+}
+
 @media (max-width: 480px) {
   .notif-bell-panel {
-    width: 92vw;
     max-height: 70vh;
-    right: -8px;
   }
   .notif-bell-wrapper--admin .notif-bell-panel {
+    width: 92vw;
     left: -8px;
   }
   .notif-bell-panel-header {

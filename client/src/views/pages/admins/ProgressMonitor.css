@@ -1081,13 +1081,14 @@ body,
   .pm-modal-header { padding: 18px 16px; }
   .pm-modal-body { padding: 16px; gap: 16px; }
   .pm-modal-footer { padding: 16px; flex-wrap: wrap; }
-  .pm-info-grid { grid-template-columns: 1fr; }
+  .pm-info-grid { gap: 8px; }
+  .pm-info-cell { padding: 8px; }
   .pm-add-stage-row { flex-wrap: wrap; }
   .pm-add-stage-row .pm-add-btn { flex: 1 1 100%; }
 }
 
 @media (max-width: 400px) {
-  .pm-card-dates { grid-template-columns: 1fr; }
-  .pm-proof-grid { grid-template-columns: repeat(2, 1fr); }
+  .pm-card-dates { gap: 6px; font-size: 0.68rem; }
+  .pm-proof-grid { gap: 6px; }
   .pm-modal-title { font-size: 1.05rem; }
 }

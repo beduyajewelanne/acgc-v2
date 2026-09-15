@@ -213,18 +213,28 @@
 
 /* ── Responsive ── */
 @media (max-width: 640px) {
-  .epm-row         { grid-template-columns: 1fr; }
-  .epm-grid-4col   { grid-template-columns: 1fr; }
-  .epm-form        { padding: 18px 18px; }
+  /* Keep the 2-column field layout like on desktop — just tighten
+     the gaps/padding instead of stacking to a single column. */
+  .epm-row         { gap: 10px; }
+  .epm-grid-4col   { gap: 10px; }
+  .epm-form        { padding: 16px; gap: 12px; }
   .epm-header,
-  .epm-footer      { padding: 16px 18px; }
+  .epm-footer      { padding: 14px 16px; }
+  .epm-input,
+  .epm-select      { padding: 9px 10px; font-size: 0.88rem; }
+  .epm-field label { font-size: 0.76rem; }
 }
 
 @media (max-width: 400px) {
-  .epm-grid-4col   { grid-template-columns: 1fr; }
   .epm-overlay     { padding: 16px 10px; align-items: center; }
   .epm-title       { font-size: 1.05rem; }
+  .epm-row,
+  .epm-grid-4col   { gap: 8px; }
+  .epm-form        { padding: 14px; }
+  .epm-input,
+  .epm-select      { padding: 8px; font-size: 0.82rem; }
+  .epm-field label { font-size: 0.7rem; }
   .epm-footer      { flex-wrap: wrap; }
   .epm-cancel-btn,
-  .epm-save-btn    { flex: 1; text-align: center; }
+  .epm-save-btn    { flex: 1; text-align: center; padding: 9px 12px; font-size: 0.85rem; }
 }

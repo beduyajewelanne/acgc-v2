@@ -386,7 +386,10 @@
   .tp-result-container { padding: 0 14px; }
   .tp-order-header { padding: 14px 16px; }
   .tp-order-details { padding: 0 16px 16px; }
-  .tp-detail-grid   { grid-template-columns: 1fr; }
+  /* Keep the 2-column detail grid instead of stacking to 1. */
+  .tp-detail-grid   { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tp-detail-grid label { font-size: 0.72rem; }
+  .tp-detail-grid p     { font-size: 0.85rem; }
   .tp-mini-label    { max-width: 60px; }
   .tp-order-links   { flex-direction: column; }
   .tp-link-btn      { text-align: center; }

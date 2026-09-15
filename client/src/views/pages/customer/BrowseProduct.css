@@ -1474,7 +1474,7 @@
    RESPONSIVE
    ================================================================ */
 @media (max-width: 1024px) {
-  .bp-product-grid { grid-template-columns: repeat(2, 1fr); }
+  .bp-product-grid { grid-template-columns: repeat(3, 1fr); gap: 22px; padding: 0 24px; }
 
   /* Tablets (both orientations) now switch the modal to a single
      stacked column instead of waiting for the 768px breakpoint —
@@ -1508,7 +1508,9 @@
   .bp-hero-title       { font-size: 2.2rem; }
   .bp-controls-row     { padding: 0 16px; }
   .bp-results-row      { padding: 0 16px; }
-  .bp-product-grid     { grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 0 20px; }
+  /* Keep the 3-column grid like the laptop view — just tighten the
+     gutters so 3 cards still fit before the fold. */
+  .bp-product-grid     { grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 0 16px; }
   .bp-modal-body       { grid-template-columns: 1fr; min-height: 0; }
   .bp-modal-gallery    { border-radius: 20px 20px 0 0; }
   .bp-modal-details    { border-left: none; border-top: 1px solid var(--light-gray); padding: 28px 24px 24px; }
@@ -1518,7 +1520,23 @@
 }
 
 @media (max-width: 540px) {
-  .bp-product-grid  { grid-template-columns: 1fr; gap: 18px; padding: 0 16px; }
+  /* Still 3 columns — shrink gutters + card text instead of stacking. */
+  .bp-product-grid  { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 10px; }
+  .bp-card-image-wrap { margin: 6px 6px 0; border-radius: 6px; }
+  .bp-card-body     { padding: 8px 2px 12px !important; margin: 0 8px; gap: 2px; }
+  .bp-card-category { font-size: 0.58rem; }
+  .bp-card-name     { font-size: 0.78rem; line-height: 1.25; }
+  .bp-card-price    { font-size: 0.76rem; gap: 3px; }
+  .bp-card-unit     { font-size: 0.62rem; }
+  .bp-card-computed-price { font-size: 0.64rem; }
+  .bp-card-badge,
+  .bp-card-top-badge { font-size: 0.56rem; padding: 3px 7px; top: 8px; }
+  .bp-card-badge    { left: 8px; }
+  .bp-card-top-badge{ right: 8px; }
+  .bp-btn-view,
+  .bp-btn-order,
+  .bp-btn-cart      { width: 26px; height: 26px; }
+  .bp-card-actions  { margin: -34px 0 0 8px; gap: 5px; opacity: 1; transform: none; }
   .bp-modal-container { border-radius: 14px; }
   .bp-modal-gallery    { border-radius: 14px 14px 0 0; }
   .bp-success-card  { padding: 30px 22px; }
@@ -1541,4 +1559,19 @@
   .bp-modal-details { padding: 22px 18px 18px; }
   .bp-detail-name   { font-size: 1.3rem; }
   .bp-gallery-thumbs{ padding: 10px 14px 14px; }
+}
+
+/* Smallest phones (iPhone SE / small Android, ~320–380px) — still 3
+   columns, just the tightest possible card so nothing overflows or
+   forces a horizontal scrollbar. */
+@media (max-width: 380px) {
+  .bp-product-grid  { gap: 6px; padding: 0 8px; }
+  .bp-card-body     { padding: 6px 1px 10px !important; margin: 0 6px; }
+  .bp-card-name     { font-size: 0.7rem; }
+  .bp-card-price    { font-size: 0.68rem; }
+  .bp-card-category { font-size: 0.52rem; }
+  .bp-btn-view,
+  .bp-btn-order,
+  .bp-btn-cart      { width: 22px; height: 22px; }
+  .bp-card-actions  { margin: -30px 0 0 6px; gap: 4px; }
 }

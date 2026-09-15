@@ -292,7 +292,10 @@
 
 @media (max-width: 400px) {
   .orders-container h2 { font-size: 1.5rem; }
-  .detail-grid  { grid-template-columns: 1fr; }
+  /* Keep the 2-column detail grid, just shrink the type + gap. */
+  .detail-grid  { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .detail-grid label { font-size: 0.7rem; }
+  .detail-grid p     { font-size: 0.82rem; }
   .order-header { padding: 14px 16px; }
   .order-details { padding: 0 16px 16px; }
   .order-links  { flex-direction: column; }

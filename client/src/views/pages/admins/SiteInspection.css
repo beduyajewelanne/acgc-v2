@@ -1114,19 +1114,21 @@
   .si-stat-card { flex: 1 1 50%; border-bottom: 1px solid var(--border); }
   .si-stat-card:nth-child(even) { border-right: none; }
   .si-stat-card:nth-last-child(-n+2) { border-bottom: none; }
-  .si-form-grid-3 { grid-template-columns: 1fr 1fr; }
-  .si-detail-grid { grid-template-columns: 1fr 1fr; }
+  .si-detail-grid { grid-template-columns: repeat(3, 1fr); }
   .si-contract-paper-inner { padding: 28px 20px; }
   .si-modal-topbar-actions { flex-wrap: wrap; }
 }
 @media (max-width: 640px) {
-  .si-stat-card { flex: 1 1 100%; border-right: none; border-bottom: 1px solid var(--border); }
-  .si-stat-card:last-child { border-bottom: none; }
-  .si-form-grid-3, .si-form-grid-2 { grid-template-columns: 1fr; }
-  .si-detail-grid { grid-template-columns: 1fr; }
+  .si-stat-card { flex: 1 1 50%; border-bottom: 1px solid var(--border); }
+  .si-stat-card:nth-child(even) { border-right: none; }
+  .si-stat-card:nth-last-child(-n+2) { border-bottom: none; }
+  .si-form-grid-3 { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .si-form-grid-2 { gap: 10px; }
+  .si-detail-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .si-page-header { flex-direction: column; align-items: flex-start; }
   .si-modal-box--large { max-height: 95vh; }
-  .si-contract-parties, .si-contract-signatures { grid-template-columns: 1fr; }
+  .si-contract-parties, .si-contract-signatures { gap: 14px; }
+  .si-contract-signatures { gap: 20px; }
   .si-contract-paper-inner { padding: 20px 14px; }
   .si-contract-modal-body { padding: 12px; }
   .si-modal-overlay { padding: 12px; }

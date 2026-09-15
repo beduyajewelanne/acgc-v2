@@ -44,6 +44,7 @@
   min-height: 100vh;
   padding: 32px 36px;
   color: var(--ap-s800);
+  overflow-x: hidden;
 }
 @media (max-width: 768px) { .ap-root { padding: 20px 14px; } }
 
@@ -100,7 +101,7 @@
   position: absolute; top: 0; left: 0; right: 0; height: 4px;
   background: linear-gradient(90deg,var(--ap-blue),#b8532c);
 }
-@media (max-width: 860px) { .ap-card { grid-template-columns: 1fr; } }
+@media (max-width: 860px) { .ap-card { grid-template-columns: 1fr; gap: 20px; } }
 
 /* Avatar */
 .ap-card__avatar-col {
@@ -145,22 +146,27 @@
 .ap-fields {
   display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 12px;
 }
+@media (max-width: 560px) {
+  .ap-fields { grid-template-columns: 1fr; gap: 8px; }
+}
 .ap-field {
   display: flex; align-items: flex-start; gap: 9px;
   padding: 11px 13px; border-radius: var(--ap-rm);
   background: var(--ap-s50); border: 1px solid var(--ap-s100);
   transition: all var(--ap-trans);
+  min-width: 0;
 }
 .ap-field:hover { background: var(--ap-blue-bg); border-color: var(--ap-blue-b); }
 .ap-field--ro { opacity: .6; }
 .ap-field--ro:hover { background: var(--ap-s50); border-color: var(--ap-s100); cursor: not-allowed; }
 .ap-field__ico { color: var(--ap-blue); margin-top: 2px; flex-shrink: 0; }
 .ap-field__lbl {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
   font-size: .7rem; font-weight: 600; color: var(--ap-s400);
   text-transform: uppercase; letter-spacing: .07em; margin-bottom: 3px;
+  min-width: 0;
 }
-.ap-field__val { display: block; font-size: .83rem; font-weight: 500; color: var(--ap-s800); word-break: break-all; }
+.ap-field__val { display: block; font-size: .83rem; font-weight: 500; color: var(--ap-s800); overflow-wrap: anywhere; }
 .ap-ro-tag {
   font-size: .62rem; font-weight: 600; color: var(--ap-s400);
   background: var(--ap-s200); padding: 1px 6px; border-radius: 100px;
@@ -440,7 +446,6 @@
 @media (max-width: 560px) {
   .ap-log__controls { width: 100%; }
   .ap-search__input { width: 130px; }
-  .ap-reqs { grid-template-columns: 1fr; }
   .ap-log-card { flex-direction: column; align-items: flex-start; }
 }
 

@@ -292,36 +292,64 @@
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
-  .au-stats-grid    { grid-template-columns: repeat(2, 1fr); }
-  .au-process-steps { grid-template-columns: repeat(2, 1fr); }
+  .au-stats-grid    { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .au-stat-card     { padding: 18px 10px; }
+  .au-process-steps { grid-template-columns: repeat(4, 1fr); gap: 14px; }
   .au-process-steps::before { display: none; }
 }
 
 @media (max-width: 768px) {
   .au-header-section h1  { font-size: 2.2rem; }
   .au-header-section p   { font-size: 1rem; }
-  .au-content-grid       { grid-template-columns: 1fr; gap: 16px; padding: 0 16px; }
-  .au-stats-grid         { padding: 0 16px; }
+  .au-content-grid       { grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
+  .au-content-grid section { padding: 16px; }
+  .au-content-grid section h2 { font-size: 1rem; margin-bottom: 12px; padding-bottom: 8px; }
+  .au-services-list li   { font-size: 0.75rem; gap: 6px; padding: 5px 0; }
+  .au-contact-info p     { font-size: 0.75rem; padding: 7px 9px; }
+  .au-contact-btn        { padding: 9px 16px; font-size: 0.82rem; }
+  .au-stats-grid         { padding: 0 16px; gap: 10px; }
+  .au-stat-card          { padding: 14px 8px; }
+  .au-stat-value         { font-size: 1.3rem; }
+  .au-stat-card p        { font-size: 0.68rem; }
   .au-process-section    { padding: 0 16px; }
+  .au-process-section h2 { font-size: 1.5rem; }
+  .au-step               { padding: 14px 8px 12px; }
+  .au-step span          { width: 30px; height: 30px; font-size: 0.8rem; margin-bottom: 8px; }
+  .au-step h3            { font-size: 0.72rem; margin-bottom: 4px; }
+  .au-step p             { font-size: 0.6rem; line-height: 1.35; }
 }
 
 @media (max-width: 480px) {
-  .au-stats-grid       { grid-template-columns: 1fr 1fr; gap: 12px; }
-  .au-process-steps    { grid-template-columns: 1fr; }
+  .au-stats-grid       { gap: 6px; }
+  .au-process-steps    { gap: 6px; }
   .au-header-section    { padding: 48px 16px 56px; }
   .au-header-section h1  { font-size: 1.7rem; }
   .au-header-section p   { font-size: 0.92rem; }
-  .au-stat-card          { padding: 20px 14px; }
-  .au-stat-value         { font-size: 1.5rem; }
-  .au-content-grid section { padding: 22px 18px; }
+  .au-stat-card          { padding: 10px 4px; }
+  .au-stat-value         { font-size: 1.05rem; margin-bottom: 3px; }
+  .au-stat-card p        { font-size: 0.58rem; }
+  .au-content-grid       { gap: 8px; padding: 0 12px; }
+  .au-content-grid section { padding: 10px 8px; }
+  .au-content-grid section h2 { font-size: 0.82rem; margin-bottom: 8px; padding-bottom: 6px; }
+  .au-services-list li   { font-size: 0.64rem; }
+  .au-services-list li::before { width: 5px; height: 5px; }
+  .au-contact-info p     { font-size: 0.62rem; padding: 5px 6px; }
+  .au-contact-btn        { width: 100%; align-self: stretch; text-align: center; padding: 8px 10px; font-size: 0.72rem; }
   .au-process-section h2 { font-size: 1.4rem; }
-  .au-step               { padding: 22px 14px 18px; }
-  .au-contact-btn        { width: 100%; align-self: stretch; text-align: center; }
+  .au-step               { padding: 10px 4px 8px; }
+  .au-step span          { width: 24px; height: 24px; font-size: 0.66rem; margin-bottom: 6px; }
+  .au-step h3            { font-size: 0.6rem; }
+  .au-step p             { font-size: 0.5rem; }
 }
 
 @media (max-width: 360px) {
   .au-header-section h1  { font-size: 1.45rem; }
   .au-badge              { font-size: 0.68rem; padding: 4px 10px; }
-  .au-stats-grid         { grid-template-columns: 1fr; }
-  .au-stat-value         { font-size: 1.35rem; }
+  .au-stats-grid         { gap: 4px; }
+  .au-stat-value         { font-size: 0.92rem; }
+  .au-stat-card p        { font-size: 0.52rem; }
+  .au-content-grid       { gap: 6px; padding: 0 8px; }
+  .au-content-grid section { padding: 8px 6px; }
+  .au-process-steps      { gap: 4px; }
+  .au-step span          { width: 20px; height: 20px; font-size: 0.58rem; }
 }

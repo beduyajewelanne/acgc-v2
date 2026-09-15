@@ -1,5 +1,5 @@
 import React, { useState, useCallback, createContext, useEffect, useRef, useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getAccessLevels } from './services/data.services';
 
 // Pages

@@ -1090,3 +1090,15 @@ body {
   .mp-stat-card { flex: 1 1 100%; border-right: none; border-bottom: 1px solid var(--mp-border); }
   .mp-stat-card:last-child { border-bottom: none; }
 }
+
+@media (max-width: 480px) {
+  .mp-pms-page { padding: 1rem; }
+  .mp-pms-header__title { font-size: 1.4rem; }
+  .mp-pms-grid { grid-template-columns: 1fr; }
+  .mp-measurements-row { grid-template-columns: 1fr; }
+  .mp-measurements-row > *:last-child { grid-column: auto; }
+  .mp-cost-display { flex-wrap: wrap; gap: 0.5rem; }
+  .mp-upload-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+  .mp-modal-header, .mp-modal-body { padding-left: 1rem; padding-right: 1rem; }
+  .mp-modal-footer { padding: 1rem; }
+}

@@ -157,3 +157,21 @@
   .nav-links         { flex-wrap: wrap; justify-content: center; }
   .logo h2           { font-size: 1.05rem; }
 }
+
+@media (max-width: 480px) {
+  .dashboard-header  { padding: 12px 14px; gap: 10px; }
+  .logo-img          { height: 32px; }
+  .logo h2           { font-size: 0.92rem; letter-spacing: 0.04em; }
+  .nav-links         { gap: 4px; width: 100%; }
+  .nav-links a       { font-size: 0.88rem; padding: 6px 8px; }
+  .logout-btn,
+  .login-btn,
+  .signup-btn        { padding: 7px 14px !important; font-size: 0.9rem !important; }
+}
+
+@media (max-width: 360px) {
+  .nav-links a       { font-size: 0.82rem; padding: 5px 6px; }
+  .logout-btn,
+  .login-btn,
+  .signup-btn        { padding: 6px 10px !important; font-size: 0.82rem !important; }
+}

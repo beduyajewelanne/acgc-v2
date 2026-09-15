@@ -1131,3 +1131,25 @@
   .si-contract-modal-body { padding: 12px; }
   .si-modal-overlay { padding: 12px; }
 }
+@media (max-width: 480px) {
+  .si-root { padding: 12px; }
+  .si-page-title { font-size: 20px; }
+  .si-page-sub   { font-size: 12.5px; }
+  .si-btn-new    { width: 100%; justify-content: center; }
+  .si-toolbar-right { width: 100%; flex-wrap: wrap; }
+  .si-search-wrap { min-width: 0; flex-basis: 100%; }
+  .si-filter, .si-toggle-canceled-btn { flex: 1; }
+  .si-modal-topbar { padding: 16px; }
+  .si-modal-topbar-actions { width: 100%; }
+  .si-modal-body   { padding: 16px; gap: 16px; }
+  .si-modal-footer { padding: 12px 16px; flex-wrap: wrap; }
+  .si-modal-footer button { flex: 1 1 auto; }
+  .si-confirm-actions { flex-wrap: wrap; width: 100%; }
+  .si-confirm-actions button { flex: 1; }
+  .si-contract-info-banner { padding: 10px 16px; font-size: 12px; }
+  .si-contract-paper-inner { padding: 16px 12px; }
+  .si-contract-header { flex-direction: column; gap: 10px; }
+  .si-contract-meta { text-align: left; }
+  .si-form-section { padding: 14px; }
+  .si-total-row { font-size: 13px; }
+}

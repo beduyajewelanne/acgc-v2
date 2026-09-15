@@ -188,3 +188,17 @@
   color: var(--mid-gray);
   display: block;
 }
+
+/* ── Responsive ── */
+@media (max-width: 560px) {
+  .cart-container { padding: 0 14px 40px; margin: 28px auto; }
+  .cart-container h2 { font-size: 1.5rem; }
+  .cart-item-card { padding: 14px; gap: 12px; }
+  .cart-item-card img { width: 64px; height: 64px; }
+  .cart-total-box { padding: 18px 16px; }
+}
+
+@media (max-width: 380px) {
+  .cart-item-card { flex-direction: column; align-items: center; text-align: center; }
+  .remove-btn { align-self: flex-end; margin-top: -8px; }
+}

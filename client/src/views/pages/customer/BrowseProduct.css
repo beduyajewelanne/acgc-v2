@@ -1523,3 +1523,22 @@
   .bp-modal-gallery    { border-radius: 14px 14px 0 0; }
   .bp-success-card  { padding: 30px 22px; }
 }
+
+@media (max-width: 480px) {
+  .bp-browse-hero   { padding: 48px 18px 56px; }
+  .bp-hero-title    { font-size: 1.7rem; }
+  .bp-hero-sub      { font-size: 0.95rem; }
+  .bp-controls-row  { flex-direction: column; align-items: stretch; margin-top: 24px; }
+  .bp-search-wrap   { min-width: 0; width: 100%; }
+  .bp-filter-wrap   { width: 100%; }
+  .bp-filter-select { flex: 1; min-width: 0; }
+  .bp-results-row   { flex-wrap: wrap; gap: 8px; }
+  .bp-form-page     { padding: 40px 16px 24px; }
+  .bp-form-page-title { font-size: 1.4rem; }
+  .bp-order-summary-panel { padding: 16px; }
+  .bp-order-product-card { flex-wrap: wrap; }
+  .bp-meas-grid     { flex-wrap: wrap; gap: 10px; }
+  .bp-modal-details { padding: 22px 18px 18px; }
+  .bp-detail-name   { font-size: 1.3rem; }
+  .bp-gallery-thumbs{ padding: 10px 14px 14px; }
+}

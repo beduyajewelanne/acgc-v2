@@ -1071,3 +1071,23 @@ body,
   display: block;
   flex-shrink: 0;
 }
+
+/* ─── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .pm-page-header { padding: 16px; }
+  .pm-page-title { font-size: 1.25rem; }
+  .pm-content { padding: 16px 12px; }
+  .pm-header-badges { gap: 12px; }
+  .pm-modal-header { padding: 18px 16px; }
+  .pm-modal-body { padding: 16px; gap: 16px; }
+  .pm-modal-footer { padding: 16px; flex-wrap: wrap; }
+  .pm-info-grid { grid-template-columns: 1fr; }
+  .pm-add-stage-row { flex-wrap: wrap; }
+  .pm-add-stage-row .pm-add-btn { flex: 1 1 100%; }
+}
+
+@media (max-width: 400px) {
+  .pm-card-dates { grid-template-columns: 1fr; }
+  .pm-proof-grid { grid-template-columns: repeat(2, 1fr); }
+  .pm-modal-title { font-size: 1.05rem; }
+}

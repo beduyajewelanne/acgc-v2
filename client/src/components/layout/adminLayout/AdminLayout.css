@@ -324,3 +324,31 @@
   .admin-sidebar-link-label { display: none; }
   .admin-sidebar--collapsed { width: 0; border-right: none; box-shadow: none; }
 }
+
+@media (max-width: 480px) {
+  .admin-sidebar {
+    width: 64px;
+  }
+  .admin-sidebar-toggle {
+    width: 24px;
+    height: 24px;
+    right: -12px;
+    top: 20px;
+  }
+  .admin-sidebar-header { padding: 18px 0 14px; }
+  .admin-sidebar-logo {
+    width: 36px;
+    height: 36px;
+  }
+  .admin-sidebar-link,
+  .admin-sidebar-logout {
+    width: 40px;
+    padding: 9px 0;
+  }
+  /* Hover-only tooltips don't work on touch; hide them on small phones
+     instead of leaving a dangling label that can never be seen. */
+  .admin-sidebar-link::after,
+  .admin-sidebar-logout::after {
+    display: none;
+  }
+}

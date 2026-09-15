@@ -290,6 +290,15 @@
   .detail-grid  { grid-template-columns: 1fr 1fr; }
 }
 
+@media (max-width: 400px) {
+  .orders-container h2 { font-size: 1.5rem; }
+  .detail-grid  { grid-template-columns: 1fr; }
+  .order-header { padding: 14px 16px; }
+  .order-details { padding: 0 16px 16px; }
+  .order-links  { flex-direction: column; }
+  .link-btn, .file-choose-btn { text-align: center; }
+}
+
 /* Base Pill Container Layout */
 .status-pill {
   display: inline-block;

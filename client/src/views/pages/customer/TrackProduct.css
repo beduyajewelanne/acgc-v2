@@ -378,3 +378,16 @@
   .tp-order-header  { flex-direction: column; }
   .tp-detail-grid   { grid-template-columns: 1fr 1fr; }
 }
+
+@media (max-width: 480px) {
+  .tp-hero { padding: 48px 16px 56px; }
+  .tp-hero h1 { font-size: 1.55rem; }
+  .tp-hero p  { font-size: 0.92rem; }
+  .tp-result-container { padding: 0 14px; }
+  .tp-order-header { padding: 14px 16px; }
+  .tp-order-details { padding: 0 16px 16px; }
+  .tp-detail-grid   { grid-template-columns: 1fr; }
+  .tp-mini-label    { max-width: 60px; }
+  .tp-order-links   { flex-direction: column; }
+  .tp-link-btn      { text-align: center; }
+}

@@ -270,7 +270,9 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   box-shadow: var(--shadow-sm);
 }
 .settings-data-table {
@@ -953,6 +955,23 @@
   .settings-summary-card:last-child { border-bottom: none; }
   .settings-module-card { flex-wrap: nowrap; }
   .settings-subrole-row { flex-direction: column; }
+  .settings-page-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .settings-page-title { font-size: 1.4rem; }
+  .settings-section-title { font-size: 1.1rem; }
+  .settings-modal-header { padding: 16px 16px 12px; }
+  .settings-modal-section { padding: 14px 16px; }
+  .settings-modal-footer { padding: 12px 16px; flex-direction: column; align-items: stretch; gap: 8px; }
+  .settings-footer-right { justify-content: stretch; }
+  .settings-footer-right button { flex: 1; }
+  .settings-custom-role-input { flex-wrap: wrap; }
+  .settings-confirm-dialog { padding: 18px; max-width: 92vw; }
+  .settings-confirm-actions { flex-wrap: wrap; }
+  .settings-confirm-actions button { flex: 1; }
+  .settings-backup-actions { flex-wrap: wrap; }
+  .settings-backup-actions button { flex: 1 1 100%; }
+  .settings-toast-container { left: 12px; right: 12px; bottom: 12px; }
+  .settings-toast { min-width: 0; max-width: none; }
+  .settings-global-perms-grid { grid-template-columns: 1fr; }
 }
 
 /* ─── Global Customer Permissions Panel ──────────────────────────────────── */

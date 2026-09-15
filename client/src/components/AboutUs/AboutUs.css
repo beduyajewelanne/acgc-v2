@@ -299,11 +299,29 @@
 
 @media (max-width: 768px) {
   .au-header-section h1  { font-size: 2.2rem; }
-  .au-content-grid       { grid-template-columns: 1fr; }
+  .au-header-section p   { font-size: 1rem; }
+  .au-content-grid       { grid-template-columns: 1fr; gap: 16px; padding: 0 16px; }
+  .au-stats-grid         { padding: 0 16px; }
+  .au-process-section    { padding: 0 16px; }
 }
 
 @media (max-width: 480px) {
-  .au-stats-grid    { grid-template-columns: 1fr 1fr; gap: 12px; }
-  .au-process-steps { grid-template-columns: 1fr; }
-  .au-header-section { padding: 60px 20px 68px; }
+  .au-stats-grid       { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .au-process-steps    { grid-template-columns: 1fr; }
+  .au-header-section    { padding: 48px 16px 56px; }
+  .au-header-section h1  { font-size: 1.7rem; }
+  .au-header-section p   { font-size: 0.92rem; }
+  .au-stat-card          { padding: 20px 14px; }
+  .au-stat-value         { font-size: 1.5rem; }
+  .au-content-grid section { padding: 22px 18px; }
+  .au-process-section h2 { font-size: 1.4rem; }
+  .au-step               { padding: 22px 14px 18px; }
+  .au-contact-btn        { width: 100%; align-self: stretch; text-align: center; }
+}
+
+@media (max-width: 360px) {
+  .au-header-section h1  { font-size: 1.45rem; }
+  .au-badge              { font-size: 0.68rem; padding: 4px 10px; }
+  .au-stats-grid         { grid-template-columns: 1fr; }
+  .au-stat-value         { font-size: 1.35rem; }
 }

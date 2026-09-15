@@ -259,3 +259,10 @@
   .cart-title     { font-size: 1.5rem; }
   .item-info      { flex-wrap: wrap; }
 }
+
+@media (max-width: 400px) {
+  .cart-container { padding: 0 12px; }
+  .item-main-row   { flex-wrap: wrap; }
+  .price-section   { align-items: flex-start; flex-direction: row; justify-content: space-between; width: 100%; }
+  .cart-summary    { padding: 18px 16px; }
+}

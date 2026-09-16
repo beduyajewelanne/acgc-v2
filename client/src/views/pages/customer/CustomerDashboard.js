@@ -158,7 +158,7 @@ const CustomerDashboard = ({ isLoggedIn }) => {
               .sort((a, b) => (b.isTopProduct ? 1 : 0) - (a.isTopProduct ? 1 : 0))
               .slice(0, 3)
               .map((p) => (
-                <ProductCard key={p._id || p.id} product={p} />
+                <ProductCard key={p._id || p.id} product={p} hideDescription />
               ))
           )}
         </div>
@@ -188,7 +188,7 @@ const CustomerDashboard = ({ isLoggedIn }) => {
                       style={{ width: `${item.percentage}%` }}
                     ></div>
                   </div>
-w
+
                   <div className="bar-meta">
                     <div className="stars-gold">
                       {renderStars(item.stars)}

@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
 
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, hideDescription = false }) => {
   // const { addToCart } = useContext(CartContext);
   // const navigate = useNavigate();
   const imageUrl = (product.mainImg && product.mainImg.startsWith('/uploads/')) 
@@ -29,7 +29,7 @@ const ProductCard = ({ product }) => {
       <div className="product-info">
         <span className="category-badge">{product.category}</span>
         <h3>{product.name}</h3>
-        <p>{product.description || "N/A"}</p>
+        {!hideDescription && <p>{product.description || "N/A"}</p>}
         <div className="price-row">
           <span style={{fontWeight: 'bold'}}>
             ₱{product.estimatedCost ? Number(product.estimatedCost).toLocaleString('en-PH', { minimumFractionDigits: 2 }) : (product.price || '—')}

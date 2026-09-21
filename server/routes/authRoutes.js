@@ -176,7 +176,7 @@ authRoutes.post("/api/register", async (req, res) => {
         const hashedPassword = await hashPass(password);
         const emailVerificationToken = crypto.randomBytes(32).toString("hex");
 
-        const db = dbo.getDb();
+        const db = await dbo.getDb();
         const existingUsersCount = await db.collection("users").countDocuments();
         const assignedRole = existingUsersCount === 0 ? "admin" : "client";
         const isSuperAdmin = existingUsersCount === 0;
@@ -283,7 +283,7 @@ authRoutes.get("/api/verify-email", async (req, res) => {
             return res.status(400).send(renderStatusPage("failed", "Missing verification token.", clientUrl));
         }
 
-        const db = dbo.getDb();
+        const db = await dbo.getDb();
         const user = await db.collection("users").findOne({ verificationToken: token });
 
         if (!user) {
@@ -308,7 +308,7 @@ authRoutes.post("/api/forgot-password", async (req, res) => {
         const { email } = req.body;
         if (!email) return res.status(400).json({ remarks: "failed", message: "Email is required" });
 
-        const db = dbo.getDb();
+        const db = await dbo.getDb();
         const user = await db.collection("users").findOne({ email: { $regex: `^${email}$`, $options: "i" } });
         
         if (!user) {
@@ -368,7 +368,7 @@ authRoutes.post("/api/verify-code", async (req, res) => {
         const { email, code } = req.body;
         if (!email || !code) return res.status(400).json({ remarks: "failed", message: "All fields are required" });
 
-        const db = dbo.getDb();
+        const db = await dbo.getDb();
         const user = await db.collection("users").findOne({ 
             email: { $regex: `^${email}$`, $options: "i" },
             resetCode: code
@@ -393,7 +393,7 @@ authRoutes.post("/api/reset-password", async (req, res) => {
         const { email, code, newPassword } = req.body;
         if (!email || !code || !newPassword) return res.status(400).json({ remarks: "failed", message: "Missing required details" });
 
-        const db = dbo.getDb();
+        const db = await dbo.getDb();
         const user = await db.collection("users").findOne({ 
             email: { $regex: `^${email}$`, $options: "i" },
             resetCode: code

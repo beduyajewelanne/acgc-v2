@@ -22,7 +22,7 @@ userRoutes.post("/api/get_settings_users", async (req, res) => {
             ]);
             const usersList = usersResult.payload || [];
 
-            const db = dbo.getDb();
+            const db = await dbo.getDb();
 
             // Stitch user documents with their respective configurations inside "access_level"
             const detailedUsers = await Promise.all(usersList.map(async (u) => {
@@ -53,7 +53,7 @@ userRoutes.post("/api/get_settings_users", async (req, res) => {
 // Individual User Access Matrix Persist Update (Upgrades / Downgrades / Fine-grained Staff Permissions)
 userRoutes.post("/api/update_user_access_level", async (req, res) => {
     try {
-        const db = dbo.getDb();
+        const db = await dbo.getDb();
         const { token, admin_id, target_user_id, role, subrole, modules } = req.body;
 
         if (!token || !admin_id) {
@@ -128,7 +128,7 @@ userRoutes.post("/api/update_user_access_level", async (req, res) => {
 
 // GLOBAL MASS UPDATE CONFIGURATOR FOR CLIENTS
 userRoutes.post("/api/update_global_customer_permissions", async (req, res) => {
-    const db = dbo.getDb();
+    const db = await dbo.getDb();
     const { client_modules } = req.body;
     
     // Normalize fetching target client roles
@@ -175,7 +175,7 @@ userRoutes.post("/api/get_user_access_level", async (req, res) => {
         checkAuth(token, _id, async (isValid) => {
             if (!isValid) return res.status(401).json({ error: "Unauthorized" });
 
-            const db_connect = dbo.getDb();
+            const db_connect = await dbo.getDb();
             const result = await db_connect.collection("access_level").findOne({ user_id: new ObjectId(_id) });
             if (result) {
                 return res.status(200).json({ remarks: "success", message: "Data fetched successfully", payload: result });
@@ -190,7 +190,7 @@ userRoutes.post("/api/get_user_access_level", async (req, res) => {
 
 userRoutes.post("/api/get_global_client_template", async (req, res) => {
   try {
-    const db = dbo.getDb();
+    const db = await dbo.getDb();
     const baseTemplate = await db.collection("base_access_level").findOne({ type: "client" });
     
     if (baseTemplate && baseTemplate.modules && baseTemplate.modules.Client) {
@@ -228,7 +228,7 @@ userRoutes.post ("/api/get_user_profile", async (req, res) => {
         checkAuth(token, _id, async (isValid) => {
             if (!isValid) return res.status(401).json({ error: "Unauthorized" });
 
-            const db_connect = dbo.getDb();
+            const db_connect = await dbo.getDb();
             const result = await db_connect.collection("users").findOne({ _id: new ObjectId(_id) });
             delete result.password;
             if (result) {
@@ -250,7 +250,7 @@ userRoutes.post("/api/get_user_dashboard", async (req, res) => {
         if (!isValid) return res.status(401).json({ error: "Unauthorized" });
 
         try {
-            const db_connect = dbo.getDb();
+            const db_connect = await dbo.getDb();
             const userObjectId = new ObjectId(_id);
 
             // 1. Pipeline for Grouped Orders Dashboard Display
@@ -405,7 +405,7 @@ userRoutes.post("/api/update_user_profile", async (req, res) => {
         checkAuth(token, _id, async (isValid) => {
             if (!isValid) return res.status(401).json({ error: "Unauthorized" });
 
-            const db = dbo.getDb();
+            const db = await dbo.getDb();
             
             // Build the standard update payload tracking structural geography elements
             const updateFields = {
@@ -462,7 +462,7 @@ userRoutes.post("/api/update_admin_account", async (req, res) => {
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ error: "Unauthorized" });
 
-            const db = dbo.getDb();
+            const db = await dbo.getDb();
             const targetQuery = { _id: new ObjectId(user_id) };
 
             // Fetch current record to verify current password and validate email changes

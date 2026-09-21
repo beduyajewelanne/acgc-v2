@@ -128,7 +128,7 @@ const generateTransactionsExcel = async (db, backupPath) => {
 
 // Pure Node.js Mongo Data Backup (Vercel-compatible)
 const runDatabaseBackup = async (backupType = "Manual") => {
-    const db = dbo.getDb();
+    const db = await dbo.getDbDb();
     const timestamp = new Date().toISOString().split('T')[0];
     const prefix = `${backupType.toUpperCase().replace(/\s+/g, '_')}_BACKUP_${timestamp}`;
     const backupFolderName = `backup-${prefix}-${Date.now()}`;
@@ -188,7 +188,7 @@ const runDatabaseBackup = async (backupType = "Manual") => {
 
 backupRouter.get('/api/backup/dashboard', async (req, res) => {
     try {
-        const db = dbo.getDb();
+        const db = await dbo.getDbDb();
         const settings = await db.collection("backup_settings").findOne({ _id: "system_backup_config" }) || { activeSchedule: "weekly" };
         const history = await db.collection("backup_history").find({}).sort({ date: -1 }).toArray();
 
@@ -220,7 +220,7 @@ backupRouter.get('/api/backup/dashboard', async (req, res) => {
 backupRouter.post('/api/backup/update-schedule', async (req, res) => {
     const { activeSchedule } = req.body;
     try {
-        const db = dbo.getDb();
+        const db = await dbo.getDbDb();
         await db.collection("backup_settings").updateOne(
             { _id: "system_backup_config" },
             { $set: { activeSchedule, updatedAt: new Date() } },
@@ -234,7 +234,7 @@ backupRouter.post('/api/backup/update-schedule', async (req, res) => {
 
 backupRouter.post('/api/backup/run-manual', async (req, res) => {
     try {
-        const db = dbo.getDb();
+        const db = await dbo.getDbDb();
         const settings = await db.collection("backup_settings").findOne({ _id: "system_backup_config" }) || { activeSchedule: "Weekly" };
         let typeString = settings.activeSchedule === "full" ? "Full System" : settings.activeSchedule;
         typeString = typeString.charAt(0).toUpperCase() + typeString.slice(1);
@@ -248,7 +248,7 @@ backupRouter.post('/api/backup/run-manual', async (req, res) => {
 
 backupRouter.get('/api/backup/download/:id', async (req, res) => {
     try {
-        const db = dbo.getDb();
+        const db = await dbo.getDbDb();
         let record;
         try {
             record = await db.collection("backup_history").findOne({ _id: new ObjectId(req.params.id) });

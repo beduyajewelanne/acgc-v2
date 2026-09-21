@@ -433,7 +433,7 @@ productRoutes.post("/api/submit_feedback", async (req, res) => {
                         message: "You have already submitted feedback for this order." 
                     });
                 }
-                const db = dbo.getDb();
+                const db = await dbo.getDb();
                 const orderItems = await db.collection("order_requests").find({ orderId: orderId }).toArray();
 
                 if (orderItems.length === 0) {

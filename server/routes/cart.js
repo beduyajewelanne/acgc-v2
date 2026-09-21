@@ -560,7 +560,7 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
 // ─── 2. CANCEL / UPDATE SPECIFIC ORDER REQUEST STATUS ─────────────────────
 cartRoutes.post("/api/cancel_order_request", async (req, res) => {
     const { token, userId, order_id } = req.body;
-    const db = dbo.getDb();
+    const db = await dbo.getDb();
     if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session tokens" });
     if (!userId) return res.status(400).json({ remarks: "failed", message: "Missing security tracking identity coordinates" });
     if (!order_id) return res.status(400).json({ remarks: "failed", message: "Missing order transaction key parameter reference" });
@@ -912,7 +912,7 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
         checkAuth(token, _id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "Unauthorized" });
 
-            const db = await dbo.getDb();
+            const db = await await dbo.getDb();
             let matchedUserId = null;
             let matchedUser = null; // Correctly initialized
 
@@ -1028,7 +1028,7 @@ cartRoutes.post("/api/update_order_request", async (req, res) => {
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "Unauthorized" });
 
-            const db = await dbo.getDb();
+            const db = await await dbo.getDb();
             let matchedUserId = null;
 
             // Re-verify/find user link by email update options
@@ -1191,7 +1191,7 @@ cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async
 
   try {
     const savedRelativePath = `/uploads/${req.file.filename}`;
-    const db = dbo.getDb ? dbo.getDb() : req.app.get('db');
+    const db = await dbo.getDb ? await dbo.getDb() : req.app.get('db');
 
     // Update database paths systematically matching target references
     if (orderId && orderId !== "") {
@@ -1243,7 +1243,7 @@ cartRoutes.post("/api/manual_approve_order", upload.single('receiptFile'), async
 
   try {
     const savedRelativePath = `/uploads/${req.file.filename}`;
-    const db = dbo.getDb ? dbo.getDb() : req.app.get('db');
+    const db = await dbo.getDb ? await dbo.getDb() : req.app.get('db');
 
     // Fetch matching layout arrays across collections to scale up payment evaluations accurately
     const matchItems = await db.collection('order_requests').find({ orderId: orderId }).toArray();
@@ -1407,7 +1407,7 @@ cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFil
           return res.status(401).json({ remarks: "failed", message: "Unauthorized transaction attempt." });
         }
 
-        const db = dbo.getDb();
+        const db = await dbo.getDb();
         const userObjectId = new ObjectId(userId);
 
         // Find a single sample document from the group to check for an existing file path link
@@ -1556,7 +1556,7 @@ cartRoutes.post("/api/update_order_request_progress", async (req, res) => {
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security framework validation failed" });
 
-            const db = await dbo.getDb();
+            const db = await await dbo.getDb();
             
             const updateFields = {
                 stages: stages || [],
@@ -1602,7 +1602,7 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
 
-            const db = dbo.getDb();
+            const db = await dbo.getDb();
 
             // 3. Clean and explicitly type parameters
             const cleanPaymentMethod = String(paymentMethod).trim();
@@ -1719,7 +1719,7 @@ cartRoutes.post("/api/upload_payment_proof", upload.single("proofFile"), async (
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
             if (!req.file) return res.status(400).json({ remarks: "failed", message: "No proof of payment file was received." });
 
-            const db = dbo.getDb();
+            const db = await dbo.getDb();
             const savedRelativePath = `/uploads/${req.file.filename}`;
 
             const updateResult = await db.collection("order_requests").updateMany(
@@ -1760,7 +1760,7 @@ cartRoutes.post("/api/notify_payment_sent", async (req, res) => {
         checkAuth(token, userId, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
 
-            const db = dbo.getDb();
+            const db = await dbo.getDb();
 
             const targetSample = await db.collection("order_requests").findOne({ orderId: orderId });
             if (!targetSample) {

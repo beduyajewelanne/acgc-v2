@@ -3,14 +3,23 @@ const notificationRoutes = express.Router();
 const dbo = require("../helper/db");
 const { ObjectId } = require("mongodb");
 const { checkAuth } = require("../helper/Helper");
-const notificationsCollection = () => dbo.getDb().collection("notifications");
-const dedupeLocksCollection = () => dbo.getDb().collection("notification_dedupe_locks");
+
+async function notificationsCollection() {
+    const db = await dbo.getDb();
+    return db.collection("notifications");
+}
+
+async function dedupeLocksCollection() {
+    const db = await dbo.getDb();
+    return db.collection("notification_dedupe_locks");
+}
 
 let dedupeIndexesEnsured = false;
 async function ensureDedupeIndexes() {
     if (dedupeIndexesEnsured) return;
     try {
-        await dedupeLocksCollection().createIndex({ type: 1, orderId: 1, discriminator: 1 }, { unique: true });
+        const collection = await dedupeLocksCollection();
+        await collection.createIndex({ type: 1, orderId: 1, discriminator: 1 }, { unique: true });
         dedupeIndexesEnsured = true;
     } catch (err) {
         console.error("[Notifications] Failed to ensure dedupe indexes:", err.message);
@@ -19,7 +28,8 @@ async function ensureDedupeIndexes() {
 
 async function pushNotification({ recipientRole, recipientId = null, type, title, message, link = null, orderId = null }) {
     try {
-        await notificationsCollection().insertOne({
+        const collection = await notificationsCollection();
+        await collection.insertOne({
             recipientRole,                                   // "admin" | "customer"
             recipientId: recipientId ? new ObjectId(recipientId) : null,
             type,
@@ -34,11 +44,13 @@ async function pushNotification({ recipientRole, recipientId = null, type, title
         console.error("[Notifications] Failed to insert notification:", err.message);
     }
 }
+
 async function claimNotificationSlot(type, orderId, discriminator = null) {
     if (!orderId) return true; // walang orderId na pagbabasehan ng dedupe, palagi na lang payagan (dating behavior din ito)
     await ensureDedupeIndexes();
     try {
-        await dedupeLocksCollection().insertOne({ type, orderId, discriminator, createdAt: new Date() });
+        const collection = await dedupeLocksCollection();
+        await collection.insertOne({ type, orderId, discriminator, createdAt: new Date() });
         return true;
     } catch (err) {
         if (err.code === 11000) return false; // duplicate key = may nauna nang naka-claim
@@ -47,10 +59,10 @@ async function claimNotificationSlot(type, orderId, discriminator = null) {
     }
 }
 
-function startWatchers() {
+async function startWatchers() {
     let db;
     try {
-        db = dbo.getDb();
+        db = await dbo.getDb();
     } catch (e) {
         db = null;
     }
@@ -242,7 +254,8 @@ notificationRoutes.post("/api/get_notifications", async (req, res) => {
                     $or: [{ recipientId: new ObjectId(_id) }, { recipientId: null }]
                 };
 
-            const notifications = await notificationsCollection()
+            const collection = await notificationsCollection();
+            const notifications = await collection
                 .find(filter)
                 .sort({ createdAt: -1 })
                 .limit(50)
@@ -272,7 +285,8 @@ notificationRoutes.post("/api/mark_notification_read", async (req, res) => {
         checkAuth(token, _id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Unauthorized" });
 
-            await notificationsCollection().updateOne(
+            const collection = await notificationsCollection();
+            await collection.updateOne(
                 { _id: new ObjectId(notificationId) },
                 { $set: { read: true } }
             );
@@ -302,7 +316,8 @@ notificationRoutes.post("/api/mark_all_notifications_read", async (req, res) => 
                     $or: [{ recipientId: new ObjectId(_id) }, { recipientId: null }]
                 };
 
-            await notificationsCollection().updateMany(filter, { $set: { read: true } });
+            const collection = await notificationsCollection();
+            await collection.updateMany(filter, { $set: { read: true } });
 
             return res.status(200).json({ remarks: "success" });
         });

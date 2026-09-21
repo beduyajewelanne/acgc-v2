@@ -1,27 +1,29 @@
 const { MongoClient } = require("mongodb");
+
 const Db = process.env.ATLAS_URI;
 const app_env = process.env.REACT_APP_ENV;
 
-if (!Db) {
-  console.error("❌ Error: ATLAS_URI is not defined in your environment variables.");
-}
-
-const client = new MongoClient(Db);
+let client;
 let _db;
-let isConnecting = false;
+let connectionPromise = null;
 
 async function connectToServer(callback) {
-  // Reuse existing connection if available
   if (_db) {
     if (typeof callback === "function") callback(null);
-    return;
+    return _db;
   }
 
-  try {
-    if (!isConnecting) {
-      isConnecting = true;
-      await client.connect();
-      
+  if (!Db) {
+    const err = new Error("❌ Error: ATLAS_URI is not defined in your environment variables.");
+    console.error(err.message);
+    if (typeof callback === "function") callback(err);
+    throw err;
+  }
+
+  // Reuse the existing connection attempt if one is already in flight
+  if (!connectionPromise) {
+    client = new MongoClient(Db);
+    connectionPromise = client.connect().then(() => {
       if (app_env === "development") {
         _db = client.db("acgc-development");
         console.log("Development Server - Connected to MongoDB");
@@ -29,22 +31,31 @@ async function connectToServer(callback) {
         _db = client.db("acgc-production");
         console.log("Production Server - Connected to MongoDB");
       } else {
-        // Default fallback if REACT_APP_ENV is not set
         _db = client.db("acgc-production");
         console.log("Connected to MongoDB default database");
       }
-      isConnecting = false;
-    }
+      return _db;
+    }).catch((err) => {
+      connectionPromise = null; // Reset on failure so future attempts can retry
+      console.error("Failed to connect to MongoDB:", err.message);
+      throw err;
+    });
+  }
 
+  try {
+    const db = await connectionPromise;
     if (typeof callback === "function") callback(null);
+    return db;
   } catch (err) {
-    isConnecting = false;
-    console.error("Failed to connect to MongoDB:", err.message);
     if (typeof callback === "function") callback(err);
+    throw err;
   }
 }
 
-function getDb() {
+async function getDb() {
+  if (!_db) {
+    await connectToServer();
+  }
   return _db;
 }
 

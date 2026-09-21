@@ -1,7 +1,7 @@
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
-const { ObjectId } = require("mongodb");
-const dbo = require("./db.js");
+const { ObjectId, MongoClient } = require("mongodb");
+const { getDb, connectToServer } = require("./db.js");
 
 function isEmpty(data) {
   if (data == null) return true;
@@ -47,7 +47,7 @@ async function validateHash(inputPassword, passwordHashed) {
 }
 
 async function insert_one_helper(target_collection, data) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     const inserted_result = await db_connect
@@ -72,7 +72,7 @@ async function insert_one_helper(target_collection, data) {
 }
 
 async function update_one_helper(target_collection, target_query, set_data) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     const result = await db_connect
@@ -104,7 +104,7 @@ async function update_one_helper(target_collection, target_query, set_data) {
 }
 
 async function delete_or_archive_helper(target_collection, target_query, archive = false) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     let result;
@@ -144,7 +144,7 @@ async function delete_or_archive_helper(target_collection, target_query, archive
 }
 
 async function delete_or_archive_many_helper(target_collection, target_query, archive = false) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     let result;
@@ -187,7 +187,7 @@ async function delete_or_archive_many_helper(target_collection, target_query, ar
 }
 
 async function get_data_helper(target_collection, target_query = {}) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     let result;
@@ -220,7 +220,7 @@ async function get_data_helper(target_collection, target_query = {}) {
 }
 
 async function check_record_exists(target_collection, query = {}) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
 
   try {
     let result;
@@ -253,9 +253,9 @@ async function check_record_exists(target_collection, query = {}) {
   }
 }
 
-async function restore_data(target_collection, _id) {
+async function restore_data(target_collection, _id, db) {
   try {
-    let db_connect = dbo.getDb();
+    let db_connect = getDb();
 
     const myquery = { _id: new ObjectId(_id) };
     const newvalues = { $set: { archive: 0 } };
@@ -310,7 +310,7 @@ async function checkAuth(token, _id, callback) {
 }
 
 async function actionLog(userId, actionType, description) {
-  const db_connect = dbo.getDb();
+  const db_connect = getDb();
   try {
     await db_connect.collection("action_logs").insertOne({
       userId: userId ? new ObjectId(userId): null,

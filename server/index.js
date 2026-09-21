@@ -51,10 +51,10 @@ app.use(notifyRoutes);
 app.get("/api/test", (_req, res) => res.json({ status: "ok" }));
 
 // ── Local Development Listener ────────────────────────────────────────────────
-if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port: ${PORT}`);
-  });
-}
+// if (process.env.NODE_ENV !== "production") {
+app.listen(PORT, () => {
+  console.log(`Server is running on port: ${PORT}`);
+});
+// }
 
 module.exports = app;

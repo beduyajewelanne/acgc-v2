@@ -43,7 +43,7 @@ function renderStatusPage(status, message, clientUrl) {
     const bgIcon = isSuccess ? "#dcfce7" : "#fee2e2";
 
     const baseUrl = clientUrl ? clientUrl.replace(/\/+$/, "") : "";
-    const loginLink = baseUrl ? `${baseUrl}/login` : "/login";
+    const loginLink = baseUrl ? `${baseUrl}/#/login` : "/login";
 
     return `
     <!DOCTYPE html>

@@ -1261,8 +1261,8 @@ cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async
 
       await brevo.transactionalEmails.sendTransacEmail({
         sender: {
-          name: process.env.SENDER_NAME || "ACGC System",
-          email: process.env.SENDER_EMAIL
+          name: process.env.SMTP_SENDER_NAME || "ACGC System",
+          email: process.env.SMTP_EMAIL
         },
         to: [{ email: customerEmail }],
         subject: `ACGC System - Service Contract Confirmation - Order Reference: ${orderId || 'SI-' + inspectionId}`,

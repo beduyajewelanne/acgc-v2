@@ -28,6 +28,12 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
+const { BrevoClient } = require("@getbrevo/brevo");
+
+const brevo = new BrevoClient({
+    apiKey: process.env.BREVO_API_KEY
+});
+
 // Configure email transporter setup matching your system environment variables
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -1182,7 +1188,7 @@ cartRoutes.post("/api/admin/update_site_inspection", async (req, res) => {
     } catch (err) { return res.status(500).json({ error: err.message }); }
 });
 
-cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async (req, res) => {
+cartRoutes.post("/api/send_contract_email-old", upload.single('contractFile'), async (req, res) => {
   const { inspectionId, orderId, customerEmail, contractId } = req.body;
 
   if (!req.file) {
@@ -1217,6 +1223,57 @@ cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async
       };
 
       await transporter.sendMail(mailOptions);
+    }
+
+    return res.status(200).json({
+      remarks: 'success',
+      message: 'Contract path updated in database logs and email attachment routed successfully.',
+      path: savedRelativePath
+    });
+
+  } catch (error) {
+    console.error("Error executing background service contract dispatch automation pipeline:", error);
+    return res.status(500).json({ remarks: 'error', error: error.message });
+  }
+});
+
+cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async (req, res) => {
+  const { inspectionId, orderId, customerEmail, contractId } = req.body;
+
+  if (!req.file) {
+    return res.status(400).json({ remarks: 'failed', message: 'Missing compiled contract binary file streaming parameter.' });
+  }
+
+  try {
+    const savedRelativePath = `/uploads/${req.file.filename}`;
+    const db = await dbo.getDb ? await dbo.getDb() : req.app.get('db');
+
+    if (orderId && orderId !== "") {
+      await db.collection('order_requests').updateMany(
+        { orderId: orderId },
+        { $set: { contractLink: savedRelativePath, contractSentToCustomer: true, contractUpdatedAt: new Date(), contractId: contractId } }
+      );
+    }
+
+    if (customerEmail && customerEmail.trim() !== "") {
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const base64Content = fileBuffer.toString('base64');
+
+      await brevo.transactionalEmails.sendTransacEmail({
+        sender: {
+          name: process.env.SENDER_NAME || "ACGC System",
+          email: process.env.SENDER_EMAIL
+        },
+        to: [{ email: customerEmail }],
+        subject: `ACGC System - Service Contract Confirmation - Order Reference: ${orderId || 'SI-' + inspectionId}`,
+        textContent: `Hello,\n\nPlease find attached the official Service Contract documentation regarding your service inquiry with ACGC Glass & Aluminum Services.\n\nBest regards,\nAdministration Team`,
+        attachment: [
+          {
+            name: req.file.originalname || `Contract_Reference.pdf`,
+            content: base64Content
+          }
+        ]
+      });
     }
 
     return res.status(200).json({

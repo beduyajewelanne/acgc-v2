@@ -265,13 +265,60 @@ const PaymentProofSection = ({ order, user, onUpdate, isFullyPaid, balanceRemain
     <div className="upload-section" style={{ marginTop: '20px', borderTop: '1px dashed #ddd', paddingTop: '15px' }}>
       <label style={{ fontSize: '12px', fontWeight: '600', color: '#666', display: 'block', marginBottom: '8px' }}>Proof of Payment</label>
 
-      {order.paymentProofLink && (
-        <p style={{ fontSize: '13px', marginBottom: '12px' }}>
-          <a href={window.base_api.replace('/api/', '') + order.paymentProofLink} target="_blank" rel="noreferrer" style={{ color: '#1d4ed8', fontWeight: '600' }}>
-            📎 View your last uploaded proof
-          </a>
-        </p>
-      )}
+      {(() => {
+        if (!order.paymentProofLink) return null;
+
+        const resolveUrl = (url) => {
+          if (!url) return '';
+          if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+            return url;
+          }
+          const baseUrl = (window.base_api || '').replace(/\/api\/?$/, '');
+          const cleanPath = url.startsWith('/') ? url : `/${url}`;
+          return `${baseUrl}${cleanPath}`;
+        };
+
+        const assetUrl = resolveUrl(order.paymentProofLink);
+
+        const isPdf = typeof assetUrl === 'string' && (
+          assetUrl.startsWith('data:application/pdf') || 
+          /\.pdf($|\?)/i.test(assetUrl) ||
+          assetUrl.includes('/raw/upload/')
+        );
+
+        const handlePreviewPdf = async (e, pdfLink) => {
+          e.preventDefault();
+          if (!pdfLink || pdfLink === '#') return;
+
+          try {
+            const targetUrl = resolveUrl(pdfLink);
+            const response = await fetch(targetUrl);
+            if (!response.ok) throw new Error('Failed to fetch document.');
+
+            const blob = await response.blob();
+            const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+            const targetBlobUrl = URL.createObjectURL(pdfBlob);
+
+            window.open(targetBlobUrl, '_blank', 'noopener,noreferrer');
+          } catch (error) {
+            console.error('Error previewing PDF:', error);
+          }
+        };
+
+        return (
+          <p style={{ fontSize: '13px', marginBottom: '12px' }}>
+            <a
+              href={assetUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={isPdf ? (e) => handlePreviewPdf(e, order.paymentProofLink) : undefined}
+              style={{ color: '#1d4ed8', fontWeight: '600' }}
+            >
+              📎 {isPdf ? 'View your last uploaded proof (PDF)' : 'View your last uploaded proof'}
+            </a>
+          </p>
+        );
+      })()}
 
       {isFullyPaid ? (
         <div className="payment-status-banner confirmed">✓ Fully paid and confirmed. Thank you!</div>
@@ -583,8 +630,80 @@ const MyOrders = () => {
                     </div>
 
                     <div className="order-links" style={{ marginTop: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {order.contractLink && order.contractLink !== '#' && <a href={window.base_api.replace('/api/', '') + order.contractLink} className="link-btn" target="_blank" rel="noreferrer">View Contract</a>}
-                      {order.receiptLink && order.receiptLink !== '#' && <a href={order.receiptLink} className="link-btn" target="_blank" rel="noreferrer">View Receipt</a>}
+                      {(() => {
+                        const resolveUrl = (url) => {
+                          if (!url || url === '#') return '';
+                          if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+                            return url;
+                          }
+                          const baseUrl = (window.base_api || '').replace(/\/api\/?$/, '');
+                          const cleanPath = url.startsWith('/') ? url : `/${url}`;
+                          return `${baseUrl}${cleanPath}`;
+                        };
+
+                        const handlePreviewPdf = async (e, rawUrl) => {
+                          e.preventDefault();
+                          if (!rawUrl || rawUrl === '#') return;
+
+                          try {
+                            const targetUrl = resolveUrl(rawUrl);
+                            const response = await fetch(targetUrl);
+                            if (!response.ok) throw new Error('Failed to fetch document.');
+
+                            const blob = await response.blob();
+                            const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+                            const targetBlobUrl = URL.createObjectURL(pdfBlob);
+
+                            window.open(targetBlobUrl, '_blank', 'noopener,noreferrer');
+                          } catch (error) {
+                            console.error('Error previewing document:', error);
+                          }
+                        };
+
+                        const checkIsPdf = (url) => {
+                          if (!url || url === '#') return false;
+                          const resolved = resolveUrl(url);
+                          return (
+                            resolved.startsWith('data:application/pdf') ||
+                            /\.pdf($|\?)/i.test(resolved) ||
+                            resolved.includes('/raw/upload/')
+                          );
+                        };
+
+                        const contractUrl = resolveUrl(order.contractLink);
+                        const receiptUrl = resolveUrl(order.receiptLink);
+
+                        const isContractPdf = checkIsPdf(order.contractLink);
+                        const isReceiptPdf = checkIsPdf(order.receiptLink);
+
+                        return (
+                          <>
+                            {order.contractLink && order.contractLink !== '#' && (
+                              <a
+                                href={contractUrl}
+                                className="link-btn"
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={isContractPdf ? (e) => handlePreviewPdf(e, order.contractLink) : undefined}
+                              >
+                                View Contract
+                              </a>
+                            )}
+
+                            {order.receiptLink && order.receiptLink !== '#' && (
+                              <a
+                                href={receiptUrl}
+                                className="link-btn"
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={isReceiptPdf ? (e) => handlePreviewPdf(e, order.receiptLink) : undefined}
+                              >
+                                View Receipt
+                              </a>
+                            )}
+                          </>
+                        );
+                      })()}
                     
                       {(order.feedback || order.rating || order.isFeedbackSubmitted) ? (
                         <div style={{

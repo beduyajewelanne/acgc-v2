@@ -10,14 +10,73 @@ const { get_data_helper, check_record_exists, decrypt, insert_one_helper, valida
 const path = require("path");
 const fs = require("fs");
 
+const cloudinary = require('cloudinary').v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const uploadToCloudinary = (fileBuffer, options = {}) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      options,
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    uploadStream.end(fileBuffer);
+  });
+};
+
 const getUploadDir = () => {
     const baseDir = __dirname.split("routes")[0];
     return path.join(baseDir, "uploads");
 };
 
-// --- HELPER FUNCTION: SAVE BASE64 STRINGS TO DISK ---
+// --- HELPER FUNCTION: SAVE BASE64 STRINGS TO CLOUDINARY ---
+const saveBase64ToCloudinary = async (base64Str, folder = "products") => {
+    if (!base64Str) return null;
+    // If it's already an existing URL path or external URL, return it as-is
+    if (base64Str.startsWith("http://") || base64Str.startsWith("https://") || base64Str.startsWith("/uploads/")) {
+        return base64Str;
+    }
+
+    try {
+        const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) return null;
+
+        const dataBuffer = Buffer.from(matches[2], 'base64');
+        const uploadResult = await uploadToCloudinary(dataBuffer, {
+            folder: folder
+        });
+
+        return uploadResult.secure_url;
+    } catch (err) {
+        console.error("Error uploading base64 image to Cloudinary:", err);
+        return null;
+    }
+};
+
+// --- HELPER FUNCTION: DELETE FROM CLOUDINARY IF URL MATCHES ---
+const deleteFromCloudinaryByUrl = async (url) => {
+    if (!url || !url.includes("cloudinary.com")) return;
+    try {
+        const parts = url.split('/');
+        const fileNameWithExt = parts.pop();
+        const folder = parts.pop();
+        const publicId = `${folder}/${fileNameWithExt.split('.')[0]}`;
+        await cloudinary.uploader.destroy(publicId);
+    } catch (err) {
+        console.error("Error deleting image from Cloudinary:", err);
+    }
+};
+
+// --- HELPER FUNCTION: SAVE BASE64 STRINGS TO DISK (OLD) ---
 // This processes incoming frontend strings, saves them to your uploads directory, and returns the URL string
-const saveBase64Image = (base64Str) => {
+const saveBase64ImageOld = (base64Str) => {
     if (!base64Str) return null;
     // If it's already a URL path (meaning it wasn't edited or re-uploaded), return it as-is
     if (base64Str.startsWith("/uploads/")) return base64Str;
@@ -215,8 +274,7 @@ productRoutes.post("/api/restore_product/:id", async (req, res) => {
     }
 });
 
-// --- UPDATED: ADD PRODUCT ---
-// Aligned fields directly to frontend matching: type, name, category, variant, width, height, unit, pricePerSqFt, estimatedCost, active
+// --- UPDATED: ADD PRODUCT (CLOUDINARY) ---
 productRoutes.post("/api/add_product", async (req, res) => {
     const { token, userId, product, fullName } = req.body;
 
@@ -227,10 +285,58 @@ productRoutes.post("/api/add_product", async (req, res) => {
         checkAuth(token, userId, async (isValid) => {
             if (!isValid) return res.status(401).json({ error: "Unauthorized" });
 
-            // Process image strings from the client bundle
-            const mainImgUrl = saveBase64Image(product.mainImg);
+            // Process image strings to Cloudinary
+            const mainImgUrl = await saveBase64ToCloudinary(product.mainImg);
             const angleImgUrls = Array.isArray(product.angleImgs) 
-                ? product.angleImgs.map(img => saveBase64Image(img)) 
+                ? await Promise.all(product.angleImgs.map(img => saveBase64ToCloudinary(img)))
+                : [null, null, null, null];
+
+            const newProduct = {
+                type: product.type || "",
+                name: product.name || "",
+                category: product.category || "",
+                variant: product.variant || "",
+                description: product.description || "",
+                width: parseFloat(product.width) || 0,
+                height: parseFloat(product.height) || 0,
+                unit: product.unit || "in",
+                pricePerSqFt: parseFloat(product.pricePerSqFt) || 0,
+                estimatedCost: parseFloat(product.estimatedCost) || 0,
+                mainImg: mainImgUrl,
+                angleImgs: angleImgUrls,
+                active: product.active !== undefined ? product.active : true,
+                isTopProduct: product.isTopProduct !== undefined ? product.isTopProduct : false,
+                archive: 0,
+                createdBy: userId,
+                createdAt: new Date()
+            };
+
+            const result = await insert_one_helper("products", newProduct);
+            await actionLog(userId, "Add Product", `${fullName} Added new product: ${newProduct.name}`);
+            const insertedPayload = { ...newProduct, _id: result.insertedId || result };
+            return res.status(200).json({ remarks: "success", message: "Product added successfully", payload: insertedPayload });
+        });
+    } catch (err) {
+        console.error("Error in /api/add_product:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
+
+// --- OLD: ADD PRODUCT ---
+productRoutes.post("/api/add_product-old", async (req, res) => {
+    const { token, userId, product, fullName } = req.body;
+
+    if (!token) return res.status(400).json({ error: "Token is required" });
+    if (!product) return res.status(400).json({ error: "Product payload data is missing" });
+
+    try {
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            // Process image strings from the client bundle
+            const mainImgUrl = saveBase64ImageOld(product.mainImg);
+            const angleImgUrls = Array.isArray(product.angleImgs) 
+                ? product.angleImgs.map(img => saveBase64ImageOld(img)) 
                 : [null, null, null, null];
 
             const newProduct = {
@@ -260,13 +366,12 @@ productRoutes.post("/api/add_product", async (req, res) => {
             return res.status(200).json({ remarks: "success", message: "Product added successfully", payload: insertedPayload });
         });
     } catch (err) {
-        console.error("Error in /api/add_product:", err);
+        console.error("Error in /api/add_product-old:", err);
         return res.status(500).json({ error: err.message || err });
     }
 });
 
-// --- UPDATED: UPDATE PRODUCT ---
-// Handles unchanged image paths flawlessly without rewriting files
+// --- UPDATED: UPDATE PRODUCT (CLOUDINARY) ---
 productRoutes.post("/api/update_product", async (req, res) => {
     const { token, userId, product, fullName } = req.body;
 
@@ -292,32 +397,30 @@ productRoutes.post("/api/update_product", async (req, res) => {
             // 1. Evaluate Main Image transformations
             let finalMainImg = currentProduct.mainImg;
             if (product.mainImg !== currentProduct.mainImg) {
-                // Remove old picture file physically if it's changing
-                if (currentProduct.mainImg && currentProduct.mainImg.startsWith("/uploads/")) {
-                    const oldPath = path.join(getUploadDir(), currentProduct.mainImg.replace("/uploads/", ""));
-                    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+                // Remove old picture from Cloudinary if replacing
+                if (currentProduct.mainImg) {
+                    await deleteFromCloudinaryByUrl(currentProduct.mainImg);
                 }
-                finalMainImg = saveBase64Image(product.mainImg);
+                finalMainImg = await saveBase64ToCloudinary(product.mainImg);
             }
 
             // 2. Evaluate Angle Multi-view image configurations
             let finalAngleImgs = currentProduct.angleImgs || [null, null, null, null];
             if (Array.isArray(product.angleImgs)) {
-                finalAngleImgs = product.angleImgs.map((incomingImg, i) => {
+                finalAngleImgs = await Promise.all(product.angleImgs.map(async (incomingImg, i) => {
                     const currentImg = finalAngleImgs[i];
                     
                     // If unchanged, keep it
                     if (incomingImg === currentImg) return currentImg;
 
-                    // If it was cleared or updated, prune old path
-                    if (currentImg && currentImg.startsWith("/uploads/")) {
-                        const oldPath = path.join(getUploadDir(), currentImg.replace("/uploads/", ""));
-                        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+                    // If it was cleared or updated, prune old Cloudinary image
+                    if (currentImg) {
+                        await deleteFromCloudinaryByUrl(currentImg);
                     }
 
                     // Process fresh raw base64 uploads
-                    return saveBase64Image(incomingImg);
-                });
+                    return await saveBase64ToCloudinary(incomingImg);
+                }));
             }
 
             const updatedData = {
@@ -349,7 +452,137 @@ productRoutes.post("/api/update_product", async (req, res) => {
     }
 });
 
+// --- OLD: UPDATE PRODUCT ---
+productRoutes.post("/api/update_product-old", async (req, res) => {
+    const { token, userId, product, fullName } = req.body;
+
+    if (!token) return res.status(400).json({ error: "Token is required" });
+    if (!product) return res.status(400).json({ error: "Product properties are required" });
+
+    const productId = product._id || product.id;
+    if (!productId) return res.status(400).json({ error: "Product Identification Identifier is missing" });
+
+    try {
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            const product_query = [{ $match: { _id: new ObjectId(productId) } }];
+            const currentProductResult = await get_data_helper("products", product_query);
+
+            if (!currentProductResult?.payload?.length) {
+                return res.status(404).json({ remarks: "failed", message: "Product not found" });
+            }
+
+            const currentProduct = currentProductResult.payload[0];
+
+            // 1. Evaluate Main Image transformations
+            let finalMainImg = currentProduct.mainImg;
+            if (product.mainImg !== currentProduct.mainImg) {
+                // Remove old picture file physically if it's changing
+                if (currentProduct.mainImg && currentProduct.mainImg.startsWith("/uploads/")) {
+                    const oldPath = path.join(getUploadDir(), currentProduct.mainImg.replace("/uploads/", ""));
+                    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+                }
+                finalMainImg = saveBase64ImageOld(product.mainImg);
+            }
+
+            // 2. Evaluate Angle Multi-view image configurations
+            let finalAngleImgs = currentProduct.angleImgs || [null, null, null, null];
+            if (Array.isArray(product.angleImgs)) {
+                finalAngleImgs = product.angleImgs.map((incomingImg, i) => {
+                    const currentImg = finalAngleImgs[i];
+                    
+                    // If unchanged, keep it
+                    if (incomingImg === currentImg) return currentImg;
+
+                    // If it was cleared or updated, prune old path
+                    if (currentImg && currentImg.startsWith("/uploads/")) {
+                        const oldPath = path.join(getUploadDir(), currentImg.replace("/uploads/", ""));
+                        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+                    }
+
+                    // Process fresh raw base64 uploads
+                    return saveBase64ImageOld(incomingImg);
+                });
+            }
+
+            const updatedData = {
+                type: product.type || currentProduct.type,
+                name: product.name || currentProduct.name,
+                category: product.category || currentProduct.category,
+                variant: product.variant || currentProduct.variant,
+                description: product.description !== undefined ? product.description : currentProduct.description,
+                width: product.width ? parseFloat(product.width) : currentProduct.width,
+                height: product.height ? parseFloat(product.height) : currentProduct.height,
+                unit: product.unit || currentProduct.unit,
+                pricePerSqFt: product.pricePerSqFt ? parseFloat(product.pricePerSqFt) : currentProduct.pricePerSqFt,
+                estimatedCost: product.estimatedCost ? parseFloat(product.estimatedCost) : currentProduct.estimatedCost,
+                mainImg: finalMainImg,
+                angleImgs: finalAngleImgs,
+                active: product.active !== undefined ? product.active : currentProduct.active,
+                isTopProduct: product.isTopProduct !== undefined ? product.isTopProduct : currentProduct.isTopProduct,
+                updatedAt: new Date()
+            };
+
+            await update_one_helper("products", { _id: new ObjectId(productId) }, { $set: updatedData });
+            await actionLog(userId, "Update Product", `${fullName} Updated product: ${currentProduct.name}`);
+            const updatedPayload = { ...currentProduct, ...updatedData };
+            return res.status(200).json({ remarks: "success", message: "Product updated successfully", payload: updatedPayload });
+        });
+    } catch (err) {
+        console.error("Error in /api/update_product-old:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
+
+// --- UPDATED: DELETE PRODUCT (CLOUDINARY) ---
 productRoutes.post("/api/delete_product/:id", async (req, res) => {
+    const token = req.body.token;
+    const userId = req.body._id;
+    const id = req.params.id;
+    const fullName = req.body.fullName;
+    let response = {};
+
+    if (!token) return res.status(400).json({ error: "Token is required" });
+    
+    try {
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ error: "Unauthorized" });
+
+            const product_query = [{ $match: { _id: new ObjectId(id) } }];
+            const productResult = await get_data_helper("products", product_query);
+
+            if (productResult?.payload?.length > 0) {
+                const product = productResult.payload[0];
+
+                // Delete main image from Cloudinary if it exists
+                if (product.mainImg) {
+                    await deleteFromCloudinaryByUrl(product.mainImg);
+                }
+
+                // Delete accompanying viewing angle images from Cloudinary
+                if (product.angleImgs && Array.isArray(product.angleImgs)) {
+                    for (const img of product.angleImgs) {
+                        if (img) await deleteFromCloudinaryByUrl(img);
+                    }
+                }
+
+                const result = await delete_or_archive_helper("products", { _id: new ObjectId(id) });
+                await actionLog(userId, "Delete Product", `${fullName} Deleted product: ${productResult.payload[0].name}`);
+                response = { remarks: "success", message: "Product and associated images deleted successfully", payload: result };
+            } else {
+                response = { remarks: "failed", message: "Product not found" };
+            }
+            return res.status(200).json(response);
+        });
+    } catch (err) {
+        console.error("Error in /api/delete_product:", err);
+        return res.status(500).json({ error: err.message || err });
+    }
+});
+
+// --- OLD: DELETE PRODUCT ---
+productRoutes.post("/api/delete_product-old/:id", async (req, res) => {
     const token = req.body.token;
     const userId = req.body._id;
     const id = req.params.id;
@@ -393,7 +626,7 @@ productRoutes.post("/api/delete_product/:id", async (req, res) => {
             return res.status(200).json(response);
         });
     } catch (err) {
-        console.error("Error in /api/delete_product:", err);
+        console.error("Error in /api/delete_product-old:", err);
         return res.status(500).json({ error: err.message || err });
     }
 });
@@ -402,8 +635,7 @@ productRoutes.get("/api/featured_products", async (req, res) => {
     try {
         const result = await get_data_helper("products", [
             { $match: { active: true } },
-            { $sort: { isTopProduct: -1, createdAt: 1 } },
-            { $limit: 3 }
+            { $sort: { isTopProduct: -1, createdAt: 1 } },             {$limit: 3 }
         ]);
         return res.status(200).json(result);
     } catch (err) {

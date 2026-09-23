@@ -10,16 +10,17 @@ const { get_data_helper, check_record_exists, decrypt, insert_one_helper, valida
 const path = require("path");
 const fs = require("fs");
 
-const getUploadDir = () => {
-    const baseDir = __dirname.split("routes")[0];
-    return path.join(baseDir, "uploads");
-};
+const cloudinary = require("cloudinary").v2;
 
-// --- HELPER FUNCTION: SAVE BASE64 STRINGS TO DISK ---
-// This processes incoming frontend strings, saves them to your uploads directory, and returns the URL string
-const saveBase64Image = (base64Str) => {
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// --- OLD LOCAL DISK HELPER ---
+const saveBase64ImageOld = (base64Str) => {
     if (!base64Str) return null;
-    // If it's already a URL path (meaning it wasn't edited or re-uploaded), return it as-is
     if (base64Str.startsWith("/uploads/")) return base64Str;
 
     try {
@@ -44,6 +45,34 @@ const saveBase64Image = (base64Str) => {
         return null;
     }
 };
+
+// --- NEW CLOUDINARY HELPER ---
+const saveBase64Image = async (base64Str, folderName = "products") => {
+    if (!base64Str) return null;
+    
+    // Return existing remote URL if image hasn't changed
+    if (base64Str.startsWith("http://") || base64Str.startsWith("https://")) {
+        return base64Str;
+    }
+
+    try {
+        const uploadResult = await cloudinary.uploader.upload(base64Str, {
+            folder: folderName,
+            resource_type: "auto"
+        });
+        return uploadResult.secure_url;
+    } catch (err) {
+        console.error("Error uploading base64 image to Cloudinary:", err);
+        return null;
+    }
+};
+
+const getUploadDir = () => {
+    const baseDir = __dirname.split("routes")[0];
+    return path.join(baseDir, "uploads");
+};
+
+
 
 contractRoutes.post("/api/get_user_contracts", async (req, res) => {
     const { token, _id } = req.body;

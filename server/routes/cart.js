@@ -11,7 +11,29 @@ const fs = require("fs");
 const { get_data_helper, check_record_exists, decrypt, insert_one_helper, validateHash, hashPass, update_one_helper, delete_or_archive_many_helper, delete_or_archive_helper, checkAuth, actionLog } = require("../helper/Helper");
 const { pushNotification } = require("./notification");
 
-// Configure file upload storage options
+const cloudinary = require('cloudinary').v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Helper function to stream memory buffers directly to Cloudinary
+const uploadToCloudinary = (fileBuffer, options = {}) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      options,
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    uploadStream.end(fileBuffer);
+  });
+};
+
+// Configure file upload storage options for disk storage (old legacy flow)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadPath = path.join(__dirname, '../uploads');
@@ -27,6 +49,10 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+
+// Configure file upload storage for Cloudinary streaming (in-memory buffer)
+const memoryStorage = multer.memoryStorage();
+const memoryUpload = multer({ storage: memoryStorage });
 
 const { BrevoClient } = require("@getbrevo/brevo");
 
@@ -184,7 +210,6 @@ cartRoutes.post("/api/remove_from_cart", async (req, res) => {
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "Unauthorized" });
             
-            // Evaluates dynamically whether product_id parameter is a single String object or raw collection array 
             const targetQuery = Array.isArray(product_id) 
                 ? { user_id: new ObjectId(user_id), product_id: { $in: product_id.map(id => new ObjectId(id)) } }
                 : { user_id: new ObjectId(user_id), product_id: new ObjectId(product_id) };
@@ -233,19 +258,16 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
                 
                 const productData = rawProductList[0];
 
-                // Ensure quantity defaults cleanly to an integer
                 const finalQuantity = parseInt(quantity) || 1;
 
                 const widthVal = width !== "" && width !== undefined ? parseFloat(width) : (parseFloat(productData.width) || 0);
                 const heightVal = height !== "" && height !== undefined ? parseFloat(height) : (parseFloat(productData.height) || 0);
                 
-                // Keep 'ft' or 'in' or whatever the product default template uses if user unit is missing
                 const unitVal = width !== "" && width !== undefined ? (unit || "in") : (productData.unit || "in");
 
                 let areaSqFt = 0;
                 const ratePerSqFt = parseFloat(productData.pricePerSqFt) || parseFloat(productData.price) || 0;
                 
-                // Conversions Engine
                 if (unitVal === "cm") {
                     areaSqFt = (widthVal * heightVal) / 929.03;
                 } else if (unitVal === "m") {
@@ -253,11 +275,9 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
                 } else if (unitVal === "in") {
                     areaSqFt = (widthVal / 12) * (heightVal / 12);
                 } else {
-                    // Default assume unit is already feet ('ft')
                     areaSqFt = widthVal * heightVal;
                 }
                 
-                // Calculate item base cost, then scale cleanly by quantity
                 const baseItemCost = areaSqFt > 0 ? (areaSqFt * ratePerSqFt) : ratePerSqFt;
                 const totalEstimatedCost = baseItemCost * finalQuantity;
 
@@ -279,7 +299,7 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
                         unit: unitVal,
                         areaSqFt: parseFloat(areaSqFt.toFixed(4)),
                         ratePerSqFt: ratePerSqFt,
-                        estimatedCost: parseFloat(totalEstimatedCost.toFixed(2)) // <-- Fixed: Formats safely after multiplication
+                        estimatedCost: parseFloat(totalEstimatedCost.toFixed(2))
                     },
                     orderId: sharedOrderId, 
                     status: "Pending",
@@ -303,7 +323,6 @@ cartRoutes.post("/api/submit_order_request_batch", async (req, res) => {
                 return res.status(500).json({ remarks: "failed", message: "Database rejected properties insertion profiles." });
             }
 
-            // Cleanup processed items out of cart database
             if (cartItemsToRemove.length > 0) {
                 for (const targetId of cartItemsToRemove) {
                     await delete_or_archive_helper("cart", { _id: targetId });
@@ -344,25 +363,22 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
             const finalHeight = parseFloat(measurements?.height) || parseFloat(product.height) || 0;
             const finalUnit = measurements?.unit || product.unit || "in";
             
-            // --- FIX: Dynamic Unit Conversion Engine to Square Feet ---
             let areaSqFt = 0;
             if (finalUnit === "cm") {
                 areaSqFt = (finalWidth * finalHeight) / 929.03;
             } else if (finalUnit === "in" || finalUnit === "inch") {
-                areaSqFt = (finalWidth * finalHeight) / 144; // 12in * 12in = 144 sq inches per sq ft
+                areaSqFt = (finalWidth * finalHeight) / 144;
             } else if (finalUnit === "m") {
                 areaSqFt = (finalWidth * 3.28084) * (finalHeight * 3.28084);
             } else if (finalUnit === "ft") {
                 areaSqFt = finalWidth * finalHeight;
             } else {
-                // Fallback to whatever is saved on the template product data if units don't match
                 areaSqFt = parseFloat(product.areaSqFt) || 0;
             }
 
             const rate = parseFloat(product.pricePerSqFt) || parseFloat(product.price) || 0;
             const finalQuantity = parseInt(quantity) || 1;
             
-            // Calculate real item estimation safely
             const baseItemCost = areaSqFt > 0 ? (areaSqFt * rate) : rate;
             const dynamicEstimatedCost = baseItemCost * finalQuantity;
 
@@ -380,9 +396,9 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
                     width: finalWidth,          
                     height: finalHeight,        
                     unit: finalUnit,            
-                    areaSqFt: parseFloat(areaSqFt.toFixed(4)), // Clean decimals
+                    areaSqFt: parseFloat(areaSqFt.toFixed(4)),
                     ratePerSqFt: rate,
-                    estimatedCost: parseFloat(dynamicEstimatedCost.toFixed(2)) // Clean currency rounding
+                    estimatedCost: parseFloat(dynamicEstimatedCost.toFixed(2))
                 },
                 orderId: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 clientNotes: clientNotes || "",
@@ -413,7 +429,6 @@ cartRoutes.post("/api/submit_order_request", async (req, res) => {
     }
 });
 
-// ─── 1. FETCH ALL ACTIVE ORDER REQUESTS ───────────────────────────────────
 cartRoutes.post("/api/get_my_orders", async (req, res) => {
     const { token, userId } = req.body;
 
@@ -424,7 +439,6 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
         checkAuth(token, userId, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authentication failed" });
 
-            // 1. Fetch all matching documents for this user
             const ordersResult = await get_data_helper("order_requests", [
                 { $match: { user_id: new ObjectId(userId), isCancelled: 0 } },
                 { $sort: { createdAt: -1 } },
@@ -432,14 +446,12 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
 
             const rawOrdersList = ordersResult?.payload || ordersResult || [];
 
-            // 2. Group items cleanly by their shared 'orderId'
             const groupedMap = {};
 
             rawOrdersList.forEach(doc => {
                 const groupKey = doc.orderId || (doc._id ? doc._id.toString() : "unassigned");
 
                 if (!groupedMap[groupKey]) {
-                    // Initialize group baseline info from the primary document template
                     groupedMap[groupKey] = {
                         _id: doc._id ? doc._id.toString() : "",
                         orderId: groupKey,
@@ -470,7 +482,6 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
 
                 const rootQuantity = parseInt(doc.quantity) || 1;
 
-                // Extract product metrics cleanly from target structural levels
                 let targetDetails = null;
                 if (doc.itemDetails) {
                     targetDetails = doc.itemDetails;
@@ -486,7 +497,6 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
                     const unit = (targetDetails.unit || 'in').toLowerCase().trim();
                     const rate = parseFloat(targetDetails.ratePerSqFt || targetDetails.price || 0);
                     
-                    // 3. Match identical square-footage algorithms from your admin panel blueprint
                     let area = parseFloat(targetDetails.areaSqFt || targetDetails.area || 0);
                     if (area === 0) {
                         if (unit === 'in') {
@@ -498,7 +508,6 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
                         }
                     }
 
-                    // Prioritize database stored costs, otherwise fallback to derived area rules
                     const computedLineCost = parseFloat(targetDetails.estimatedCost || targetDetails.lineTotal || (area * rate * rootQuantity));
 
                     groupedMap[groupKey].items.push({
@@ -514,9 +523,7 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
                 }
             });
 
-            // 4. Convert structural object mappings into flat payloads for React maps
             const normalizedOrders = Object.values(groupedMap).map(order => {
-                // If the root total array lacks aggregate sums, compute across child components
                 if (order.estimatedTotal === 0) {
                     order.estimatedTotal = order.items.reduce((sum, entry) => sum + entry.lineTotal, 0);
                 }
@@ -530,7 +537,7 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
                     }) : "Date Unspecified",
                     status: order.status,
                     estimatedTotal: order.estimatedTotal,
-                    downpaymentPaid: order.downpaymentPaid ? (order.estimatedTotal * 0.5) : 0, // Maps exactly to matching DP targets
+                    downpaymentPaid: order.downpaymentPaid ? (order.estimatedTotal * 0.5) : 0,
                     requiredDownpayment: order.estimatedTotal * 0.5,
                     siteInspection: order.siteInspection,
                     contractLink: order.contractLink,
@@ -562,8 +569,6 @@ cartRoutes.post("/api/get_my_orders", async (req, res) => {
     }
 });
 
-
-// ─── 2. CANCEL / UPDATE SPECIFIC ORDER REQUEST STATUS ─────────────────────
 cartRoutes.post("/api/cancel_order_request", async (req, res) => {
     const { token, userId, order_id } = req.body;
     const db = await dbo.getDb();
@@ -572,11 +577,9 @@ cartRoutes.post("/api/cancel_order_request", async (req, res) => {
     if (!order_id) return res.status(400).json({ remarks: "failed", message: "Missing order transaction key parameter reference" });
 
     try {
-        // Authenticate user token profile validity before modifying collections
         checkAuth(token, userId, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
 
-            // 1. Verify target order existence and ownership profile before executing update
             const findResult = await get_data_helper("order_requests", [
                 { $match: { orderId: order_id } }
             ]);
@@ -588,22 +591,6 @@ cartRoutes.post("/api/cancel_order_request", async (req, res) => {
 
             const targetOrder = existingOrderList[0];
 
-            // 2. Prevent cancellation if design process has proceeded past initial verification status unless explicitly allowed
-            // const isPending = targetOrder.status === "Pending" || targetOrder.status === "Pending Inspection";
-
-            // if (!isPending) {
-            //     return res.status(400).json({ 
-            //         remarks: "failed", 
-            //         message: "Cannot cancel order requests already processed into production status or inspection clearance loops" 
-            //     });
-            // }
-
-            // 3. Instead of deleting, update the document status to "Cancelled"
-            // const updateResult = await update_many_helper(
-            //     "order_requests", 
-            //     { orderId: order_id }, 
-            //     { $set: { status: "Cancelled", isCancelled: 1, updatedAt: new Date() } }
-            // );
             const updateResult = await db.collection("order_requests").updateMany(
                 { orderId: order_id },
                 { 
@@ -616,8 +603,6 @@ cartRoutes.post("/api/cancel_order_request", async (req, res) => {
             );
 
             if (updateResult.remarks === "success" || updateResult.modifiedCount > 0 || updateResult.matchedCount > 0) {
-                
-                // Write transaction operations log tracking details
                 await actionLog(userId, "Cancel Order Request", `Updated structural order request status to Cancelled for tracking key ID: ${order_id}`);
 
                 return res.status(200).json({
@@ -638,7 +623,6 @@ cartRoutes.get("/api/test_cart_endpoint/:orderId", async (req, res) => {
     const { orderId } = req.params;
 
     try {
-        // 1. Fetch matching records. (Removed status restriction so users can track Cancelled states correctly)
         const result = await get_data_helper("order_requests", [
             { $match: { orderId: orderId } }
         ]);
@@ -652,7 +636,6 @@ cartRoutes.get("/api/test_cart_endpoint/:orderId", async (req, res) => {
             });
         }
 
-        // 2. Format and pass down the exact structure expected by the TrackProducts component
         return res.status(200).json({
             remarks: "success",
             message: "Project tracking tracking context documents fetched successfully",
@@ -665,7 +648,6 @@ cartRoutes.get("/api/test_cart_endpoint/:orderId", async (req, res) => {
     }
 });
 
-// ─── 3. ADMIN WORKSPACE: FETCH ALL SITE INSPECTION RECORDS ────────────────
 cartRoutes.post("/api/get_order_requests", async (req, res) => {
     const { token, user_id } = req.body;
 
@@ -687,9 +669,7 @@ cartRoutes.post("/api/get_order_requests", async (req, res) => {
                 {
                     $group: {
                         _id: "$orderId",
-                        // Capture base document fields from the first occurrence
                         baseDoc: { $first: "$$ROOT" },
-                        // Aggregate all items associated with this orderId
                         measurements: {
                             $push: {
                                 id: "$_id",
@@ -701,7 +681,6 @@ cartRoutes.post("/api/get_order_requests", async (req, res) => {
                                 unit: "$itemDetails.unit",
                             }
                         },
-                        // Sum up costs across all grouped documents
                         totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" }
                     }
                 },
@@ -714,7 +693,7 @@ cartRoutes.post("/api/get_order_requests", async (req, res) => {
             const normalizedPayload = rawPayload.map(group => {
                 const b = group.baseDoc;
                 return {
-                    id: group._id, // orderId acts as the unique identifier
+                    id: group._id,
                     clientName: b.clientName || "Unknown Client",
                     clientAddress: b.installationAddress || "",
                     clientNumber: b.clientPhone || "",
@@ -770,9 +749,7 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
                 {
                     $group: {
                         _id: "$orderId",
-                        // Capture base document fields from the first occurrence
                         baseDoc: { $first: "$$ROOT" },
-                        // Aggregate all items associated with this orderId
                         measurements: {
                             $push: {
                                 id: "$_id",
@@ -787,7 +764,6 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
                                 estimatedInstallationDate: "$estimatedInstallationDate"
                             }
                         },
-                        // Sum up costs across all grouped documents
                         totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" },
                     }
                 },
@@ -800,7 +776,7 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
             const normalizedPayload = rawPayload.map(group => {
                 const b = group.baseDoc;
                 return {
-                    id: group._id, // orderId acts as the unique identifier
+                    id: group._id,
                     clientName: b.clientName || "Unknown Client",
                     clientAddress: b.installationAddress || "",
                     clientNumber: b.clientPhone || "",
@@ -833,7 +809,6 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
                             return "Completed Project";
                         }
 
-                        // 1. Instantly check if there are any unfinished items across the order
                         const isAllCompleted = group.measurements.every(m => m.progressStatus === "Completed");
                         
                         if (!isAllCompleted) {
@@ -846,14 +821,12 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
                         warrantyCutoffDate.setDate(warrantyCutoffDate.getDate() - warrantyDaysForCat);
 
                         const isPastWarrantyAll = group.measurements.every(m => {
-                            // If a date string is somehow missing, keep it in "Warranty" for safety
                             if (!m.estimatedInstallationDate) return false; 
                             
                             const installationDate = new Date(m.estimatedInstallationDate);
                             return installationDate < warrantyCutoffDate;
                         });
 
-                        // 4. Return categorical state classifications
                         return isPastWarrantyAll ? "Completed Project" : "Warranty";
                     })(),
                     paymentMethod: b.paymentMethod || 'Cash',
@@ -903,7 +876,6 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
     }
 });
 
-// ─── 4. ADMIN WORKSPACE: CREATE NEW ORDER REQUEST RECORD ──────────────────
 cartRoutes.post("/api/create_order_request", async (req, res) => {
     const { 
         token, _id, clientName, clientNumber, siteAddress, inspectionDate, 
@@ -920,14 +892,13 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
 
             const db = await await dbo.getDb();
             let matchedUserId = null;
-            let matchedUser = null; // Correctly initialized
+            let matchedUser = null;
 
-            // Find user_id from users collection safely
             if (customerHasAccount && customerEmail) {
                 const userDoc = await db.collection("users").findOne({ email: customerEmail.trim() });
                 if (userDoc) {
                     matchedUserId = userDoc._id; 
-                    matchedUser = userDoc; // Fixed: Wrapped securely inside proper braces
+                    matchedUser = userDoc;
                 }
             }
 
@@ -936,18 +907,15 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
             const hasExplicitWarrantyDays = warrantyDays !== undefined && warrantyDays !== null && warrantyDays !== '';
             const warrantyDaysValue = hasExplicitWarrantyDays ? Number(warrantyDays) : undefined;
 
-            // Map each row in measurements safely
             const documentBatch = (measurements || []).map((row, index) => {
                 const widthVal = parseFloat(row.width) || 0;
                 const heightVal = parseFloat(row.height) || 0;
                 const qtyVal = parseInt(row.qty) || 1;
                 const rateVal = parseFloat(row.pricePerSqFt) || 0;
                 
-                // Normalization Safeguard: Handle both "in" and "inch" uniform assignments
                 let unitVal = row.unit || "cm";
                 if (unitVal === "in") unitVal = "inch"; 
                 
-                // Dynamic conversion engine to Square Feet
                 let areaSqFt = 0;
                 if (unitVal === "cm") {
                     areaSqFt = (widthVal * heightVal) / 929.03;
@@ -978,8 +946,6 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
                     customerHasAccount: !!matchedUserId,
                     ...(warrantyDaysValue !== undefined ? { warrantyDays: warrantyDaysValue } : {}),
                     
-                    // Integrity Fix: Only attach the total transaction financial figures to the FIRST item doc 
-                    // to avoid multi-row duplicate compounding errors inside aggregation lookups
                     manualOverride: index === 0 && manualOverride !== undefined && manualOverride !== null ? parseFloat(manualOverride) : 0,
                     estimatedTotal: index === 0 ? (parseFloat(estimatedTotal) || 0) : 0,
                     
@@ -1000,7 +966,6 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
                 return res.status(400).json({ remarks: "failed", message: "Cannot create an inspection without measurements rows." });
             }
 
-            // High performance direct batch execution
             const result = await db.collection("order_requests").insertMany(documentBatch);
             
             if (result.acknowledged) {
@@ -1016,7 +981,6 @@ cartRoutes.post("/api/create_order_request", async (req, res) => {
     }
 });
 
-// ─── 5. ADMIN WORKSPACE: UPDATE EXISTING ORDER REQUEST RECORD ──────────────
 cartRoutes.post("/api/update_order_request", async (req, res) => {
     const { 
         token, user_id, id, orderId, clientName, clientNumber, siteAddress, inspectionDate, 
@@ -1037,7 +1001,6 @@ cartRoutes.post("/api/update_order_request", async (req, res) => {
             const db = await await dbo.getDb();
             let matchedUserId = null;
 
-            // Re-verify/find user link by email update options
             if (customerHasAccount && customerEmail) {
                 const userDoc = await db.collection("users").findOne({ email: customerEmail.trim() });
                 if (userDoc) matchedUserId = userDoc._id;
@@ -1048,18 +1011,15 @@ cartRoutes.post("/api/update_order_request", async (req, res) => {
             const hasExplicitWarrantyDays = warrantyDays !== undefined && warrantyDays !== null && warrantyDays !== '';
             const warrantyDaysValue = hasExplicitWarrantyDays ? Number(warrantyDays) : undefined;
 
-            // 1. Clear out the previous grouped documents under this orderId to prevent layout row fragmentation
             await db.collection("order_requests").deleteMany({ orderId: targetOrderId });
 
-            // 2. Re-insert the updated measurements array into individual documents maintaining schema alignment
             const documentBatch = (measurements || []).map(row => {
                 const widthVal = parseFloat(row.width) || 0;
                 const heightVal = parseFloat(row.height) || 0;
                 const qtyVal = parseInt(row.qty) || 1;
                 const rateVal = parseFloat(row.pricePerSqFt) || 0;
-                const unitVal = row.unit || "cm"; // Default fallback match
+                const unitVal = row.unit || "cm";
                 
-                // Dynamic conversion to Square Feet
                 let areaSqFt = 0;
                 if (unitVal === "cm") {
                     areaSqFt = (widthVal * heightVal) / 929.03;
@@ -1096,7 +1056,7 @@ cartRoutes.post("/api/update_order_request", async (req, res) => {
                         name: row.product || "",
                         width: widthVal,
                         height: heightVal,
-                        unit: unitVal, // Stores the exact selected unit choice safely
+                        unit: unitVal,
                         areaSqFt: parseFloat(areaSqFt.toFixed(4)),
                         ratePerSqFt: rateVal,
                         estimatedCost: parseFloat(estimatedCost.toFixed(2))
@@ -1123,7 +1083,6 @@ cartRoutes.post("/api/update_order_request", async (req, res) => {
     }
 });
 
-// ─── 6. ADMIN WORKSPACE: DISPATCH / SEND INSPECTION CONTRACT ───────────────
 cartRoutes.post("/api/send_inspection_contract", async (req, res) => {
     const { token, _id, orderRequestId } = req.body;
 
@@ -1136,7 +1095,6 @@ cartRoutes.post("/api/send_inspection_contract", async (req, res) => {
 
             const targetQuery = ObjectId.isValid(orderRequestId) ? { _id: new ObjectId(orderRequestId) } : { orderId: orderRequestId };
 
-            // Set contract tracking flags on the initial base request structure
             const updateResult = await update_one_helper(
                 "order_requests",
                 targetQuery,
@@ -1156,7 +1114,6 @@ cartRoutes.post("/api/send_inspection_contract", async (req, res) => {
     }
 });
 
-// Deprecated tracking routes left active for historical API mapping compatibility layers
 cartRoutes.post("/api/admin/site_inspections", async (req, res) => {
     const { token, _id } = req.body;
     if (!token) return res.status(401).json({ remarks: "Unauthorized" });
@@ -1199,7 +1156,6 @@ cartRoutes.post("/api/send_contract_email-old", upload.single('contractFile'), a
     const savedRelativePath = `/uploads/${req.file.filename}`;
     const db = await dbo.getDb ? await dbo.getDb() : req.app.get('db');
 
-    // Update database paths systematically matching target references
     if (orderId && orderId !== "") {
       await db.collection('order_requests').updateMany(
         { orderId: orderId },
@@ -1207,7 +1163,6 @@ cartRoutes.post("/api/send_contract_email-old", upload.single('contractFile'), a
       );
     }
 
-    // Configure and dispatch the customer contract email payload context
     if (customerEmail && customerEmail.trim() !== "") {
       const mailOptions = {
         from: `"ACGC System" <${process.env.SMTP_EMAIL}>`,
@@ -1237,7 +1192,7 @@ cartRoutes.post("/api/send_contract_email-old", upload.single('contractFile'), a
   }
 });
 
-cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async (req, res) => {
+cartRoutes.post("/api/send_contract_email", memoryUpload.single('contractFile'), async (req, res) => {
   const { inspectionId, orderId, customerEmail, contractId } = req.body;
 
   if (!req.file) {
@@ -1245,7 +1200,11 @@ cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async
   }
 
   try {
-    const savedRelativePath = `/uploads/${req.file.filename}`;
+    const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+      folder: "contracts",
+      resource_type: "auto"
+    });
+    const savedRelativePath = cloudinaryResult.secure_url;
     const db = await dbo.getDb ? await dbo.getDb() : req.app.get('db');
 
     if (orderId && orderId !== "") {
@@ -1256,8 +1215,7 @@ cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async
     }
 
     if (customerEmail && customerEmail.trim() !== "") {
-      const fileBuffer = fs.readFileSync(req.file.path);
-      const base64Content = fileBuffer.toString('base64');
+      const base64Content = req.file.buffer.toString('base64');
 
       await brevo.transactionalEmails.sendTransacEmail({
         sender: {
@@ -1288,7 +1246,7 @@ cartRoutes.post("/api/send_contract_email", upload.single('contractFile'), async
   }
 });
 
-cartRoutes.post("/api/manual_approve_order", upload.single('receiptFile'), async (req, res) => {
+cartRoutes.post("/api/manual_approve_order-old", upload.single('receiptFile'), async (req, res) => {
   const { orderId, contractId } = req.body;
 
   if (!orderId) {
@@ -1302,7 +1260,6 @@ cartRoutes.post("/api/manual_approve_order", upload.single('receiptFile'), async
     const savedRelativePath = `/uploads/${req.file.filename}`;
     const db = await dbo.getDb ? await dbo.getDb() : req.app.get('db');
 
-    // Fetch matching layout arrays across collections to scale up payment evaluations accurately
     const matchItems = await db.collection('order_requests').find({ orderId: orderId }).toArray();
     if (!matchItems || matchItems.length === 0) {
       return res.status(404).json({ remarks: 'failed', message: 'Target order request mapping tracking parameters completely missing.' });
@@ -1310,14 +1267,11 @@ cartRoutes.post("/api/manual_approve_order", upload.single('receiptFile'), async
 
     const orderRecord = matchItems[0];
     
-    // Read the contract total values securely from database or derived computation layers
     const finalGrandTotal = parseFloat(orderRecord.estimatedTotal || orderRecord.itemDetails?.estimatedCost || 0);
     
-    // Normalization logic check: Clean up text parameters to match client component rules
     const cleanedTerms = String(orderRecord.paymentTerms || '').trim();
     const isFullPayment = cleanedTerms === 'Full payment';
 
-    // Build the dynamic update database parameters depending on paymentTerms definition context
     let updateFields = {
       contractLink: savedRelativePath,
       approvedAt: new Date(),
@@ -1325,17 +1279,79 @@ cartRoutes.post("/api/manual_approve_order", upload.single('receiptFile'), async
     };
 
     if (isFullPayment) {
-      // Full Payment route adjustments
       updateFields.status = 'Pending Payment';
-      updateFields.contractApproved = 1
+      updateFields.contractApproved = 1;
     } else {
-      // 50% down payment fallback route adjustments
       const calculatedDpAmount = finalGrandTotal * 0.5;
       updateFields.status = 'Pending Payment';
-      updateFields.contractApproved = 1
+      updateFields.contractApproved = 1;
     }
 
-    // Mutate and set validation fields inside target document blocks
+    await db.collection('order_requests').updateMany(
+      { orderId: orderId },
+      { $set: updateFields }
+    );
+
+    return res.status(200).json({
+      remarks: 'success',
+      message: isFullPayment 
+        ? 'Order fully approved and settled balance payload cataloged successfully.' 
+        : 'Order manually approved and downpayment asset verification logged successfully.',
+      path: savedRelativePath,
+      workflow: isFullPayment ? 'full_payment' : 'downpayment'
+    });
+
+  } catch (error) {
+    console.error("Error executing manual system administrative override approval:", error);
+    return res.status(500).json({ remarks: 'error', error: error.message });
+  }
+});
+
+cartRoutes.post("/api/manual_approve_order", memoryUpload.single('receiptFile'), async (req, res) => {
+  const { orderId, contractId } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ remarks: 'failed', message: 'Missing target validation identification context orderId.' });
+  }
+  if (!req.file) {
+    return res.status(400).json({ remarks: 'failed', message: 'Validation verification files attachment parameter streams required.' });
+  }
+
+  try {
+    const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+      folder: "receipts",
+      resource_type: "auto"
+    });
+    const savedRelativePath = cloudinaryResult.secure_url;
+    const db = await dbo.getDb ? await dbo.getDb() : req.app.get('db');
+
+    const matchItems = await db.collection('order_requests').find({ orderId: orderId }).toArray();
+    if (!matchItems || matchItems.length === 0) {
+      return res.status(404).json({ remarks: 'failed', message: 'Target order request mapping tracking parameters completely missing.' });
+    }
+
+    const orderRecord = matchItems[0];
+    
+    const finalGrandTotal = parseFloat(orderRecord.estimatedTotal || orderRecord.itemDetails?.estimatedCost || 0);
+    
+    const cleanedTerms = String(orderRecord.paymentTerms || '').trim();
+    const isFullPayment = cleanedTerms === 'Full payment';
+
+    let updateFields = {
+      contractLink: savedRelativePath,
+      approvedAt: new Date(),
+      contractId: contractId
+    };
+
+    if (isFullPayment) {
+      updateFields.status = 'Pending Payment';
+      updateFields.contractApproved = 1;
+    } else {
+      const calculatedDpAmount = finalGrandTotal * 0.5;
+      updateFields.status = 'Pending Payment';
+      updateFields.contractApproved = 1;
+    }
+
     await db.collection('order_requests').updateMany(
       { orderId: orderId },
       { $set: updateFields }
@@ -1362,13 +1378,11 @@ cartRoutes.route("/api/get_my_contracts").post(async (req, res) => {
   if (!token) return res.status(401).json({ remarks: "Unauthorized" });
 
   try {
-    // Utilize your existing checkAuth validation helper
     checkAuth(token, userId, async (isValid) => {
       if (!isValid) return res.status(401).json({ remarks: "Unauthorized" });
 
       const userObjectId = new ObjectId(userId);
 
-      // Aggregation pipeline matching your architecture's grouping schema
       const pipeline = [
         {
           $match: {
@@ -1377,16 +1391,14 @@ cartRoutes.route("/api/get_my_contracts").post(async (req, res) => {
               { contractApproved: 1 },
               { contractSentToCustomer: true },
               { status: "Completed" },
-              { status: "Cancelled" } // Ensures declined contracts stay visible to clients
+              { status: "Cancelled" }
             ]
           }
         },
         {
           $group: {
             _id: "$orderId",
-            // Capture base document metadata configurations from the cluster root
             baseDoc: { $first: "$$ROOT" },
-            // Gather item configurations out of the nested itemDetails object
             measurements: {
               $push: {
                 id: "$_id",
@@ -1404,15 +1416,13 @@ cartRoutes.route("/api/get_my_contracts").post(async (req, res) => {
         { $sort: { "baseDoc.createdAt": -1 } }
       ];
 
-      // Use your native helper utility to execute the query
       const result = await get_data_helper("order_requests", pipeline);
       const rawPayload = result?.payload || result || [];
 
-      // Normalize properties mapping seamlessly to your frontend template fields
       const normalizedPayload = rawPayload.map(group => {
         const b = group.baseDoc;
         return {
-          orderId: group._id, // Set the shared grouping key explicitly
+          orderId: group._id,
           id: group._id,
           clientName: b.clientName || "Unknown Client",
           clientAddress: b.installationAddress || "",
@@ -1446,17 +1456,15 @@ cartRoutes.route("/api/get_my_contracts").post(async (req, res) => {
   }
 });
 
-cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFile"), async (req, res) => {
+cartRoutes.route("/api/client_respond_contract-old").post(upload.single("contractFile"), async (req, res) => {
   const { token, userId, orderId, action } = req.body;
 
-  // Immediately clean up uploaded file if initial validation requirements fail
   if (!token || !userId || !orderId || !action) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     return res.status(400).json({ remarks: "failed", message: "Missing tracking credentials or response parameters." });
   }
 
   try {
-    // Wrap inside checkAuth logic block securely
     checkAuth(token, userId, async (isValid) => {
       try {
         if (!isValid) {
@@ -1467,7 +1475,6 @@ cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFil
         const db = await dbo.getDb();
         const userObjectId = new ObjectId(userId);
 
-        // Find a single sample document from the group to check for an existing file path link
         const targetGroupSample = await db.collection("order_requests").findOne({
           orderId: orderId,
           user_id: userObjectId
@@ -1480,7 +1487,6 @@ cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFil
 
         let savedRelativePath = targetGroupSample.contractLink || "#";
 
-        // Physical File Asset Overwrite Execution (Happens exactly once for the base file)
         if (req.file) {
           const targetUploadDir = path.join(__dirname, "../uploads");
           
@@ -1490,7 +1496,7 @@ cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFil
             
             if (fs.existsSync(oldFilePath)) {
               try {
-                fs.unlinkSync(oldFilePath); // Deletes the original un-stamped file from disk
+                fs.unlinkSync(oldFilePath);
               } catch (e) {
                 console.warn("File target locked or already moved, skipping deletion path:", e);
               }
@@ -1499,21 +1505,19 @@ cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFil
           savedRelativePath = `/uploads/${req.file.filename}`;
         }
 
-        // Map dynamic fields based on customer's choice
         let updateFields = {
           contractLink: savedRelativePath,
           contractUpdatedAt: new Date()
         };
 
         if (action === "Approve") {
-          updateFields.contractApproved = 1; // 1 = Approved / Accepted Status
+          updateFields.contractApproved = 1;
           updateFields.status = "Pending Payment"; 
         } else if (action === "Decline") {
-          updateFields.contractApproved = 0; // 0 = Rejected / Declined Status
+          updateFields.contractApproved = 0;
           updateFields.status = "Cancelled";
         }
 
-        // CRITICAL FIX: Synchronize EVERY document inside the cluster matching the targeted orderId group instantly
         const result = await db.collection("order_requests").updateMany(
           { orderId: orderId, user_id: userObjectId },
           { $set: updateFields }
@@ -1539,12 +1543,83 @@ cartRoutes.route("/api/client_respond_contract").post(upload.single("contractFil
   }
 });
 
+cartRoutes.route("/api/client_respond_contract").post(memoryUpload.single("contractFile"), async (req, res) => {
+  const { token, userId, orderId, action } = req.body;
+
+  if (!token || !userId || !orderId || !action) {
+    return res.status(400).json({ remarks: "failed", message: "Missing tracking credentials or response parameters." });
+  }
+
+  try {
+    checkAuth(token, userId, async (isValid) => {
+      try {
+        if (!isValid) {
+          return res.status(401).json({ remarks: "failed", message: "Unauthorized transaction attempt." });
+        }
+
+        const db = await dbo.getDb();
+        const userObjectId = new ObjectId(userId);
+
+        const targetGroupSample = await db.collection("order_requests").findOne({
+          orderId: orderId,
+          user_id: userObjectId
+        });
+
+        if (!targetGroupSample) {
+          return res.status(404).json({ remarks: "failed", message: "Target order reference group not found." });
+        }
+
+        let savedRelativePath = targetGroupSample.contractLink || "#";
+
+        if (req.file) {
+          const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+            folder: "contracts",
+            resource_type: "auto"
+          });
+          savedRelativePath = cloudinaryResult.secure_url;
+        }
+
+        let updateFields = {
+          contractLink: savedRelativePath,
+          contractUpdatedAt: new Date()
+        };
+
+        if (action === "Approve") {
+          updateFields.contractApproved = 1;
+          updateFields.status = "Pending Payment"; 
+        } else if (action === "Decline") {
+          updateFields.contractApproved = 0;
+          updateFields.status = "Cancelled";
+        }
+
+        const result = await db.collection("order_requests").updateMany(
+          { orderId: orderId, user_id: userObjectId },
+          { $set: updateFields }
+        );
+
+        return res.status(200).json({
+          remarks: "success",
+          message: `Successfully updated base contract file asset and synchronized [${action}] status across ${result.modifiedCount} line item collections.`,
+          path: savedRelativePath
+        });
+
+      } catch (innerError) {
+        console.error("Error inside checkAuth query lifecycle block:", innerError);
+        return res.status(500).json({ remarks: "error", message: "Internal data synchronization processing error." });
+      }
+    });
+
+  } catch (error) {
+    console.error("Critical outer pipeline crash in client_respond_contract:", error);
+    return res.status(500).json({ remarks: "error", message: "Internal server error executing file operations." });
+  }
+});
+
 cartRoutes.post("/api/get_progress_monitor", async (req, res) => {
     const { token, user_id } = req.body;
     if (!token || !user_id) return res.status(400).json({ remarks: "failed", message: "Missing tracking credentials or response parameters." }); 
 
     try {
-        // Wrap inside checkAuth logic block securely
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Unauthorized transaction attempt." });
 
@@ -1581,18 +1656,43 @@ cartRoutes.post("/api/get_progress_monitor", async (req, res) => {
     }
 });
 
-cartRoutes.post("/api/upload_proof_file", upload.single("proofFile"), async (req, res) => {
+cartRoutes.post("/api/upload_proof_file-old", upload.single("proofFile"), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ remarks: "failed", message: "No binary file payload received." });
         }
 
-        // Return a structural reference pointing to the new file metadata
         return res.status(200).json({
             remarks: "success",
             proof: {
                 id: "p" + Date.now() + Math.floor(Math.random() * 100),
                 fileName: req.file.filename,
+                originalName: req.file.originalname,
+                uploadedAt: new Date().toISOString()
+            }
+        });
+    } catch (err) {
+        console.error("Proof file tracking intercept failure:", err);
+        return res.status(500).json({ error: "File system allocation failure." });
+    }
+});
+
+cartRoutes.post("/api/upload_proof_file", memoryUpload.single("proofFile"), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ remarks: "failed", message: "No binary file payload received." });
+        }
+
+        const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+            folder: "proofs",
+            resource_type: "auto"
+        });
+
+        return res.status(200).json({
+            remarks: "success",
+            proof: {
+                id: "p" + Date.now() + Math.floor(Math.random() * 100),
+                fileName: cloudinaryResult.secure_url,
                 originalName: req.file.originalname,
                 uploadedAt: new Date().toISOString()
             }
@@ -1642,7 +1742,6 @@ cartRoutes.post("/api/update_order_request_progress", async (req, res) => {
 cartRoutes.post("/api/edit_payment", async (req, res) => {
     const { token, user_id, orderId, paymentMethod, totalPayment, transactionNumber, resolvesCustomerNotification, customerDeclaredAmount } = req.body;
 
-    // 1. Initial input validation
     if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session token" });
     if (!user_id) return res.status(400).json({ remarks: "failed", message: "Missing security tracking identity coordinates" });
     if (!orderId) return res.status(400).json({ remarks: "failed", message: "Missing orderId target reference identifier" });
@@ -1655,18 +1754,15 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
     }
 
     try {
-        // 2. Wrap transaction securely within checkAuth security profiles
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
 
             const db = await dbo.getDb();
 
-            // 3. Clean and explicitly type parameters
             const cleanPaymentMethod = String(paymentMethod).trim();
             const floatTotalPayment = parseFloat(totalPayment) || 0.0;
             const cleanTransactionNumber = transactionNumber ? String(transactionNumber).trim() : "";
 
-            // 4. Retrieve a record from this group to check financial targets (manualOverride or estimatedTotal)
             const targetSample = await db.collection("order_requests").findOne({ orderId: orderId });
             
             if (!targetSample) {
@@ -1676,17 +1772,13 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
                 });
             }
 
-            // Extract threshold values safely from the cluster document
             const manualOverrideTarget = parseFloat(targetSample.manualOverride) || 0.0;
             const estimatedTotalTarget = parseFloat(targetSample.estimatedTotal) || 0.0;
             const previousTotalPayment = parseFloat(targetSample.totalPayment) || 0.0;
 
-
             const targetRequiredAmount = manualOverrideTarget > 0 ? manualOverrideTarget : estimatedTotalTarget;
-            // 5. Evaluate the payment status dynamically using safe numeric rounding
             var calculatedPaymentStatus = "Pending"; 
 
-            // Round both numbers to 2 decimal places to remove binary precision tails safely
             const roundedTotalPayment = Math.round(floatTotalPayment * 100) / 100;
             const roundedTargetAmount = Math.round(targetRequiredAmount * 100) / 100;
             var status = ""
@@ -1695,13 +1787,11 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
                 status = "Paid";
             }
 
-            // Check your server console to verify both values are now clean numbers
             console.log(`Comparing numbers: ${roundedTotalPayment} >= ${roundedTargetAmount} -> result:`, roundedTotalPayment >= roundedTargetAmount);
             const incrementalRecorded = Math.round((floatTotalPayment - previousTotalPayment) * 100) / 100;
             const floatDeclaredAmount = parseFloat(customerDeclaredAmount) || 0;
             const matchesDeclaration = floatDeclaredAmount > 0 && Math.abs(floatDeclaredAmount - incrementalRecorded) <= 1;
 
-            // 6. Update EVERY document inside the cluster matching the targeted orderId group instantly
             const updateResult = await db.collection("order_requests").updateMany(
                 { orderId: orderId },
                 { 
@@ -1737,9 +1827,7 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
                 });
             }
 
-            // 7. Return execution response context profiles safely
             if (updateResult.matchedCount > 0) {
-                // Log operation tracking metrics
                 await actionLog(
                     user_id, 
                     "Edit Payment Details", 
@@ -1763,9 +1851,8 @@ cartRoutes.post("/api/edit_payment", async (req, res) => {
     }
 });
 
-
 // ─── CUSTOMER: UPLOAD PROOF OF PAYMENT (used by the "I've Already Paid" action) ───
-cartRoutes.post("/api/upload_payment_proof", upload.single("proofFile"), async (req, res) => {
+cartRoutes.post("/api/upload_payment_proof-old", upload.single("proofFile"), async (req, res) => {
     const { token, userId, orderId } = req.body;
 
     if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session token" });
@@ -1778,6 +1865,47 @@ cartRoutes.post("/api/upload_payment_proof", upload.single("proofFile"), async (
 
             const db = await dbo.getDb();
             const savedRelativePath = `/uploads/${req.file.filename}`;
+
+            const updateResult = await db.collection("order_requests").updateMany(
+                { orderId: orderId },
+                { $set: { paymentProofLink: savedRelativePath, paymentProofUploadedAt: new Date() } }
+            );
+
+            if (updateResult.matchedCount > 0) {
+                await actionLog(userId, "Uploaded Proof of Payment", `Customer uploaded proof of payment for orderId: ${orderId}`);
+                return res.status(200).json({
+                    remarks: "success",
+                    message: "Proof of payment uploaded successfully.",
+                    payload: { paymentProofLink: savedRelativePath }
+                });
+            } else {
+                return res.status(404).json({ remarks: "failed", message: "No matching order records found with the provided orderId reference." });
+            }
+        });
+    } catch (err) {
+        console.error("Critical error inside /api/upload_payment_proof handler:", err);
+        return res.status(500).json({ remarks: "failed", error: err.message || err });
+    }
+});
+
+cartRoutes.post("/api/upload_payment_proof", memoryUpload.single("proofFile"), async (req, res) => {
+    const { token, userId, orderId } = req.body;
+
+    if (!token) return res.status(401).json({ remarks: "failed", message: "Unauthorized: Missing session token" });
+    if (!orderId) return res.status(400).json({ remarks: "failed", message: "Missing orderId target reference identifier" });
+
+    try {
+        checkAuth(token, userId, async (isValid) => {
+            if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
+            if (!req.file) return res.status(400).json({ remarks: "failed", message: "No proof of payment file was received." });
+
+            const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+                folder: "payment_proofs",
+                resource_type: "auto"
+            });
+
+            const db = await dbo.getDb();
+            const savedRelativePath = cloudinaryResult.secure_url;
 
             const updateResult = await db.collection("order_requests").updateMany(
                 { orderId: orderId },
@@ -1866,14 +1994,12 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
     if (!user_id) return res.status(400).json({ remarks: "failed", message: "Missing user_id parameter" });
 
     try {
-        // 2. Wrap transaction securely within checkAuth security profiles
         checkAuth(token, user_id, async (isValid) => {
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
 
             const pipeline = [
                 {
-                    $match: {
-                        $or: [
+                    $match: {$or: [
                         { contractApproved: { $ne: 1 } },
                         { status: "Completed" }
                         ]
@@ -1882,9 +2008,7 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
                 {
                     $group: {
                         _id: "$orderId",
-                        // Capture base document fields from the first occurrence
                         baseDoc: { $first: "$$ROOT" },
-                        // Aggregate all items associated with this orderId
                         measurements: {
                             $push: {
                                 id: "$_id",
@@ -1896,7 +2020,6 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
                                 unit: "$itemDetails.unit",
                             }
                         },
-                        // Sum up costs across all grouped documents
                         totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" }
                     }
                 },
@@ -1909,7 +2032,7 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
             const normalizedPayload = rawPayload.map(group => {
                 const b = group.baseDoc;
                 return {
-                    id: group._id, // orderId acts as the unique identifier
+                    id: group._id,
                     clientName: b.clientName || "Unknown Client",
                     clientAddress: b.installationAddress || "",
                     clientNumber: b.clientPhone || "",
@@ -1934,12 +2057,7 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
 
             const query = [
                 {
-                    $match: {
-                        contractApproved: 1,
-                    }
-                },
-                {
-                    $addFields:{
+                    $match: {                         contractApproved: 1,                     }                 },                 {$addFields:{
                         progressStatus: { 
                             $ifNull: ["$progressStatus", "Pending"] 
                         },
@@ -1952,19 +2070,16 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
 
             const progress = await get_data_helper("order_requests", query);
 
-
             const warranty_query = [
                 {
                     $match: {
-                        contractApproved: { $exists: true, $ne: null }
+                        contractApproved: { $exists: true,$ne: null }
                     }
                 },
                 {
                     $group: {
                         _id: "$orderId",
-                        // Capture base document fields from the first occurrence
                         baseDoc: { $first: "$$ROOT" },
-                        // Aggregate all items associated with this orderId
                         measurements: {
                             $push: {
                                 id: "$_id",
@@ -1979,7 +2094,6 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
                                 estimatedInstallationDate: "$estimatedInstallationDate"
                             }
                         },
-                        // Sum up costs across all grouped documents
                         totalEstimatedCost: { $sum: "$itemDetails.estimatedCost" },
                     }
                 },
@@ -1992,7 +2106,7 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
             var warrantyNormalized = warrantyPayload.map(group => {
                 const b = group.baseDoc;
                 return {
-                    id: group._id, // orderId acts as the unique identifier
+                    id: group._id,
                     clientName: b.clientName || "Unknown Client",
                     clientAddress: b.installationAddress || "",
                     clientNumber: b.clientPhone || "",
@@ -2025,29 +2139,24 @@ cartRoutes.post('/api/dashboard_data', async (req, res) => {
                             return "Completed Project";
                         }
 
-                        // 1. Instantly check if there are any unfinished items across the order
                         const isAllCompleted = group.measurements.every(m => m.progressStatus === "Completed");
                         
                         if (!isAllCompleted) {
                             return "In Progress";
                         }
 
-                        // 2. Establish the timeline boundary 
                         const hasExplicitWarrantyDaysForCat = b.warrantyDays !== undefined && b.warrantyDays !== null && b.warrantyDays !== '';
                         const warrantyDaysForCat = hasExplicitWarrantyDaysForCat ? Number(b.warrantyDays) : 90;
                         const warrantyCutoffDate = new Date();
                         warrantyCutoffDate.setDate(warrantyCutoffDate.getDate() - warrantyDaysForCat);
 
-                        // 3. Inspect if every single item has aged out past this order's warranty window
                         const isPastWarrantyAll = group.measurements.every(m => {
-                            // If a date string is somehow missing, keep it in "Warranty" for safety
                             if (!m.estimatedInstallationDate) return false; 
                             
                             const installationDate = new Date(m.estimatedInstallationDate);
                             return installationDate < warrantyCutoffDate;
                         });
 
-                        // 4. Return categorical state classifications
                         return isPastWarrantyAll ? "Completed Project" : "Warranty";
                     })(),
                     paymentMethod: b.paymentMethod || 'Cash',

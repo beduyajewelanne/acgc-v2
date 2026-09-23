@@ -420,12 +420,21 @@ const ContractModal = ({ tx, onClose }) => {
             const fileUrl = tx.contractLink;
             
             // 2. Perform a robust regex type validation check
-            const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(tx.contractLink);
+            // const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(tx.contractLink);
+            const isPdf = typeof fileUrl === 'string' && (
+              fileUrl.startsWith('data:application/pdf') || 
+              /\.pdf($|\?)/i.test(fileUrl) ||
+              fileUrl.includes('/raw/upload/')
+            );
 
-            if (isImage) {
+            const fileURL = isPdf && fileUrl 
+                ? `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true` 
+                : fileUrl
+            
+            if (!isPdf) {
               return (
                 <img
-                  src={fileUrl}
+                  src={fileURL}
                   alt={`Contract ${tx.contractId || tx.id}`}
                   className="transaction-contract-iframe" // Inherits your existing modal dimensions perfectly
                   style={{ 
@@ -439,31 +448,37 @@ const ContractModal = ({ tx, onClose }) => {
               );
             } else {
               return (
-                <object
-                  data={fileUrl}
-                  type="application/pdf"
-                  className="transaction-contract-iframe"
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    display: 'block',
-                    border: 'none'
-                  }}
-                >
-                  {/* Fallback if the browser completely blocks nested objects */}
-                  <div style={{ padding: '20px', textAlign: 'center', fontSize: '14px', color: '#64748b' }}>
-                    <p style={{ marginBottom: '12px' }}>Unable to preview PDF directly in this view.</p>
-                    <a 
-                      href={fileUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="transaction-btn-download"
-                      style={{ display: 'inline-flex', textDecoration: 'none', padding: '8px 16px' }}
-                    >
-                      Open PDF in New Tab
-                    </a>
-                  </div>
-                </object>
+                // <object
+                //   data={fileUrl}
+                //   type="application/pdf"
+                //   className="transaction-contract-iframe"
+                //   style={{ 
+                //     width: '100%', 
+                //     height: '100%', 
+                //     display: 'block',
+                //     border: 'none'
+                //   }}
+                // >
+                //   {/* Fallback if the browser completely blocks nested objects */}
+                //   <div style={{ padding: '20px', textAlign: 'center', fontSize: '14px', color: '#64748b' }}>
+                //     <p style={{ marginBottom: '12px' }}>Unable to preview PDF directly in this view.</p>
+                //     <a 
+                //       href={fileUrl} 
+                //       target="_blank" 
+                //       rel="noopener noreferrer"
+                //       className="transaction-btn-download"
+                //       style={{ display: 'inline-flex', textDecoration: 'none', padding: '8px 16px' }}
+                //     >
+                //       Open PDF in New Tab
+                //     </a>
+                //   </div>
+                // </object>
+                <iframe
+                  src={fileURL}
+                  title="PDF Payment Proof Preview"
+                  className="payment-proof-pdf-preview"
+                  style={{ width: '100%', height: '300px', border: '1px solid #e2e8f0', marginTop: '8px', borderRadius: '4px' }}
+                />
               );
             }
           })()}
@@ -578,38 +593,100 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
               </div>
             )}
 
-            <div className="transaction-info-row">
-              <span className="transaction-info-label">Proof of Payment</span>
-              {tx.paymentProofLink ? (
-                <a
-                  href={window.base_api.replace('/api/', '') + tx.paymentProofLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="transaction-info-value"
-                  style={{ color: '#1d4ed8', textDecoration: 'underline' }}
-                >
-                  📎 View Uploaded Proof
-                </a>
-              ) : (
-                <span className="transaction-info-value">Not yet submitted</span>
-              )}
-            </div>
+            {(() => {
+              const resolveUrl = (url) => {
+                if (!url) return '';
+                if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+                  return url;
+                }
+                const baseUrl = (window.base_api || '').replace(/\/api\/?$/, '');
+                const cleanPath = url.startsWith('/') ? url : `/${url}`;
+                return `${baseUrl}${cleanPath}`;
+              };
 
-            {tx.paymentProofLink && /\.(png|jpe?g|gif|webp)$/i.test(tx.paymentProofLink) && (
-              <a
-                href={window.base_api.replace('/api/', '') + tx.paymentProofLink}
-                target="_blank"
-                rel="noreferrer"
-                className="payment-proof-thumb-link"
-              >
-                <img
-                  // src={window.base_api.replace('/api/', '') + tx.paymentProofLink}
-                  src={tx.paymentProofLink}
-                  alt="Customer's uploaded proof of payment"
-                  className="payment-proof-thumb"
-                />
-              </a>
-            )}
+              const assetUrl = resolveUrl(tx.paymentProofLink);
+
+              const isPdf = typeof assetUrl === 'string' && (
+                assetUrl.startsWith('data:application/pdf') || 
+                /\.pdf($|\?)/i.test(assetUrl) ||
+                assetUrl.includes('/raw/upload/')
+              );
+
+              const isImage = typeof assetUrl === 'string' && !isPdf && (
+                assetUrl.startsWith('data:image/') || 
+                /\.(png|jpe?g|gif|webp|bmp|svg)($|\?)/i.test(assetUrl) ||
+                assetUrl.includes('/image/upload/')
+              );
+
+              const handlePreviewPdf = async (e, pdfLink) => {
+                e.preventDefault();
+                if (!pdfLink || pdfLink === '#') return;
+
+                try {
+                  const targetUrl = resolveUrl(pdfLink);
+                  const response = await fetch(targetUrl);
+                  if (!response.ok) throw new Error('Failed to fetch document.');
+
+                  const blob = await response.blob();
+                  const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+                  const targetBlobUrl = URL.createObjectURL(pdfBlob);
+
+                  window.open(targetBlobUrl, '_blank', 'noopener,noreferrer');
+                } catch (error) {
+                  console.error('Error previewing PDF:', error);
+                }
+              };
+
+              const pdfViewerUrl = isPdf && assetUrl 
+                ? `https://docs.google.com/viewer?url=${encodeURIComponent(assetUrl)}&embedded=true` 
+                : assetUrl;
+
+              return (
+                <>
+                  <div className="transaction-info-row">
+                    <span className="transaction-info-label">Proof of Payment</span>
+                    {tx.paymentProofLink ? (
+                      <a
+                        href={assetUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={isPdf ? (e) => handlePreviewPdf(e, tx.paymentProofLink) : undefined}
+                        className="transaction-info-value"
+                        style={{ color: '#1d4ed8', textDecoration: 'underline' }}
+                      >
+                        📎 {isPdf ? 'View Uploaded PDF' : 'View Uploaded Proof'}
+                      </a>
+                    ) : (
+                      <span className="transaction-info-value">Not yet submitted</span>
+                    )}
+                  </div>
+
+                  {tx.paymentProofLink && isImage && (
+                    <a
+                      href={assetUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="payment-proof-thumb-link"
+                    >
+                      <img
+                        src={assetUrl}
+                        alt="Customer's uploaded proof of payment"
+                        className="payment-proof-thumb"
+                      />
+                    </a>
+                  )}
+
+                  {tx.paymentProofLink && isPdf && (
+                    <iframe
+                      src={pdfViewerUrl}
+                      title="PDF Payment Proof Preview"
+                      className="payment-proof-pdf-preview"
+                      style={{ width: '100%', height: '300px', border: '1px solid #e2e8f0', marginTop: '8px', borderRadius: '4px' }}
+                    />
+                  )}
+                </>
+              );
+            })()}
           </InfoSection>
 
           <InfoSection title="Contract Information">

@@ -737,6 +737,7 @@ cartRoutes.post("/api/get_transactions", async (req, res) => {
             const pipeline = [
                 {
                     $match: {
+                        status: { $ne: "Cancelled" },
                         $or: [
                             { contractApproved: { $exists: true, $ne: null } },
                             { totalPayment: { $gt: 0 } },

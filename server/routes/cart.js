@@ -1198,11 +1198,13 @@ cartRoutes.post("/api/send_contract_email", memoryUpload.single('contractFile'),
   if (!req.file) {
     return res.status(400).json({ remarks: 'failed', message: 'Missing compiled contract binary file streaming parameter.' });
   }
-
+  const isPdf = req.file.mimetype === 'application/pdf';
   try {
     const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
       folder: "contracts",
-      resource_type: "auto"
+      resource_type: isPdf ? "raw" : "image",
+      type: "upload",
+      access_mode: "public"
     });
     const savedRelativePath = cloudinaryResult.secure_url;
     const db = await dbo.getDb ? await dbo.getDb() : req.app.get('db');
@@ -1316,11 +1318,13 @@ cartRoutes.post("/api/manual_approve_order", memoryUpload.single('receiptFile'),
   if (!req.file) {
     return res.status(400).json({ remarks: 'failed', message: 'Validation verification files attachment parameter streams required.' });
   }
-
+    const isPdf = req.file.mimetype === 'application/pdf';
   try {
     const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
       folder: "receipts",
-      resource_type: "auto"
+      resource_type: isPdf ? "raw" : "image",
+      type: "upload",
+      access_mode: "public"
     });
     const savedRelativePath = cloudinaryResult.secure_url;
     const db = await dbo.getDb ? await dbo.getDb() : req.app.get('db');
@@ -1570,11 +1574,13 @@ cartRoutes.route("/api/client_respond_contract").post(memoryUpload.single("contr
         }
 
         let savedRelativePath = targetGroupSample.contractLink || "#";
-
+        const isPdf = req.file.mimetype === 'application/pdf';
         if (req.file) {
           const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
             folder: "contracts",
-            resource_type: "auto"
+            resource_type: isPdf ? "raw" : "image",
+            type: "upload",
+            access_mode: "public"
           });
           savedRelativePath = cloudinaryResult.secure_url;
         }
@@ -1683,9 +1689,12 @@ cartRoutes.post("/api/upload_proof_file", memoryUpload.single("proofFile"), asyn
             return res.status(400).json({ remarks: "failed", message: "No binary file payload received." });
         }
 
+        const isPdf = req.file.mimetype === 'application/pdf';
         const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
             folder: "proofs",
-            resource_type: "auto"
+            resource_type: isPdf ? "raw" : "image",
+            type: "upload",
+            access_mode: "public"
         });
 
         return res.status(200).json({
@@ -1899,9 +1908,12 @@ cartRoutes.post("/api/upload_payment_proof", memoryUpload.single("proofFile"), a
             if (!isValid) return res.status(401).json({ remarks: "failed", message: "Security authorization failed" });
             if (!req.file) return res.status(400).json({ remarks: "failed", message: "No proof of payment file was received." });
 
+            const isPdf = req.file.mimetype === "application/pdf";
             const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
                 folder: "payment_proofs",
-                resource_type: "auto"
+                resource_type: isPdf ? "raw" : "image",
+                type: "upload",
+                access_mode: "public"
             });
 
             const db = await dbo.getDb();

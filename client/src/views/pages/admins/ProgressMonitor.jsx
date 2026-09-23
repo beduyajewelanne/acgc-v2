@@ -254,7 +254,8 @@ const ProofUpload = ({ proofs, onAdd, onRemove }) => {
           {proofs.map((p) => (
             <div key={p.id} className="pm-proof-thumb">
               {/* Renders server URL pathway pointer instead of an unstable local runtime string blob */}
-              <img src={window.base_api.replace('/api/', '') + p.url} alt={p.name} className="pm-proof-img" />
+              {/* <img src={window.base_api.replace('/api/', '') + p.url} alt={p.name} className="pm-proof-img" /> */}
+              <img src={p.url} alt={p.name} className="pm-proof-img" />
               <button className="pm-proof-remove" onClick={() => onRemove(p.id)}>✕</button>
             </div>
           ))}
@@ -348,7 +349,8 @@ const ViewModal = ({ project, onClose }) => {
                     {stage.proofs.length > 0 && (
                       <div className="pm-proof-row">
                         {stage.proofs.map((p) => (
-                          <img key={p.id} src={window.base_api.replace('/api/', '') + p.url} alt={p.name} className="pm-proof-thumb-sm" />
+                          // <img key={p.id} src={window.base_api.replace('/api/', '') + p.url} alt={p.name} className="pm-proof-thumb-sm" />
+                          <img key={p.id} src={p.url} alt={p.name} className="pm-proof-thumb-sm" />
                         ))}
                       </div>
                     )}

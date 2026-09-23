@@ -416,7 +416,8 @@ const ContractModal = ({ tx, onClose }) => {
         <div className="transaction-contract-iframe-wrap" style={{ width: '100%', height: '100%', position: 'relative' }}>
           {(() => {
             // 1. Construct the absolute link cleanly
-            const fileUrl = window.base_api.replace('/api/', '') + tx.contractLink;
+            // const fileUrl = window.base_api.replace('/api/', '') + tx.contractLink;
+            const fileUrl = tx.contractLink;
             
             // 2. Perform a robust regex type validation check
             const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(tx.contractLink);
@@ -602,7 +603,8 @@ const ViewModal = ({ tx, onClose, onViewContract }) => {
                 className="payment-proof-thumb-link"
               >
                 <img
-                  src={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                  // src={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                  src={tx.paymentProofLink}
                   alt="Customer's uploaded proof of payment"
                   className="payment-proof-thumb"
                 />
@@ -901,7 +903,8 @@ const handleSave = () => {
                         className="payment-proof-thumb-link"
                       >
                         <img
-                          src={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                          // src={window.base_api.replace('/api/', '') + tx.paymentProofLink}
+                          src={tx.paymentProofLink}
                           alt="Customer's uploaded proof of payment"
                           className="payment-proof-thumb"
                         />

@@ -220,7 +220,8 @@ const Cart = () => {
                     
                     {item.image ? (
                       <img 
-                        src={(window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + item.image} 
+                        // src={(window.base_api || `http://localhost:5000/api/`).replace('/api/', '') + item.image} 
+                        src={item.image} 
                         alt={item.name} 
                         className="item-image-placeholder" 
                         style={{ objectFit: 'cover', background: 'none' }}
